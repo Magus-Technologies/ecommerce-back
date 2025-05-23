@@ -41,4 +41,34 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function role() // <-- RELACIÓN con Role (belongsTo)
+    {
+        return $this->belongsTo(Role::class); // <-- Laravel busca role_id automáticamente
+    }
+
+    public function hasRole($name) // <-- Método para chequear rol usando relación
+    {
+        return $this->role && $this->role->nombre === $name;
+    }
+
+    public function isSuperadmin()
+    {
+        return $this->hasRole('superadmin');
+    }
+
+    public function isAdmin()
+    {
+        return $this->hasRole('admin');
+    }
+
+    public function isSoporte()
+    {
+        return $this->hasRole('soporte');
+    }
+
+    public function isCliente()
+    {
+        return $this->hasRole('cliente');
+    }
 }

@@ -25,7 +25,7 @@ class AdminController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Login exitoso',
-                'user' => $user,
+                'role' => $user->role,  
                 'token' => $token,
             ]);
         }
@@ -42,7 +42,8 @@ class AdminController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'user' => $request->user(),
+            'user' => $user->load('role'), // CARGA relación role para que venga con el usuario // MODIFICADO
+            'role' => $user->role->nombre ?? null, 
         ]);
     }
 
