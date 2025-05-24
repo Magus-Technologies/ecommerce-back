@@ -71,4 +71,15 @@ class User extends Authenticatable
     {
         return $this->hasRole('cliente');
     }
+
+    public function profile()
+    {
+        return $this->hasOne(UserProfile::class);
+    }
+
+    public function addresses()
+    {
+        return $this->hasMany(UserAddress::class);
+    }
+
 }

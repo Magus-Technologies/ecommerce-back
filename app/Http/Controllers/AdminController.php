@@ -11,6 +11,7 @@ class AdminController extends Controller
     /**
      * Login del usuario y generación de token
      */
+ // AdminController.php - método login
     public function login(Request $request)
     {
         $request->validate([
@@ -25,7 +26,7 @@ class AdminController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Login exitoso',
-                'role' => $user->role,  
+                'user' => $user->load('role'), // Agregamos el usuario con su rol
                 'token' => $token,
             ]);
         }
@@ -35,11 +36,14 @@ class AdminController extends Controller
         ]);
     }
 
+
     /**
      * Obtener información del usuario autenticado
      */
     public function user(Request $request)
     {
+        $user = $request->user();
+
         return response()->json([
             'status' => 'success',
             'user' => $user->load('role'), // CARGA relación role para que venga con el usuario // MODIFICADO
