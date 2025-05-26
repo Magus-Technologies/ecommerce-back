@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UserProfile extends Model
@@ -25,4 +26,12 @@ class UserProfile extends Model
         return $this->belongsTo(User::class);
     }
 
+    protected $casts = [
+        'birth_date' => 'date',
+    ];
+
+    public function documentType()
+    {
+        return $this->belongsTo(DocumentType::class, 'document_type');
+    }
 }
