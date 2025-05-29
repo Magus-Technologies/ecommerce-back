@@ -8,6 +8,7 @@ Route::get('/', function () {
 });
 
 
+
 // Agrupamos rutas con middleware de autenticación y rol (editado)
 Route::middleware(['auth:sanctum', 'role:superadmin,admin'])->group(function () { // <-- agregado grupo middleware
     Route::get('/usuarios', [UsuarioController::class, 'index']); // <-- ruta protegida de usuarios (editado)
