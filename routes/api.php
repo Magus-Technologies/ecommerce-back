@@ -1,10 +1,35 @@
 <?php
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\UsuariosController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\DocumentTypeController;
+use App\Http\Controllers\UbigeoController;
+use App\Http\Controllers\UserRegistrationController;
+
 use Illuminate\Support\Facades\Route;;
 
 Route::post('/login',[AdminController::class,'login']);
 
+// Rutas para tipos de documentos
+Route::get('/document-types', [DocumentTypeController::class, 'getDocumentTypes']);
+
+// Rutas para ubigeo
+Route::get('/departamentos', [UbigeoController::class, 'getDepartamentos']);
+Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
+Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
+Route::get('/ubigeo/departamentos', [UbigeoController::class, 'getDepartamentos']);
+Route::get('/ubigeo/provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
+Route::get('/ubigeo/distritos/{departamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
+
 Route::middleware('auth:sanctum')->group(function () {
+
     Route::get('/user', [AdminController::class, 'user']);
     Route::post('/logout', [AdminController::class, 'logout']);
+    Route::get('/usuarios', [UsuariosController::class, 'index']);
+    Route::get('/roles', [RoleController::class, 'getRoles']);
+    Route::post('/usuarios/register', [UserRegistrationController::class, 'store']);
+    Route::get('/usuarios/{id}', [UsuariosController::class, 'show']);
+    Route::put('/usuarios/{id}', [UsuariosController::class, 'update']);
+    Route::delete('/usuarios/{id}', [UsuariosController::class, 'destroy']);
+
 });
