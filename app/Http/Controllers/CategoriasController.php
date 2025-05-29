@@ -16,7 +16,7 @@ class CategoriasController extends Controller
         try {
             $categorias = Categoria::orderBy('nombre')->get();
             
-            // Agregar URL completa de imagen
+            // Agregar ruta completa de imagen
             $categorias->transform(function ($categoria) {
                 if ($categoria->imagen) {
                     $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
@@ -56,7 +56,7 @@ class CategoriasController extends Controller
             $data = $request->only(['nombre', 'descripcion', 'activo']);
             $data['activo'] = $request->has('activo') ? (bool)$request->activo : true;
 
-            // MÉTODO MANUAL - Manejar imagen directamente en public/storage
+           // Manejar imagen directamente en public/storage
             if ($request->hasFile('imagen')) {
                 $imagen = $request->file('imagen');
                 $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
@@ -220,4 +220,27 @@ class CategoriasController extends Controller
             ], 500);
         }
     }
+    public function categoriasPublicas()
+{
+    try {
+        $categorias = Categoria::activas()
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'descripcion', 'imagen']);
+        
+        // Agregar ruta completa de imagen
+        $categorias->transform(function ($categoria) {
+            if ($categoria->imagen) {
+                $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
+            }
+            return $categoria;
+        });
+
+        return response()->json($categorias);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error al obtener categorías públicas',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 }
