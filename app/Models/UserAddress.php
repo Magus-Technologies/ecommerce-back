@@ -14,6 +14,7 @@ class UserAddress extends Model
         'user_id',
         'label',
         'district', // si decides tenerlo
+        'address_line',
         'city',
         'province',
         'department',

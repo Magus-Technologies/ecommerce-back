@@ -40,14 +40,13 @@ class UbigeoController extends Controller
         }
     }
 
-    // Busca esta función y reemplázala completamente:
     public function getDistritos($departamentoId, $provinciaId) 
     {
         try {
             $distritos = UbigeoInei::where('departamento', $departamentoId)
                 ->where('provincia', $provinciaId)
                 ->where('distrito', '!=', '00')
-                ->select('distrito as id', 'nombre', 'id_ubigeo') // ← AGREGADO id_ubigeo
+                ->select('distrito as id', 'nombre', 'id_ubigeo')
                 ->orderBy('nombre')
                 ->get();
                     

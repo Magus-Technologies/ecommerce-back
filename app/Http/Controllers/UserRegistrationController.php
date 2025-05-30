@@ -139,12 +139,49 @@ class UserRegistrationController extends Controller
         }
     }
 
-    private function uploadAvatar($file, $userId)
+    public function uploadAvatar($file, $userId)
     {
-        $fileName = 'avatar_' . $userId . '_' . time() . '.' . $file->getClientOriginalExtension();
-        $path = $file->storeAs('public/avatars', $fileName);
-        
-        // Retornar la URL pública
-        return Storage::url($path);
+        try {
+            $fileName = 'avatar_' . $userId . '_' . time() . '.' . $file->getClientOriginalExtension();
+            
+            // Verificar que el directorio existe
+            $avatarsPath = storage_path('app/public/avatars');
+            error_log('🔍 Verificando directorio: ' . $avatarsPath);
+            
+            if (!is_dir($avatarsPath)) {
+                error_log('📁 Creando directorio: ' . $avatarsPath);
+                if (!mkdir($avatarsPath, 0755, true)) {
+                    throw new \Exception("No se pudo crear el directorio de avatars");
+                }
+            }
+            
+            // Verificar permisos del directorio
+            if (!is_writable($avatarsPath)) {
+                throw new \Exception("El directorio de avatars no tiene permisos de escritura");
+            }
+            
+            // Intentar guardar el archivo usando move() directamente
+            $destinationPath = $avatarsPath . DIRECTORY_SEPARATOR . $fileName;
+            error_log('📦 Intentando guardar en: ' . $destinationPath);
+            
+            if ($file->move($avatarsPath, $fileName)) {
+                error_log('✅ Archivo movido correctamente');
+                
+                // Verificar que el archivo existe
+                if (file_exists($destinationPath)) {
+                    error_log('✅ Archivo confirmado en disco');
+                    return '/storage/avatars/' . $fileName;
+                } else {
+                    throw new \Exception("El archivo se movió pero no se encuentra en disco");
+                }
+            } else {
+                throw new \Exception("No se pudo mover el archivo");
+            }
+            
+        } catch (\Exception $e) {
+            error_log('❌ Error en uploadAvatar: ' . $e->getMessage());
+            throw $e;
+        }
     }
+
 }
