@@ -19,14 +19,9 @@ Route::get('/document-types', [DocumentTypeController::class, 'getDocumentTypes'
 
 // Rutas para ubigeo
 Route::get('/departamentos', [UbigeoController::class, 'getDepartamentos']);
-Route::get('/ubigeo/departamentos', [UbigeoController::class, 'getDepartamentos']);
-Route::get('/ubigeo/provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
-Route::get('/ubigeo/distritos/{departamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
-
-
-Route::get('/provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
-Route::get('/distritos/{departamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 Route::get('/categorias/publicas', [CategoriasController::class, 'categoriasPublicas']);
+Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
+Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -35,11 +30,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/usuarios', [UsuariosController::class, 'index']);
     Route::get('/roles', [RoleController::class, 'getRoles']);
     Route::post('/usuarios/register', [UserRegistrationController::class, 'store']);
-    Route::get('/usuarios/{id}', [UsuariosController::class, 'show']);
-    Route::put('/usuarios/{id}', [UsuariosController::class, 'update']);
-    Route::delete('/usuarios/{id}', [UsuariosController::class, 'destroy']);
-
-});
     
     // Rutas para categorías
     Route::get('/categorias', [CategoriasController::class, 'index']);
@@ -56,3 +46,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
     Route::get('/productos/stock/bajo', [ProductosController::class, 'stockBajo']);
 
+     Route::get('/usuarios/{id}', [UsuariosController::class, 'show']);
+    Route::put('/usuarios/{id}', [UsuariosController::class, 'update']);
+    Route::delete('/usuarios/{id}', [UsuariosController::class, 'destroy']);
+
+});
+
+// Buscar datos de RENIEC por DNI
+// CORRECTO:
+Route::get('reniec/buscar/{dni}', [UserRegistrationController::class, 'buscarDocInfo']); // ✅ corregido

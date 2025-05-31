@@ -184,4 +184,62 @@ class UserRegistrationController extends Controller
         }
     }
 
+    public function buscarDocInfo($dni)
+    {
+        $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6InN5c3RlbWNyYWZ0LnBlQGdtYWlsLmNvbSJ9.yuNS5hRaC0hCwymX_PjXRoSZJWLNNBeOdlLRSUGlHGA';
+        
+        try {
+            // Validar y sanitizar el documento
+            $doc = filter_var($dni, FILTER_SANITIZE_STRING);
+            
+            if (strlen($doc) == 8) {
+                $url = 'https://dniruc.apisperu.com/api/v1/dni/' . $doc . '?token=' . $token;
+            } else {
+                $url = 'https://dniruc.apisperu.com/api/v1/ruc/' . $doc . '?token=' . $token;
+            }
+        
+            $data = $this->apiRequest($url);
+            
+            if (isset($data['data'])) {
+                if (strlen($doc) == 8) {
+                    $data["data"]["nombre"] = $data["data"]["nombres"] . " " . $data["data"]["apellidoPaterno"] . " " . $data["data"]["apellidoMaterno"];
+                } else {
+                    $data["data"]["nombre"] = $data["data"]["razonSocial"];
+                }
+            }
+        
+            return response()->json($data);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al consultar RENIEC: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    private function apiRequest($url)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        if (curl_errno($ch)) {
+            curl_close($ch);
+            throw new \Exception('Error CURL: ' . curl_error($ch));
+        }
+        
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            throw new \Exception('Error HTTP: ' . $httpCode);
+        }
+        
+        return json_decode($response, true);
+    }
 }
