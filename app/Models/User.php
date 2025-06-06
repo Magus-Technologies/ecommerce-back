@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles; // Add this import
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles; 
 
     /**
      * The attributes that are mass assignable.
@@ -20,7 +21,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role_id',
         'is_enabled',
     ];
 
@@ -43,37 +43,13 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+ 
+    //public function isSuperadmin()
+    //{
+    //    return $this->hasRole('superadmin');
+    //}
 
-    public function role() // <-- RELACIÓN con Role (belongsTo)
-    {
-        return $this->belongsTo(Role::class); // <-- Laravel busca role_id automáticamente
-    }
-
-    public function hasRole($name) // <-- Método para chequear rol usando relación
-    {
-        return $this->role && $this->role->nombre === $name;
-    }
-
-    public function isSuperadmin()
-    {
-        return $this->hasRole('superadmin');
-    }
-
-    public function isAdmin()
-    {
-        return $this->hasRole('admin');
-    }
-
-    public function isSoporte()
-    {
-        return $this->hasRole('soporte');
-    }
-
-    public function isCliente()
-    {
-        return $this->hasRole('cliente');
-    }
-
+    
     public function profile()
     {
         return $this->hasOne(UserProfile::class);
@@ -82,6 +58,28 @@ class User extends Authenticatable
     public function addresses()
     {
         return $this->hasMany(UserAddress::class);
+    }
+
+    public function getRoleAttribute()
+    {
+        $role = $this->roles->first();
+        if ($role) {
+            return (object) ['nombre' => $role->name];
+        }
+        return null;
+    }
+
+    // Añadido: Relación con roles a través de Spatie Laravel-Permission
+    public function getRoleIdAttribute()
+    {
+        $role = $this->roles->first();
+        return $role ? $role->id : null;
+    }
+
+    public function getRoleNombreAttribute()
+    {
+        $role = $this->roles->first();
+        return $role ? $role->name : '';
     }
 
 }

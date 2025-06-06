@@ -9,8 +9,10 @@ use App\Http\Controllers\UbigeoController;
 use App\Http\Controllers\UserRegistrationController;
 use App\Http\Controllers\CategoriasController;
 use App\Http\Controllers\ProductosController;
-
+use App\Http\Middleware\CheckPermission;
 use Illuminate\Support\Facades\Route;
+
+Route::aliasMiddleware('permission', CheckPermission::class);
 
 Route::post('/login', [AdminController::class, 'login']);
 
@@ -32,15 +34,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [AdminController::class, 'user']);
     Route::post('/logout', [AdminController::class, 'logout']);
-    Route::get('/usuarios', [UsuariosController::class, 'index']);
+    
+    // Rutas de usuarios protegidas con permiso usuarios.ver
+    Route::middleware('permission:usuarios.ver')->group(function () {
+        Route::get('/usuarios', [UsuariosController::class, 'index']);
+        Route::get('/usuarios/{id}', [UsuariosController::class, 'show']);
+        Route::put('/usuarios/{id}', [UsuariosController::class, 'update']);
+        Route::delete('/usuarios/{id}', [UsuariosController::class, 'destroy']);
+        Route::post('/usuarios/register', [UserRegistrationController::class, 'store']);
+    });
+    
     Route::get('/roles', [RoleController::class, 'getRoles']);
-    Route::post('/usuarios/register', [UserRegistrationController::class, 'store']);
-    Route::get('/usuarios/{id}', [UsuariosController::class, 'show']);
-    Route::put('/usuarios/{id}', [UsuariosController::class, 'update']);
-    Route::delete('/usuarios/{id}', [UsuariosController::class, 'destroy']);
-
+    Route::get('/permissions', [RoleController::class, 'getPermissions']);
+    Route::get('/roles/{id}/permissions', [RoleController::class, 'getRolePermissions']);
+    Route::put('/roles/{id}/permissions', [RoleController::class, 'updateRolePermissions']);
+    Route::post('/roles', [RoleController::class, 'store']);
+    Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
 });
     
+
     // Rutas para categorías
     Route::get('/categorias', [CategoriasController::class, 'index']);
     Route::post('/categorias', [CategoriasController::class, 'store']);

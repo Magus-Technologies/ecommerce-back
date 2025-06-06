@@ -37,7 +37,7 @@ class UserRegistrationController extends Controller
             'name' => 'required|string|max:255|unique:users',
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8',
-            'role' => 'required|exists:roles,id',
+            'role' => 'required|string|exists:roles,name', // ← Ahora valida que el nombre del rol exista
             
             // Datos de perfil
             'first_name' => 'required|string|max:255',
@@ -80,7 +80,7 @@ class UserRegistrationController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role_id' => $request->role,
+                // Eliminado: 'role_id' porque ahora usamos Spatie
                 'is_enabled' => 1
             ]);
 
@@ -106,6 +106,9 @@ class UserRegistrationController extends Controller
                 'avatar_url' => $avatarUrl
             ]);
 
+            // 4. Asignar rol usando Spatie
+            $user->assignRole($request->role); // ← AGREGAR esta línea
+
             // 4. Crear direcciones
             foreach ($request->addresses as $addressData) {
                 UserAddress::create([
@@ -126,7 +129,7 @@ class UserRegistrationController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Usuario registrado exitosamente',
-                'user' => $user->load(['role', 'profile', 'addresses'])
+                'user' => $user->load(['roles', 'profile', 'addresses'])
             ], 201);
 
         } catch (\Exception $e) {
