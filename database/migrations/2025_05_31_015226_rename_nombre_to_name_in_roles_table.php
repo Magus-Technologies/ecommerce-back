@@ -11,13 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('roles')) {
-            Schema::create('roles', function (Blueprint $table) {
-                $table->id();
-                $table->string('nombre')->unique();
-                $table->timestamps();
-            });
-        }
+        Schema::table('roles', function (Illuminate\Database\Schema\Blueprint $table) {
+        $table->renameColumn('nombre', 'name');
+    });
     }
 
     /**
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('roles');
+        Schema::table('roles', function (Illuminate\Database\Schema\Blueprint $table) {
+            $table->renameColumn('name', 'nombre');
+        });
     }
 };

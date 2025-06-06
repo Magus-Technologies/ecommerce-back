@@ -265,4 +265,83 @@ class ProductosController extends Controller
             ], 500);
         }
     }
+public function productosPublicos(Request $request)
+{
+    $query = Producto::with(['categoria']) // ✅ Quitar 'imagenes' porque no existe esa relación
+        ->where('activo', true)
+        ->where('stock', '>', 0);
+
+    // Filtrar por categoría si se proporciona
+    if ($request->has('categoria')) {
+        $query->where('categoria_id', $request->categoria);
+    }
+
+    // Filtrar por búsqueda si se proporciona
+    if ($request->has('search')) {
+        $search = $request->search;
+        $query->where(function($q) use ($search) {
+            $q->where('nombre', 'LIKE', "%{$search}%")
+              ->orWhere('descripcion', 'LIKE', "%{$search}%");
+        });
+    }
+
+    $productos = $query->paginate(20);
+
+    // Agregar campos calculados para el frontend
+    $productos->getCollection()->transform(function ($producto) {
+        return [
+            'id' => $producto->id,
+            'nombre' => $producto->nombre,
+            'descripcion' => $producto->descripcion,
+            'precio' => $producto->precio_venta, // ✅ CORREGIR: usar precio_venta
+            'precio_oferta' => null, // Por ahora null, luego puedes agregar este campo
+            'stock' => $producto->stock,
+            'imagen_principal' => $producto->imagen ? asset('storage/productos/' . $producto->imagen) : '/placeholder-product.jpg', // ✅ CORREGIR
+            'categoria' => $producto->categoria?->nombre,
+            'categoria_id' => $producto->categoria_id,
+            
+            // ✅ CAMPOS DE RATING (valores fijos por ahora)
+            'rating' => 4.8,
+            'total_reviews' => rand(15, 25) . 'k',
+            'reviews_count' => rand(150, 250),
+            
+            // ✅ CAMPOS ADICIONALES PARA EL FRONTEND
+            'sold_count' => rand(10, 30),
+            'total_stock' => $producto->stock + rand(10, 30),
+            'is_on_sale' => false, // Por ahora false, luego puedes implementar ofertas
+            'discount_percentage' => 0
+        ];
+    });
+
+    return response()->json([
+        'productos' => $productos->items(),
+        'pagination' => [
+            'current_page' => $productos->currentPage(),
+            'last_page' => $productos->lastPage(),
+            'per_page' => $productos->perPage(),
+            'total' => $productos->total()
+        ]
+    ]);
+}
+
+    // ✅ NUEVO MÉTODO PARA OBTENER CATEGORÍAS PARA EL SIDEBAR
+    public function categoriasParaSidebar()
+    {
+        $categorias = Categoria::withCount(['productos' => function($query) {
+            $query->where('activo', true)->where('stock', '>', 0);
+        }])
+        ->where('activo', true)
+        ->orderBy('nombre')
+        ->get()
+        ->map(function($categoria) {
+            return [
+                'id' => $categoria->id,
+                'nombre' => $categoria->nombre,
+                'productos_count' => $categoria->productos_count
+            ];
+        });
+
+        return response()->json($categorias);
+    }
+
 }

@@ -15,15 +15,16 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // Asegurarse que el usuario esté autenticado y tenga el rol cargado
-        $user = $request->user(); // // MODIFICADO: guardamos usuario
+        $user = $request->user();
 
-        if (!$user || !$user->role) { // MODIFICADO: verificamos que role exista
+        // ELIMINADO: if (!$user || !$user->role) - ya no usamos relación role
+        if (!$user) { // ← MODIFICADO: solo verificar que usuario exista
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
-        // Compara el nombre del rol en la relación con los roles permitidos
-        if (!in_array($user->role->nombre, $roles)) { // MODIFICADO: acceso a $user->role->nombre
+        // ELIMINADO: if (!in_array($user->role->nombre, $roles))
+        // NUEVO: usar método de Spatie
+        if (!$user->hasAnyRole($roles)) { // ← NUEVO: usar hasAnyRole de Spatie
             return response()->json(['message' => 'No autorizado'], 403);
         }
 

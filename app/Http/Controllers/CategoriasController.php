@@ -224,6 +224,7 @@ class CategoriasController extends Controller
 {
     try {
         $categorias = Categoria::activas()
+        ->withCount('productos')
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'descripcion', 'imagen']);
         

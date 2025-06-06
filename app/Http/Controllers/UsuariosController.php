@@ -14,7 +14,7 @@ class UsuariosController extends Controller
         // Antes:
         // $usuarios = User::with('role');
         // Después:
-        $usuarios = User::with(['role', 'profile'])->get(); // ← Agregado 'profile' para incluir avatar_url
+        $usuarios = User::with(['roles', 'profile'])->get();
         
         return response()->json($usuarios);
     }
@@ -22,13 +22,14 @@ class UsuariosController extends Controller
     public function show($id)
     {
         try {
-            $usuario = User::with(['role', 'profile.documentType', 'addresses'])
-                ->findOrFail($id);
-
-                // ← AGREGAR ESTE LOG PARA DEBUG:
-            \Log::info('Usuario encontrado:', $usuario->toArray()); 
+            $usuario = User::with(['roles', 'profile.documentType', 'addresses'])->findOrFail($id);
             
-            return response()->json($usuario);
+            // Transformamos el usuario para incluir role_id y role_nombre
+            $usuarioTransformado = $usuario->toArray();
+            $usuarioTransformado['role_id'] = $usuario->roles->isNotEmpty() ? $usuario->roles->first()->id : null;
+            $usuarioTransformado['role_nombre'] = $usuario->roles->isNotEmpty() ? $usuario->roles->first()->name : '';
+
+            return response()->json($usuarioTransformado);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Usuario no encontrado'], 404);
         }
@@ -162,8 +163,17 @@ class UsuariosController extends Controller
             $usuario->update([
                 'name' => $request->name,
                 'email' => $request->email,
-                'role_id' => $request->role_id,
             ]);
+
+            // Asegurar que role_id sea un número entero
+            $roleId = is_string($request->role_id) ? intval($request->role_id) : $request->role_id;
+
+            if (!is_int($roleId) || $roleId <= 0) {
+                \Log::error('Role ID inválido:', ['role_id' => $request->role_id]);
+                return response()->json(['error' => 'Role ID debe ser un número entero válido'], 422);
+            }
+
+            $usuario->syncRoles([$roleId]);
 
             // Actualizar o crear perfil
             $profileData = $request->input('profile');
@@ -265,7 +275,7 @@ class UsuariosController extends Controller
 
             return response()->json([
                 'message' => 'Usuario actualizado correctamente',
-                'usuario' => $usuario->load(['role', 'profile.documentType', 'addresses'])
+                'usuario' => $usuario->load(['roles', 'profile.documentType', 'addresses'])
             ]);
 
         } catch (\Exception $e) {
