@@ -81,6 +81,20 @@ public function login(Request $request)
             'message' => 'Logout exitoso',
         ]);
     }
+
+    /**
+     * Refrescar permisos del usuario autenticado
+     */
+    public function refreshPermissions(Request $request)
+    {
+        $user = $request->user();
+        $user->load('roles.permissions');
+
+        return response()->json([
+            'status' => 'success',
+            'permissions' => $user->getAllPermissions()->pluck('name')
+        ]);
+    }
 }
 
 
