@@ -9,51 +9,50 @@ use Illuminate\Validation\ValidationException;
 class AdminController extends Controller
 {
     /**
-     * Login del usuario y generación de token
+     * Login del usuario y generación de token (versión segura)
      */
- // AdminController.php - método login
-  // In App\Http\Controllers\AdminController.php - Replace the login method
-public function login(Request $request)
-{
-    $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
-    ]);
-
-    if (Auth::attempt($request->only('email', 'password'))) {
-        $user = Auth::user();
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Login exitoso',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'roles' => $user->getRoleNames(), // Obtener roles usando Spatie
-                'permissions' => $user->getAllPermissions()->pluck('name'), // Obtener permisos usando Spatie
-            ],
-            'token' => $token,
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
         ]);
+
+        // Intentar autenticación
+        if (Auth::attempt($request->only('email', 'password'))) {
+            $user = Auth::user();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Login exitoso',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'roles' => $user->getRoleNames(),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                ],
+                'token' => $token,
+            ]);
+        }
+
+        // Mensaje genérico para cualquier error de credenciales
+        // No distinguimos entre usuario inexistente o contraseña incorrecta
+        return response()->json([
+            'message' => 'Las credenciales proporcionadas son incorrectas.',
+            'errors' => [
+                'email' => ['Las credenciales proporcionadas son incorrectas.']
+            ]
+        ], 401);
     }
-
-    throw ValidationException::withMessages([
-        'email' => ['Las credenciales proporcionadas son incorrectas.'],
-    ]);
-}
-
-
 
     /**
      * Obtener información del usuario autenticado
      */
-    // In App\Http\Controllers\AdminController.php - Replace the user method
     public function user(Request $request)
     {
         $user = $request->user();
-
-        // Cargar relaciones de roles y permisos para evitar consultas múltiples
         $user->load('roles.permissions');
 
         return response()->json([
@@ -62,12 +61,11 @@ public function login(Request $request)
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'roles' => $user->getRoleNames(), // Obtener roles usando Spatie
-                'permissions' => $user->getAllPermissions()->pluck('name'), // Obtener permisos usando Spatie
+                'roles' => $user->getRoleNames(),
+                'permissions' => $user->getAllPermissions()->pluck('name'),
             ],
         ]);
     }
-
 
     /**
      * Cerrar sesión (revocar token)
@@ -82,5 +80,3 @@ public function login(Request $request)
         ]);
     }
 }
-
-
