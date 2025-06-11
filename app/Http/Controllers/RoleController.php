@@ -44,13 +44,18 @@ class RoleController extends Controller
         ]);
 
         $role = Role::findOrFail($roleId);
+
+        // 🆕 NUEVA LÍNEA AGREGADA
+        $affectedUserIds = $role->users()->pluck('id')->toArray();
         
         // Sincronizar permisos (elimina los anteriores y asigna los nuevos)
         $role->syncPermissions($request->permissions);
 
         return response()->json([
             'message' => 'Permisos actualizados correctamente',
-            'role' => $role->load('permissions')
+            'role' => $role->load('permissions'),
+            'affected_users' => $affectedUserIds
+
         ]);
     }
 
@@ -91,4 +96,6 @@ class RoleController extends Controller
             'message' => 'Rol eliminado correctamente'
         ]);
     }
+
+    
 }

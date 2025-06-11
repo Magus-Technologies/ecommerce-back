@@ -34,6 +34,7 @@ Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::c
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [AdminController::class, 'user']);
+    Route::get('/refresh-permissions', [AdminController::class, 'refreshPermissions']); // ← NUEVO
     Route::post('/logout', [AdminController::class, 'logout']);
 
     // Rutas de usuarios protegidas con permiso usuarios.ver
