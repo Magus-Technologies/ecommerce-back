@@ -344,4 +344,44 @@ public function productosPublicos(Request $request)
         return response()->json($categorias);
     }
 
+    /**
+     * Obtener estadísticas de productos para dashboard
+     */
+    public function estadisticasDashboard()
+    {
+        try {
+            $totalProductos = Producto::count();
+            
+            return response()->json([
+                'total_productos' => $totalProductos
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al obtener estadísticas',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener productos con stock crítico
+     */
+    public function productosStockCritico()
+    {
+        try {
+            $productosStockCritico = Producto::with('categoria')
+                ->whereRaw('stock <= stock_minimo')
+                ->select('id', 'nombre', 'stock', 'stock_minimo', 'categoria_id')
+                ->orderBy('stock', 'asc')
+                ->get();
+
+            return response()->json($productosStockCritico);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al obtener productos con stock crítico',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 }
