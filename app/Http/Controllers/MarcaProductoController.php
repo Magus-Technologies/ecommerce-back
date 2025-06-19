@@ -2,124 +2,38 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Categoria;
 use Illuminate\Http\Request;
+use App\Models\MarcaProducto;
 use Illuminate\Support\Facades\Validator;
 
-class CategoriasController extends Controller
+class MarcaProductoController extends Controller
 {
-    /**
-     * Obtener todas las categorías
-     */
     public function index()
     {
         try {
-            $categorias = Categoria::orderBy('nombre')->get();
-            
+            $marcas = MarcaProducto::orderBy('nombre')->get();
+
             // Agregar ruta completa de imagen
-            $categorias->transform(function ($categoria) {
-                if ($categoria->imagen) {
-                    $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
+            $marcas->transform(function ($marca) {
+                if ($marca->imagen) {
+                    $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
                 }
-                return $categoria;
+                return $marca;
             });
 
-            return response()->json($categorias);
+            return response()->json($marcas);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al obtener categorías',
+                'message' => 'Error al obtener marcas',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    /**
-     * Crear nueva categoría
-     */
-    public function store(Request $request)
+    public function store(Request $request) 
     {
         $validator = Validator::make($request->all(), [
-            'nombre' => 'required|string|max:255|unique:categorias,nombre',
-            'descripcion' => 'nullable|string',
-            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'activo' => 'boolean'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Datos de validación incorrectos',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $data = $request->only(['nombre', 'descripcion', 'activo']);
-            $data['activo'] = $request->has('activo') ? (bool)$request->activo : true;
-
-           // Manejar imagen directamente en public/storage
-            if ($request->hasFile('imagen')) {
-                $imagen = $request->file('imagen');
-                $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
-                
-                // Crear directorio si no existe
-                $directorioDestino = public_path('storage/categorias');
-                if (!file_exists($directorioDestino)) {
-                    mkdir($directorioDestino, 0755, true);
-                }
-                
-                // Mover imagen directamente a public/storage/categorias
-                $imagen->move($directorioDestino, $nombreImagen);
-                $data['imagen'] = $nombreImagen;
-            }
-
-            $categoria = Categoria::create($data);
-
-            // Agregar URL completa de imagen para la respuesta
-            if ($categoria->imagen) {
-                $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
-            }
-
-            return response()->json([
-                'message' => 'Categoría creada exitosamente',
-                'categoria' => $categoria
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error al crear categoría',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Obtener categoría específica
-     */
-    public function show($id)
-    {
-        try {
-            $categoria = Categoria::findOrFail($id);
-            
-            if ($categoria->imagen) {
-                $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
-            }
-
-            return response()->json($categoria);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Categoría no encontrada',
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
-
-    /**
-     * Actualizar categoría
-     */
-   public function update(Request $request, $id)
-    {
-        $validator = Validator::make($request->all(), [
-            'nombre' => 'required|string|max:255|unique:categorias,nombre,' . $id,
+            'nombre' => 'required|string|max:255|unique:marcas_productos,nombre',
             'descripcion' => 'nullable|string',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'activo' => 'required|in:true,false,1,0'
@@ -133,15 +47,89 @@ class CategoriasController extends Controller
         }
 
         try {
-            $categoria = Categoria::findOrFail($id);
             $data = $request->only(['nombre', 'descripcion']);
             $data['activo'] = filter_var($request->activo, FILTER_VALIDATE_BOOLEAN);
 
-            // MÉTODO MANUAL - Manejar imagen
+            // Manejar imagen directamente en public/storage
+            if ($request->hasFile('imagen')) {
+                $imagen = $request->file('imagen');
+                $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
+                
+                // Crear directorio si no existe
+                $directorioDestino = public_path('storage/marcas_productos');
+                if (!file_exists($directorioDestino)) {
+                    mkdir($directorioDestino, 0755, true);
+                }
+                
+                // Mover imagen directamente a public/storage/marcas_productos
+                $imagen->move($directorioDestino, $nombreImagen);
+                $data['imagen'] = $nombreImagen;
+            }
+
+            $marca = MarcaProducto::create($data);
+
+            // Agregar URL completa de imagen para la respuesta
+            if ($marca->imagen) {
+                $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
+            }
+
+            return response()->json([
+                'message' => 'Marca creada exitosamente',
+                'marca' => $marca
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al crear marca',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $marca = MarcaProducto::findOrFail($id);
+
+            // Agregar ruta completa de imagen
+            if ($marca->imagen) {
+                $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
+            }
+
+            return response()->json($marca);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Marca no encontrada',
+                'error' => $e->getMessage()
+            ], 404);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'nombre' => 'required|string|max:255|unique:marcas_productos,nombre,' . $id,
+            'descripcion' => 'nullable|string',
+            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'activo' => 'required|in:true,false,1,0'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $marca = MarcaProducto::findOrFail($id);
+            $data = $request->only(['nombre', 'descripcion']);
+            $data['activo'] = filter_var($request->activo, FILTER_VALIDATE_BOOLEAN);
+
+            // Manejar imagen directamente en public/storage
             if ($request->hasFile('imagen')) {
                 // Eliminar imagen anterior si existe
-                if ($categoria->imagen) {
-                    $rutaImagenAnterior = public_path('storage/categorias/' . $categoria->imagen);
+                if ($marca->imagen) {
+                    $rutaImagenAnterior = public_path('storage/marcas_productos/' . $marca->imagen);
                     if (file_exists($rutaImagenAnterior)) {
                         unlink($rutaImagenAnterior);
                     }
@@ -151,37 +139,37 @@ class CategoriasController extends Controller
                 $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
                 
                 // Crear directorio si no existe
-                $directorioDestino = public_path('storage/categorias');
+                $directorioDestino = public_path('storage/marcas_productos');
                 if (!file_exists($directorioDestino)) {
                     mkdir($directorioDestino, 0755, true);
                 }
                 
-                // Mover imagen directamente a public/storage/categorias
+                // Mover imagen directamente a public/storage/marcas_productos
                 $imagen->move($directorioDestino, $nombreImagen);
                 $data['imagen'] = $nombreImagen;
             }
 
-            $categoria->update($data);
+            $marca->update($data);
 
             // Agregar URL completa de imagen para la respuesta
-            if ($categoria->imagen) {
-                $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
+            if ($marca->imagen) {
+                $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
             }
 
             return response()->json([
-                'message' => 'Categoría actualizada exitosamente',
-                'categoria' => $categoria
+                'message' => 'Marca actualizada exitosamente',
+                'marca' => $marca
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al actualizar categoría',
+                'message' => 'Error al actualizar marca',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
+
     /**
-     * Cambiar estado de la categoría (NUEVO ENDPOINT ESPECÍFICO)
+     * Cambiar estado de la marca (NUEVO ENDPOINT ESPECÍFICO)
      */
     public function toggleEstado(Request $request, $id)
     {
@@ -197,84 +185,104 @@ class CategoriasController extends Controller
         }
 
         try {
-            $categoria = Categoria::findOrFail($id);
-            $categoria->update(['activo' => (bool)$request->activo]);
+            $marca = MarcaProducto::findOrFail($id);
+            $marca->update(['activo' => (bool)$request->activo]);
 
             // Agregar URL completa de imagen para la respuesta
-            if ($categoria->imagen) {
-                $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
+            if ($marca->imagen) {
+                $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
             }
 
             return response()->json([
-                'message' => 'Estado de la categoría actualizado exitosamente',
-                'categoria' => $categoria
+                'message' => 'Estado de la marca actualizado exitosamente',
+                'marca' => $marca
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al actualizar estado de la categoría',
+                'message' => 'Error al actualizar estado de la marca',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    /**
-     * Eliminar categoría
-     */
     public function destroy($id)
     {
         try {
-            $categoria = Categoria::findOrFail($id);
+            $marca = MarcaProducto::findOrFail($id);
 
             // Verificar si tiene productos asociados
-            if ($categoria->productos()->count() > 0) {
+            if ($marca->productos()->count() > 0) {
                 return response()->json([
-                    'message' => 'No se puede eliminar la categoría porque tiene productos asociados'
+                    'message' => 'No se puede eliminar la marca porque tiene productos asociados'
                 ], 400);
             }
 
-            // MÉTODO MANUAL - Eliminar imagen si existe
-            if ($categoria->imagen) {
-                $rutaImagen = public_path('storage/categorias/' . $categoria->imagen);
+            // Eliminar imagen si existe
+            if ($marca->imagen) {
+                $rutaImagen = public_path('storage/marcas_productos/' . $marca->imagen);
                 if (file_exists($rutaImagen)) {
                     unlink($rutaImagen);
                 }
             }
 
-            $categoria->delete();
+            $marca->delete();
 
             return response()->json([
-                'message' => 'Categoría eliminada exitosamente'
+                'message' => 'Marca eliminada exitosamente'
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al eliminar categoría',
+                'message' => 'Error al eliminar marca',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    public function categoriasPublicas()
+    public function marcasActivas()
     {
         try {
-            $categorias = Categoria::activas()
-            ->withCount('productos')
-                ->orderBy('nombre')
-                ->get(['id', 'nombre', 'descripcion', 'imagen']);
-            
+            $marcas = MarcaProducto::activas()->orderBy('nombre')->get();
+
             // Agregar ruta completa de imagen
-            $categorias->transform(function ($categoria) {
-                if ($categoria->imagen) {
-                    $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
+            $marcas->transform(function ($marca) {
+                if ($marca->imagen) {
+                    $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
                 }
-                return $categoria;
+                return $marca;
             });
 
-            return response()->json($categorias);
+            return response()->json($marcas);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al obtener categorías públicas',
+                'message' => 'Error al obtener marcas activas',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function marcasPublicas()
+    {
+        try {
+            $marcas = MarcaProducto::activas()
+                ->withCount(['productos' => function($query) {
+                    $query->where('activo', true)->where('stock', '>', 0);
+                }])
+                ->orderBy('nombre')
+                ->get();
+
+            // Agregar ruta completa de imagen
+            $marcas->transform(function ($marca) {
+                if ($marca->imagen) {
+                    $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
+                }
+                return $marca;
+            });
+
+            return response()->json($marcas);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al obtener marcas públicas',
                 'error' => $e->getMessage()
             ], 500);
         }

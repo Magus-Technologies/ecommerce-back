@@ -18,7 +18,7 @@ class ProductosController extends Controller
             $productos = Producto::with('categoria')
                 ->orderBy('nombre')
                 ->get();
-            
+
             // Agregar URL completa de imagen
             $productos->transform(function ($producto) {
                 if ($producto->imagen) {
@@ -63,23 +63,30 @@ class ProductosController extends Controller
 
         try {
             $data = $request->only([
-                'nombre', 'descripcion', 'codigo_producto', 'categoria_id',
-                'precio_compra', 'precio_venta', 'stock', 'stock_minimo', 'activo'
+                'nombre',
+                'descripcion',
+                'codigo_producto',
+                'categoria_id',
+                'precio_compra',
+                'precio_venta',
+                'stock',
+                'stock_minimo',
+                'activo'
             ]);
-            
-            $data['activo'] = $request->has('activo') ? (bool)$request->activo : true;
+
+            $data['activo'] = $request->has('activo') ? (bool) $request->activo : true;
 
             // MÉTODO MANUAL - Manejar imagen directamente en public/storage
             if ($request->hasFile('imagen')) {
                 $imagen = $request->file('imagen');
                 $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
-                
+
                 // Crear directorio si no existe
                 $directorioDestino = public_path('storage/productos');
                 if (!file_exists($directorioDestino)) {
                     mkdir($directorioDestino, 0755, true);
                 }
-                
+
                 // Mover imagen directamente a public/storage/productos
                 $imagen->move($directorioDestino, $nombreImagen);
                 $data['imagen'] = $nombreImagen;
@@ -113,7 +120,7 @@ class ProductosController extends Controller
     {
         try {
             $producto = Producto::with('categoria')->findOrFail($id);
-            
+
             if ($producto->imagen) {
                 $producto->imagen_url = asset('storage/productos/' . $producto->imagen);
             }
@@ -130,19 +137,20 @@ class ProductosController extends Controller
     /**
      * Actualizar producto
      */
-    public function update(Request $request, $id)
+   public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
             'codigo_producto' => 'required|string|max:100|unique:productos,codigo_producto,' . $id,
             'categoria_id' => 'required|exists:categorias,id',
+            'marca_id' => 'nullable|exists:marcas_productos,id',
             'precio_compra' => 'required|numeric|min:0',
             'precio_venta' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'stock_minimo' => 'required|integer|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'activo' => 'boolean'
+            'activo' => 'required|in:true,false,1,0'
         ]);
 
         if ($validator->fails()) {
@@ -155,13 +163,11 @@ class ProductosController extends Controller
         try {
             $producto = Producto::findOrFail($id);
             $data = $request->only([
-                'nombre', 'descripcion', 'codigo_producto', 'categoria_id',
-                'precio_compra', 'precio_venta', 'stock', 'stock_minimo', 'activo'
+                'nombre', 'descripcion', 'codigo_producto', 'categoria_id', 'marca_id',
+                'precio_compra', 'precio_venta', 'stock', 'stock_minimo'
             ]);
             
-            if ($request->has('activo')) {
-                $data['activo'] = (bool)$request->activo;
-            }
+            $data['activo'] = filter_var($request->activo, FILTER_VALIDATE_BOOLEAN);
 
             // MÉTODO MANUAL - Manejar imagen
             if ($request->hasFile('imagen')) {
@@ -188,7 +194,7 @@ class ProductosController extends Controller
             }
 
             $producto->update($data);
-            $producto->load('categoria');
+            $producto->load(['categoria', 'marca']);
 
             // Agregar URL completa de imagen para la respuesta
             if ($producto->imagen) {
@@ -203,6 +209,45 @@ class ProductosController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al actualizar producto',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Cambiar estado del producto (NUEVO ENDPOINT ESPECÍFICO)
+     */
+    public function toggleEstado(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'activo' => 'required|boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $producto = Producto::findOrFail($id);
+            $producto->update(['activo' => (bool) $request->activo]);
+            $producto->load('categoria');
+
+            // Agregar URL completa de imagen para la respuesta
+            if ($producto->imagen) {
+                $producto->imagen_url = asset('storage/productos/' . $producto->imagen);
+            }
+
+            return response()->json([
+                'message' => 'Estado del producto actualizado exitosamente',
+                'producto' => $producto
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al actualizar estado del producto',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -265,81 +310,84 @@ class ProductosController extends Controller
             ], 500);
         }
     }
-public function productosPublicos(Request $request)
-{
-    $query = Producto::with(['categoria']) // ✅ Quitar 'imagenes' porque no existe esa relación
-        ->where('activo', true)
-        ->where('stock', '>', 0);
 
-    // Filtrar por categoría si se proporciona
-    if ($request->has('categoria')) {
-        $query->where('categoria_id', $request->categoria);
-    }
+    public function productosPublicos(Request $request)
+    {
+        $query = Producto::with(['categoria']) // ✅ Quitar 'imagenes' porque no existe esa relación
+            ->where('activo', true)
+            ->where('stock', '>', 0);
 
-    // Filtrar por búsqueda si se proporciona
-    if ($request->has('search')) {
-        $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('nombre', 'LIKE', "%{$search}%")
-              ->orWhere('descripcion', 'LIKE', "%{$search}%");
+        // Filtrar por categoría si se proporciona
+        if ($request->has('categoria')) {
+            $query->where('categoria_id', $request->categoria);
+        }
+
+        // Filtrar por búsqueda si se proporciona
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'LIKE', "%{$search}%")
+                    ->orWhere('descripcion', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $productos = $query->paginate(20);
+
+        // Agregar campos calculados para el frontend
+        $productos->getCollection()->transform(function ($producto) {
+            return [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'descripcion' => $producto->descripcion,
+                'precio' => $producto->precio_venta, // ✅ CORREGIR: usar precio_venta
+                'precio_oferta' => null, // Por ahora null, luego puedes agregar este campo
+                'stock' => $producto->stock,
+                'imagen_principal' => $producto->imagen ? asset('storage/productos/' . $producto->imagen) : '/placeholder-product.jpg', // ✅ CORREGIR
+                'categoria' => $producto->categoria?->nombre,
+                'categoria_id' => $producto->categoria_id,
+
+                // ✅ CAMPOS DE RATING (valores fijos por ahora)
+                'rating' => 4.8,
+                'total_reviews' => rand(15, 25) . 'k',
+                'reviews_count' => rand(150, 250),
+
+                // ✅ CAMPOS ADICIONALES PARA EL FRONTEND
+                'sold_count' => rand(10, 30),
+                'total_stock' => $producto->stock + rand(10, 30),
+                'is_on_sale' => false, // Por ahora false, luego puedes implementar ofertas
+                'discount_percentage' => 0
+            ];
         });
+
+        return response()->json([
+            'productos' => $productos->items(),
+            'pagination' => [
+                'current_page' => $productos->currentPage(),
+                'last_page' => $productos->lastPage(),
+                'per_page' => $productos->perPage(),
+                'total' => $productos->total()
+            ]
+        ]);
     }
-
-    $productos = $query->paginate(20);
-
-    // Agregar campos calculados para el frontend
-    $productos->getCollection()->transform(function ($producto) {
-        return [
-            'id' => $producto->id,
-            'nombre' => $producto->nombre,
-            'descripcion' => $producto->descripcion,
-            'precio' => $producto->precio_venta, // ✅ CORREGIR: usar precio_venta
-            'precio_oferta' => null, // Por ahora null, luego puedes agregar este campo
-            'stock' => $producto->stock,
-            'imagen_principal' => $producto->imagen ? asset('storage/productos/' . $producto->imagen) : '/placeholder-product.jpg', // ✅ CORREGIR
-            'categoria' => $producto->categoria?->nombre,
-            'categoria_id' => $producto->categoria_id,
-            
-            // ✅ CAMPOS DE RATING (valores fijos por ahora)
-            'rating' => 4.8,
-            'total_reviews' => rand(15, 25) . 'k',
-            'reviews_count' => rand(150, 250),
-            
-            // ✅ CAMPOS ADICIONALES PARA EL FRONTEND
-            'sold_count' => rand(10, 30),
-            'total_stock' => $producto->stock + rand(10, 30),
-            'is_on_sale' => false, // Por ahora false, luego puedes implementar ofertas
-            'discount_percentage' => 0
-        ];
-    });
-
-    return response()->json([
-        'productos' => $productos->items(),
-        'pagination' => [
-            'current_page' => $productos->currentPage(),
-            'last_page' => $productos->lastPage(),
-            'per_page' => $productos->perPage(),
-            'total' => $productos->total()
-        ]
-    ]);
-}
 
     // ✅ NUEVO MÉTODO PARA OBTENER CATEGORÍAS PARA EL SIDEBAR
     public function categoriasParaSidebar()
     {
-        $categorias = Categoria::withCount(['productos' => function($query) {
-            $query->where('activo', true)->where('stock', '>', 0);
-        }])
-        ->where('activo', true)
-        ->orderBy('nombre')
-        ->get()
-        ->map(function($categoria) {
-            return [
-                'id' => $categoria->id,
-                'nombre' => $categoria->nombre,
-                'productos_count' => $categoria->productos_count
-            ];
-        });
+        $categorias = Categoria::withCount([
+            'productos' => function ($query) {
+                $query->where('activo', true)->where('stock', '>', 0);
+            }
+        ])
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get()
+            ->map(function ($categoria) {
+                return [
+                    'id' => $categoria->id,
+                    'nombre' => $categoria->nombre,
+                    'productos_count' => $categoria->productos_count
+                ];
+            });
 
         return response()->json($categorias);
     }
@@ -351,7 +399,7 @@ public function productosPublicos(Request $request)
     {
         try {
             $totalProductos = Producto::count();
-            
+
             return response()->json([
                 'total_productos' => $totalProductos
             ]);
@@ -383,5 +431,4 @@ public function productosPublicos(Request $request)
             ], 500);
         }
     }
-
 }

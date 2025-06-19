@@ -4,6 +4,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\BannersPromocionalesController;
+use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\DocumentTypeController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\UbigeoController;
 use App\Http\Controllers\UserRegistrationController;
 use App\Http\Controllers\CategoriasController;
 use App\Http\Controllers\ProductosController;
+use App\Http\Controllers\VentasController;
 use App\Http\Middleware\CheckPermission;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReniecController;
@@ -19,6 +21,7 @@ use App\Http\Controllers\ClientesController;
 Route::aliasMiddleware('permission', CheckPermission::class);
 
 Route::post('/login', [AdminController::class, 'login']);
+Route::post('/register', [AdminController::class, 'register']); 
 
 // Rutas para tipos de documentos
 Route::get('/document-types', [DocumentTypeController::class, 'getDocumentTypes']);
@@ -34,11 +37,27 @@ Route::get('/productos-publicos', [ProductosController::class, 'productosPublico
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
+Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
+
+
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [AdminController::class, 'user']);
     Route::get('/refresh-permissions', [AdminController::class, 'refreshPermissions']); // ← NUEVO
     Route::post('/logout', [AdminController::class, 'logout']);
+
+      // NUEVAS RUTAS DE VENTAS
+    Route::prefix('ventas')->group(function () {
+        Route::get('/', [VentasController::class, 'index']);
+        Route::post('/', [VentasController::class, 'store']);
+        Route::get('/estadisticas', [VentasController::class, 'estadisticas']);
+        Route::get('/mis-ventas', [VentasController::class, 'misVentas']); // Para clientes e-commerce
+        Route::post('/ecommerce', [VentasController::class, 'crearVentaEcommerce']); // Para carrito
+        Route::get('/{id}', [VentasController::class, 'show']);
+        Route::post('/{id}/facturar', [VentasController::class, 'facturar']);
+        Route::patch('/{id}/anular', [VentasController::class, 'anular']);
+    });
+
 
     // Rutas de usuarios protegidas con permiso usuarios.ver
     Route::middleware('permission:usuarios.ver')->group(function () {
@@ -64,8 +83,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/categorias', [CategoriasController::class, 'index']);
     Route::post('/categorias', [CategoriasController::class, 'store']);
     Route::get('/categorias/{id}', [CategoriasController::class, 'show']);
-    Route::post('/categorias/{id}', [CategoriasController::class, 'update']); // POST para manejar archivos
+    Route::put('/categorias/{id}', [CategoriasController::class, 'update']); // POST para manejar archivos
     Route::delete('/categorias/{id}', [CategoriasController::class, 'destroy']);
+     Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
+
+   // Rutas para marcas
+Route::get('/marcas', [MarcaProductoController::class, 'index']);
+Route::get('/marcas/activas', [MarcaProductoController::class, 'marcasActivas']); // ← MOVER ANTES
+Route::post('/marcas', [MarcaProductoController::class, 'store']);
+Route::get('/marcas/{id}', [MarcaProductoController::class, 'show']); // ← DESPUÉS
+Route::put('/marcas/{id}', [MarcaProductoController::class, 'update']);
+Route::delete('/marcas/{id}', [MarcaProductoController::class, 'destroy']);
+Route::patch('/marcas/{id}/toggle-estado', [MarcaProductoController::class, 'toggleEstado']);
+
 
     // Rutas para productos
 
@@ -76,9 +106,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/productos', [ProductosController::class, 'index']);
     Route::post('/productos', [ProductosController::class, 'store']);
     Route::get('/productos/{id}', [ProductosController::class, 'show']);
-    Route::post('/productos/{id}', [ProductosController::class, 'update']); // POST para manejar archivos
+    Route::put('/productos/{id}', [ProductosController::class, 'update']); // POST para manejar archivos
     Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
- 
+    Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
+
 
     // Protección de rutas del módulo banners con sus respectivos permisos
     Route::middleware('permission:banners.ver')->group(function () {

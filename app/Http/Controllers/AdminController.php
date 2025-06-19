@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Models\UserCliente;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
     /**
-     * Login del usuario y generación de token (versión segura)
+     * Login unificado para usuarios admin y clientes
      */
     public function login(Request $request)
     {
@@ -18,14 +21,28 @@ class AdminController extends Controller
             'password' => 'required',
         ]);
 
-        // Intentar autenticación
-        if (Auth::attempt($request->only('email', 'password'))) {
-            $user = Auth::user();
-            $token = $user->createToken('auth_token')->plainTextToken;
+        $email = $request->email;
+        $password = $request->password;
+
+        // PASO 1: Intentar login como ADMIN primero
+        if (Auth::guard('web')->attempt(['email' => $email, 'password' => $password])) {
+            $user = Auth::guard('web')->user();
+            
+            // Verificar que el usuario esté habilitado
+            if (!$user->is_enabled) {
+                Auth::guard('web')->logout();
+                return response()->json([
+                    'message' => 'Usuario deshabilitado',
+                    'errors' => ['email' => ['Tu cuenta está deshabilitada']]
+                ], 401);
+            }
+
+            $token = $user->createToken('admin_token')->plainTextToken;
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Login exitoso',
+                'tipo_usuario' => 'admin',
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -37,38 +54,167 @@ class AdminController extends Controller
             ]);
         }
 
-        // Mensaje genérico para cualquier error de credenciales
-        // No distinguimos entre usuario inexistente o contraseña incorrecta
+        // PASO 2: Si no es admin, intentar login como CLIENTE
+        $cliente = UserCliente::where('email', $email)->first();
+
+        if ($cliente && Hash::check($password, $cliente->password)) {
+            // Verificar que el cliente esté activo
+            if (!$cliente->estado) {
+                return response()->json([
+                    'message' => 'Cuenta de cliente deshabilitada',
+                    'errors' => ['email' => ['Tu cuenta está deshabilitada']]
+                ], 401);
+            }
+
+            $token = $cliente->createToken('cliente_token')->plainTextToken;
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Login exitoso',
+                'tipo_usuario' => 'cliente',
+                'user' => [
+                    'id' => $cliente->id,
+                    'nombre_completo' => $cliente->nombre_completo,
+                    'nombres' => $cliente->nombres,
+                    'apellidos' => $cliente->apellidos,
+                    'email' => $cliente->email,
+                    'telefono' => $cliente->telefono,
+                    'numero_documento' => $cliente->numero_documento,
+                    'tipo_documento' => $cliente->tipoDocumento?->nombre,
+                    'puede_facturar' => $cliente->puedeFacturar(),
+                    'foto_url' => $cliente->foto_url
+                ],
+                'token' => $token,
+            ]);
+        }
+
+        // PASO 3: Si no encuentra en ninguna tabla
         return response()->json([
             'message' => 'Las credenciales proporcionadas son incorrectas.',
-            'errors' => [
-                'email' => ['Las credenciales proporcionadas son incorrectas.']
-            ]
+            'errors' => ['email' => ['Las credenciales proporcionadas son incorrectas.']]
         ], 401);
     }
 
     /**
-     * Obtener información del usuario autenticado
+     * Registro de nuevos clientes
+     */
+    public function register(Request $request)
+    {
+        $request->validate([
+            'nombres' => 'required|string|max:255',
+            'apellidos' => 'required|string|max:255',
+            'email' => 'required|email|unique:user_clientes,email|unique:users,email',
+            'password' => 'required|string|min:8|confirmed',
+            'telefono' => 'nullable|string|max:20',
+            'tipo_documento_id' => 'required|exists:document_types,id',
+            'numero_documento' => 'required|string|max:20|unique:user_clientes,numero_documento',
+            'fecha_nacimiento' => 'nullable|date|before:today',
+            'genero' => 'nullable|in:masculino,femenino,otro',
+            
+            // Datos de dirección (opcional)
+            'direccion_completa' => 'nullable|string',
+            'departamento' => 'nullable|string|max:100',
+            'provincia' => 'nullable|string|max:100',
+            'distrito' => 'nullable|string|max:100'
+        ]);
+
+        try {
+            // Crear cliente
+            $cliente = UserCliente::create([
+                'nombres' => $request->nombres,
+                'apellidos' => $request->apellidos,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'telefono' => $request->telefono,
+                'tipo_documento_id' => $request->tipo_documento_id,
+                'numero_documento' => $request->numero_documento,
+                'fecha_nacimiento' => $request->fecha_nacimiento,
+                'genero' => $request->genero,
+                'estado' => true
+            ]);
+
+            // Crear dirección si se proporciona
+            if ($request->direccion_completa) {
+                $cliente->direcciones()->create([
+                    'nombre_destinatario' => $cliente->nombre_completo,
+                    'direccion_completa' => $request->direccion_completa,
+                    'departamento' => $request->departamento ?? 'Lima',
+                    'provincia' => $request->provincia ?? 'Lima',
+                    'distrito' => $request->distrito ?? 'Lima',
+                    'predeterminada' => true,
+                    'activa' => true
+                ]);
+            }
+
+            $token = $cliente->createToken('cliente_token')->plainTextToken;
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cliente registrado exitosamente',
+                'tipo_usuario' => 'cliente',
+                'user' => [
+                    'id' => $cliente->id,
+                    'nombre_completo' => $cliente->nombre_completo,
+                    'email' => $cliente->email,
+                    'telefono' => $cliente->telefono,
+                ],
+                'token' => $token,
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al registrar cliente',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener información del usuario autenticado (admin o cliente)
      */
     public function user(Request $request)
     {
         $user = $request->user();
-        $user->load('roles.permissions');
 
-        return response()->json([
-            'status' => 'success',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'roles' => $user->getRoleNames(),
-                'permissions' => $user->getAllPermissions()->pluck('name'),
-            ],
-        ]);
+        // Verificar si es un usuario admin o cliente
+        if ($user instanceof User) {
+            // Usuario admin
+            return response()->json([
+                'status' => 'success',
+                'tipo_usuario' => 'admin',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'roles' => $user->getRoleNames(),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                ],
+            ]);
+        } elseif ($user instanceof UserCliente) {
+            // Cliente del e-commerce
+            return response()->json([
+                'status' => 'success',
+                'tipo_usuario' => 'cliente',
+                'user' => [
+                    'id' => $user->id,
+                    'nombre_completo' => $user->nombre_completo,
+                    'nombres' => $user->nombres,
+                    'apellidos' => $user->apellidos,
+                    'email' => $user->email,
+                    'telefono' => $user->telefono,
+                    'numero_documento' => $user->numero_documento,
+                    'tipo_documento' => $user->tipoDocumento?->nombre,
+                    'puede_facturar' => $user->puedeFacturar(),
+                    'foto_url' => $user->foto_url
+                ],
+            ]);
+        }
+
+        return response()->json(['message' => 'Usuario no válido'], 401);
     }
 
     /**
-     * Cerrar sesión (revocar token)
+     * Logout unificado
      */
     public function logout(Request $request)
     {
@@ -81,11 +227,16 @@ class AdminController extends Controller
     }
 
     /**
-     * Refrescar permisos del usuario autenticado
+     * Refrescar permisos del usuario autenticado (solo admin)
      */
     public function refreshPermissions(Request $request)
     {
         $user = $request->user();
+        
+        if (!$user instanceof User) {
+            return response()->json(['message' => 'Solo usuarios admin pueden refrescar permisos'], 403);
+        }
+        
         $user->load('roles.permissions');
 
         return response()->json([
