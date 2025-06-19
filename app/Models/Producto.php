@@ -14,6 +14,7 @@ class Producto extends Model
         'descripcion',
         'codigo_producto',
         'categoria_id',
+        'marca_id',
         'precio_compra',
         'precio_venta',
         'stock',
@@ -36,6 +37,12 @@ class Producto extends Model
     public function categoria()
     {
         return $this->belongsTo(Categoria::class);
+    }
+
+    // Relación con marca
+    public function marca()
+    {
+        return $this->belongsTo(MarcaProducto::class, 'marca_id');
     }
 
     // Scope para productos activos
@@ -96,7 +103,7 @@ class Producto extends Model
         }
     }
 
-    // Boot method para eventos del modelo - MÉTODO MANUAL
+    // Boot method para eventos del modelo
     protected static function boot()
     {
         parent::boot();

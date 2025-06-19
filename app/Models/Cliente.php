@@ -9,52 +9,93 @@ class Cliente extends Model
 {
     use HasFactory;
 
-    protected $table = 'clientes';
-    protected $primaryKey = 'id_cliente';
-    public $timestamps = false;
-
     protected $fillable = [
-        'tipo_documento_id',
+        'tipo_documento',
         'numero_documento',
-        'nombres',
-        'apellidos',
-        'email',
+        'razon_social',
+        'nombre_comercial',
+        'direccion',
+        'ubigeo',
+        'distrito',
+        'provincia',
+        'departamento',
         'telefono',
-        'fecha_nacimiento',
-        'genero',
-        'contrasena_hash',
-        'foto',
-        'tipo_login',
-        'fecha_registro',
-        'estado'
+        'email',
+        'activo',
+        'user_id'
     ];
 
     protected $casts = [
-        'fecha_nacimiento' => 'date',
-        'fecha_registro' => 'datetime',
-        'estado' => 'boolean'
+        'activo' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
 
-    protected $appends = ['nombre_completo'];
+    // Relaciones
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function comprobantes()
+    {
+        return $this->hasMany(Comprobante::class);
+    }
+
+    public function ventas()
+    {
+        return $this->hasMany(Venta::class);
+    }
+
+    // Scopes
+    public function scopeActivos($query)
+    {
+        return $query->where('activo', true);
+    }
+
+    public function scopePorTipoDocumento($query, $tipo)
+    {
+        return $query->where('tipo_documento', $tipo);
+    }
+
+    // Accessors
+    public function getTipoDocumentoNombreAttribute()
+    {
+        $tipos = [
+            '1' => 'DNI',
+            '4' => 'Carnet de Extranjería',
+            '6' => 'RUC',
+            '7' => 'Pasaporte',
+            '0' => 'DOC.TRIB.NO.DOM.SIN.RUC'
+        ];
+
+        return $tipos[$this->tipo_documento] ?? 'Desconocido';
+    }
 
     public function getNombreCompletoAttribute()
     {
-        return $this->nombres . ' ' . $this->apellidos;
+        return $this->nombre_comercial ?: $this->razon_social;
     }
 
-    public function tipoDocumento()
+    public function getEsEmpresaAttribute()
     {
-        return $this->belongsTo(DocumentType::class, 'tipo_documento_id', 'id');
+        return $this->tipo_documento === '6'; // RUC
     }
 
-    public function direcciones()
+    // Métodos de utilidad
+    public static function tiposDocumento()
     {
-        return $this->hasMany(ClienteDireccion::class, 'id_cliente', 'id_cliente');
+        return [
+            '1' => 'DNI',
+            '4' => 'Carnet de Extranjería', 
+            '6' => 'RUC',
+            '7' => 'Pasaporte',
+            '0' => 'DOC.TRIB.NO.DOM.SIN.RUC'
+        ];
     }
 
-    public function direccionPrincipal()
+    public function puedeEliminar()
     {
-        return $this->hasOne(ClienteDireccion::class, 'id_cliente', 'id_cliente')
-                    ->where('predeterminada', 1);
+        return $this->comprobantes()->count() === 0 && $this->ventas()->count() === 0;
     }
 }

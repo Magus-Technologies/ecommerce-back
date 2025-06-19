@@ -34,5 +34,21 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'greenter' => [
+        'fe_url' => env('GREENTER_FE_URL'),
+        'fe_user' => env('GREENTER_FE_USER'),
+        'fe_password' => env('GREENTER_FE_PASSWORD'),
+        'cert_path' => storage_path('app/' . env('GREENTER_CERT_PATH')),
+        'private_key_path' => storage_path('app/' . env('GREENTER_PRIVATE_KEY_PATH')),
+    ],
+
+    'company' => [
+        'ruc' => env('COMPANY_RUC'),
+        'name' => env('COMPANY_NAME'),
+        'address' => env('COMPANY_ADDRESS'),
+        'district' => env('COMPANY_DISTRICT'),
+        'province' => env('COMPANY_PROVINCE'),
+        'department' => env('COMPANY_DEPARTMENT'),
+    ],
 
 ];
