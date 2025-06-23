@@ -85,16 +85,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/categorias/{id}', [CategoriasController::class, 'show']);
     Route::put('/categorias/{id}', [CategoriasController::class, 'update']); // POST para manejar archivos
     Route::delete('/categorias/{id}', [CategoriasController::class, 'destroy']);
-     Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
+    Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
 
-   // Rutas para marcas
-Route::get('/marcas', [MarcaProductoController::class, 'index']);
-Route::get('/marcas/activas', [MarcaProductoController::class, 'marcasActivas']); // ← MOVER ANTES
-Route::post('/marcas', [MarcaProductoController::class, 'store']);
-Route::get('/marcas/{id}', [MarcaProductoController::class, 'show']); // ← DESPUÉS
-Route::put('/marcas/{id}', [MarcaProductoController::class, 'update']);
-Route::delete('/marcas/{id}', [MarcaProductoController::class, 'destroy']);
-Route::patch('/marcas/{id}/toggle-estado', [MarcaProductoController::class, 'toggleEstado']);
+    // Rutas para secciones
+    Route::get('/secciones', [App\Http\Controllers\SeccionController::class, 'index']);
+    Route::post('/secciones', [App\Http\Controllers\SeccionController::class, 'store']);
+    Route::get('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'show']);
+    Route::put('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'update']); // ← AGREGAR ESTA LÍNEA
+    Route::delete('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'destroy']);
+    Route::patch('/categorias/{id}/migrar-seccion', [App\Http\Controllers\SeccionController::class, 'migrarCategoria']);
+    
+    // Rutas para marcas
+    Route::get('/marcas', [MarcaProductoController::class, 'index']);
+    Route::get('/marcas/activas', [MarcaProductoController::class, 'marcasActivas']); // ← MOVER ANTES
+    Route::post('/marcas', [MarcaProductoController::class, 'store']);
+    Route::get('/marcas/{id}', [MarcaProductoController::class, 'show']); // ← DESPUÉS
+    Route::put('/marcas/{id}', [MarcaProductoController::class, 'update']);
+    Route::delete('/marcas/{id}', [MarcaProductoController::class, 'destroy']);
+    Route::patch('/marcas/{id}/toggle-estado', [MarcaProductoController::class, 'toggleEstado']);
 
 
     // Rutas para productos

@@ -13,6 +13,7 @@ class Categoria extends Model
 
     protected $fillable = [
         'nombre',
+        'id_seccion',
         'descripcion',
         'imagen',
         'activo'
@@ -28,6 +29,12 @@ class Categoria extends Model
     public function productos()
     {
         return $this->hasMany(Producto::class);
+    }
+
+    // Relación con sección
+    public function seccion()
+    {
+        return $this->belongsTo(Seccion::class, 'id_seccion');
     }
 
     // Scope para categorías activas

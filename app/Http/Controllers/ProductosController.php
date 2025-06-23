@@ -12,12 +12,19 @@ class ProductosController extends Controller
     /**
      * Obtener todos los productos
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $productos = Producto::with('categoria')
-                ->orderBy('nombre')
-                ->get();
+            $query = Producto::with(['categoria.seccion', 'marca'])->orderBy('nombre');
+            
+            // Filtrar por sección si se proporciona
+            if ($request->has('seccion') && $request->seccion !== '') {
+                $query->whereHas('categoria', function($q) use ($request) {
+                    $q->where('id_seccion', $request->seccion);
+                });
+            }
+            
+            $productos = $query->get();
 
             // Agregar URL completa de imagen
             $productos->transform(function ($producto) {
@@ -313,7 +320,7 @@ class ProductosController extends Controller
 
     public function productosPublicos(Request $request)
     {
-        $query = Producto::with(['categoria']) // ✅ Quitar 'imagenes' porque no existe esa relación
+        $query = Producto::with(['categoria.seccion'])  
             ->where('activo', true)
             ->where('stock', '>', 0);
 
