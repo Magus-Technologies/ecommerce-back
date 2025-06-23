@@ -17,7 +17,8 @@ class ReniecController extends Controller
             $url = 'https://dniruc.apisperu.com/api/v1/ruc/' . $doc . '?token=' . $token;
         }
 
-        $response = Http::get($url);
+        // SOLUCIÓN: Desactiva verificación SSL solo en desarrollo
+        $response = Http::withoutVerifying()->get($url);
 
         if ($response->successful()) {
             $data = $response->json();
