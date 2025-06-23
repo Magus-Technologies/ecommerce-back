@@ -8,10 +8,20 @@ use Illuminate\Support\Facades\Validator;
 
 class MarcaProductoController extends Controller
 {
-    public function index()
+   
+    public function index(Request $request)
     {
         try {
-            $marcas = MarcaProducto::orderBy('nombre')->get();
+            $query = MarcaProducto::orderBy('nombre');
+            
+            // Filtrar marcas que tienen productos en la sección especificada
+            if ($request->has('seccion') && $request->seccion !== '') {
+                $query->whereHas('productos.categoria', function($q) use ($request) {
+                    $q->where('id_seccion', $request->seccion);
+                });
+            }
+            
+            $marcas = $query->get();
 
             // Agregar ruta completa de imagen
             $marcas->transform(function ($marca) {

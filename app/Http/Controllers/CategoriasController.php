@@ -11,10 +11,17 @@ class CategoriasController extends Controller
     /**
      * Obtener todas las categorías
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $categorias = Categoria::orderBy('nombre')->get();
+            $query = Categoria::with('seccion')->orderBy('nombre');
+            
+            // Filtrar por sección si se proporciona
+            if ($request->has('seccion') && $request->seccion !== '') {
+                $query->where('id_seccion', $request->seccion);
+            }
+            
+            $categorias = $query->get();
             
             // Agregar ruta completa de imagen
             $categorias->transform(function ($categoria) {
@@ -32,7 +39,7 @@ class CategoriasController extends Controller
             ], 500);
         }
     }
-
+    
     /**
      * Crear nueva categoría
      */
@@ -40,6 +47,7 @@ class CategoriasController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255|unique:categorias,nombre',
+            'id_seccion' => 'nullable|exists:secciones,id',
             'descripcion' => 'nullable|string',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'activo' => 'boolean'
@@ -53,7 +61,7 @@ class CategoriasController extends Controller
         }
 
         try {
-            $data = $request->only(['nombre', 'descripcion', 'activo']);
+            $data = $request->only(['nombre', 'id_seccion', 'descripcion', 'activo']);
             $data['activo'] = $request->has('activo') ? (bool)$request->activo : true;
 
            // Manejar imagen directamente en public/storage
