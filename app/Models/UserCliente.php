@@ -114,4 +114,5 @@ class UserCliente extends Authenticatable
     {
         return $this->cliente_facturacion_id !== null;
     }
+    
 }

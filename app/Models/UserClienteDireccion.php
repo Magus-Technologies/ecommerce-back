@@ -16,9 +16,10 @@ class UserClienteDireccion extends Model
         'nombre_destinatario',
         'direccion_completa',
         'referencia',
-        'departamento',
-        'provincia',
-        'distrito',
+        'id_ubigeo',
+        // 'departamento',
+        // 'provincia',
+        // 'distrito',
         'codigo_postal',
         'predeterminada',
         'activa'
@@ -88,4 +89,8 @@ class UserClienteDireccion extends Model
             }
         });
     }
+    public function ubigeo()
+{
+    return $this->belongsTo(\App\Models\UbigeoInei::class, 'id_ubigeo', 'id');
+}
 }

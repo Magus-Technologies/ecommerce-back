@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cliente;
-use App\Models\ClienteDireccion;
+use App\Models\UserCliente;
+use App\Models\UserClienteDireccion;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -11,10 +11,10 @@ use Illuminate\Support\Facades\Storage;
 
 class ClientesController extends Controller
 {
-     public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $query = Cliente::with(['tipoDocumento', 'direccionPrincipal.ubigeo']);
+            $query = UserCliente::with(['tipoDocumento', 'direccionPredeterminada']);
 
             // Filtros
             if ($request->filled('search')) {
@@ -31,20 +31,48 @@ class ClientesController extends Controller
                 $query->where('estado', $request->estado);
             }
 
+            // Agregar tipo_login si existe en la tabla
             if ($request->filled('tipo_login')) {
-                $query->where('tipo_login', $request->tipo_login);
+                // Si no tienes este campo, puedes comentar esta línea
+                // $query->where('tipo_login', $request->tipo_login);
             }
 
             if ($request->filled('fecha_desde')) {
-                $query->whereDate('fecha_registro', '>=', $request->fecha_desde);
+                $query->whereDate('created_at', '>=', $request->fecha_desde);
             }
 
             if ($request->filled('fecha_hasta')) {
-                $query->whereDate('fecha_registro', '<=', $request->fecha_hasta);
+                $query->whereDate('created_at', '<=', $request->fecha_hasta);
             }
 
-            $perPage = $request->get('per_page', 10);
-            $clientes = $query->orderBy('fecha_registro', 'desc')->paginate($perPage);
+            $perPage = $request->get('per_page', 15);
+            $clientes = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            // Transformar los datos para que coincidan con el frontend
+            $clientesTransformados = $clientes->getCollection()->map(function ($cliente) {
+                return [
+                    'id_cliente' => $cliente->id,
+                    'nombres' => $cliente->nombres,
+                    'apellidos' => $cliente->apellidos,
+                    'nombre_completo' => $cliente->nombre_completo,
+                    'email' => $cliente->email,
+                    'telefono' => $cliente->telefono,
+                    'numero_documento' => $cliente->numero_documento,
+                    'tipo_documento' => $cliente->tipoDocumento ? [
+                        'id' => $cliente->tipoDocumento->id,
+                        'nombre' => $cliente->tipoDocumento->nombre
+                    ] : null,
+                    'estado' => $cliente->estado,
+                    'fecha_registro' => $cliente->created_at->toISOString(),
+                    'foto' => $cliente->foto_url,
+                    'tipo_login' => 'manual', // Por defecto manual, ajusta según tu lógica
+                    'genero' => $cliente->genero,
+                    'fecha_nacimiento' => $cliente->fecha_nacimiento?->format('Y-m-d'),
+                ];
+            });
+
+            // Reemplazar la colección transformada
+            $clientes->setCollection($clientesTransformados);
 
             return response()->json([
                 'status' => 'success',
@@ -62,50 +90,72 @@ class ClientesController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $cliente = Cliente::with(['tipoDocumento', 'direcciones.ubigeo'])
-                             ->findOrFail($id);
+            $cliente = UserCliente::with(['tipoDocumento', 'direcciones'])
+                                 ->findOrFail($id);
 
-            // Datos ficticios para estadísticas (ya que no tienes módulo de pedidos)
+            // Transformar datos del cliente
+            $clienteData = [
+                'id_cliente' => $cliente->id,
+                'nombres' => $cliente->nombres,
+                'apellidos' => $cliente->apellidos,
+                'nombre_completo' => $cliente->nombre_completo,
+                'email' => $cliente->email,
+                'telefono' => $cliente->telefono,
+                'numero_documento' => $cliente->numero_documento,
+                'tipo_documento' => $cliente->tipoDocumento ? [
+                    'id' => $cliente->tipoDocumento->id,
+                    'nombre' => $cliente->tipoDocumento->nombre
+                ] : null,
+                'estado' => $cliente->estado,
+                'fecha_registro' => $cliente->created_at->toISOString(),
+                'foto' => $cliente->foto_url,
+                'genero' => $cliente->genero,
+                'fecha_nacimiento' => $cliente->fecha_nacimiento?->format('Y-m-d'),
+                'direcciones' => $cliente->direcciones->map(function($direccion) {
+                    return [
+                        'id' => $direccion->id,
+                        'nombre_destinatario' => $direccion->nombre_destinatario,
+                        'direccion_completa' => $direccion->direccion_completa,
+                        'referencia' => $direccion->referencia,
+                        'predeterminada' => $direccion->predeterminada,
+                        'activa' => $direccion->activa,
+                    ];
+                })
+            ];
+
+            // Estadísticas ficticias (puedes reemplazar con datos reales cuando tengas el módulo de ventas)
             $estadisticas = [
                 'total_pedidos' => rand(0, 20),
                 'total_gastado' => rand(0, 5000),
                 'ultima_compra' => now()->subDays(rand(1, 180))->format('Y-m-d'),
-                'productos_favoritos' => ['Audífonos', 'Polo Nike'],
+                'productos_favoritos' => ['Producto A', 'Producto B'],
                 'porcentaje_entregados' => rand(80, 100)
             ];
 
-            // Datos ficticios para historial de pedidos
+            // Historial ficticio
             $pedidos = collect([
                 [
-                    'id' => 12,
-                    'fecha' => '2024-05-01',
+                    'id' => 1,
+                    'fecha' => now()->subDays(5)->format('Y-m-d'),
                     'estado' => 'Entregado',
                     'monto' => 189.90,
                     'metodo_pago' => 'Tarjeta'
                 ],
                 [
-                    'id' => 10,
-                    'fecha' => '2024-04-10',
-                    'estado' => 'Cancelado',
+                    'id' => 2,
+                    'fecha' => now()->subDays(15)->format('Y-m-d'),
+                    'estado' => 'Pendiente',
                     'monto' => 65.00,
                     'metodo_pago' => 'Yape'
                 ]
             ]);
 
-            // Datos ficticios para cupones
-            $cupones = collect([
-                [
-                    'codigo' => 'WELCOME10',
-                    'descuento' => '10%',
-                    'fecha_uso' => '2024-05-01',
-                    'pedido_id' => 12
-                ]
-            ]);
+            $cupones = collect([]);
 
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'cliente' => $cliente,
+                    'cliente' => $clienteData,
                     'estadisticas' => $estadisticas,
                     'pedidos' => $pedidos,
                     'cupones' => $cupones
@@ -115,7 +165,7 @@ class ClientesController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Cliente no encontrado'
+                'message' => 'Cliente no encontrado: ' . $e->getMessage()
             ], 404);
         }
     }
@@ -123,24 +173,47 @@ class ClientesController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            $cliente = Cliente::findOrFail($id);
+            $cliente = UserCliente::findOrFail($id);
 
             $request->validate([
-                'nombres' => 'required|string|max:100',
-                'apellidos' => 'required|string|max:100',
-                'email' => 'required|email|max:150|unique:clientes,email,' . $id . ',id_cliente',
+                'nombres' => 'required|string|max:255',
+                'apellidos' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:user_clientes,email,' . $id,
                 'telefono' => 'nullable|string|max:20',
                 'fecha_nacimiento' => 'nullable|date',
-                'genero' => 'nullable|in:M,F,Otro',
+                'genero' => 'nullable|in:masculino,femenino,otro',
                 'estado' => 'required|boolean'
             ]);
 
-            $cliente->update($request->all());
+            $cliente->update($request->only([
+                'nombres', 'apellidos', 'email', 'telefono', 
+                'fecha_nacimiento', 'genero', 'estado'
+            ]));
+
+            // Transformar respuesta
+            $clienteTransformado = [
+                'id_cliente' => $cliente->id,
+                'nombres' => $cliente->nombres,
+                'apellidos' => $cliente->apellidos,
+                'nombre_completo' => $cliente->nombre_completo,
+                'email' => $cliente->email,
+                'telefono' => $cliente->telefono,
+                'numero_documento' => $cliente->numero_documento,
+                'tipo_documento' => $cliente->tipoDocumento ? [
+                    'id' => $cliente->tipoDocumento->id,
+                    'nombre' => $cliente->tipoDocumento->nombre
+                ] : null,
+                'estado' => $cliente->estado,
+                'fecha_registro' => $cliente->created_at->toISOString(),
+                'foto' => $cliente->foto_url,
+                'genero' => $cliente->genero,
+                'fecha_nacimiento' => $cliente->fecha_nacimiento?->format('Y-m-d'),
+            ];
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cliente actualizado correctamente',
-                'data' => $cliente->load(['tipoDocumento'])
+                'data' => $clienteTransformado
             ]);
 
         } catch (\Exception $e) {
@@ -154,10 +227,10 @@ class ClientesController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
-            $cliente = Cliente::findOrFail($id);
+            $cliente = UserCliente::findOrFail($id);
             
             // Soft delete - cambiar estado a inactivo
-            $cliente->update(['estado' => 0]);
+            $cliente->update(['estado' => false]);
 
             return response()->json([
                 'status' => 'success',
@@ -167,7 +240,7 @@ class ClientesController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al desactivar cliente'
+                'message' => 'Error al desactivar cliente: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -175,19 +248,22 @@ class ClientesController extends Controller
     public function toggleEstado($id): JsonResponse
     {
         try {
-            $cliente = Cliente::findOrFail($id);
+            $cliente = UserCliente::findOrFail($id);
             $cliente->update(['estado' => !$cliente->estado]);
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Estado actualizado correctamente',
-                'data' => $cliente
+                'data' => [
+                    'id_cliente' => $cliente->id,
+                    'estado' => $cliente->estado
+                ]
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al cambiar estado'
+                'message' => 'Error al cambiar estado: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -195,9 +271,11 @@ class ClientesController extends Controller
     public function estadisticas(): JsonResponse
     {
         try {
-            $totalClientes = Cliente::count();
-            $clientesActivos = Cliente::where('estado', 1)->count();
-            $clientesNuevos = Cliente::whereMonth('fecha_registro', now()->month)->count();
+            $totalClientes = UserCliente::count();
+            $clientesActivos = UserCliente::where('estado', true)->count();
+            $clientesNuevos = UserCliente::whereMonth('created_at', now()->month)
+                                       ->whereYear('created_at', now()->year)
+                                       ->count();
 
             return response()->json([
                 'status' => 'success',
@@ -211,7 +289,7 @@ class ClientesController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al obtener estadísticas'
+                'message' => 'Error al obtener estadísticas: ' . $e->getMessage()
             ], 500);
         }
     }

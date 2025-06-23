@@ -22,7 +22,8 @@ Route::aliasMiddleware('permission', CheckPermission::class);
 
 Route::post('/login', [AdminController::class, 'login']);
 Route::post('/register', [AdminController::class, 'register']); 
-
+Route::post('/check-email', [AdminController::class, 'checkEmail']);
+Route::post('/check-documento', [AdminController::class, 'checkDocumento']);
 // Rutas para tipos de documentos
 Route::get('/document-types', [DocumentTypeController::class, 'getDocumentTypes']);
 

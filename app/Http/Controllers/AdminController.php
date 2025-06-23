@@ -95,11 +95,44 @@ class AdminController extends Controller
         ], 401);
     }
 
+  public function checkEmail(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email'
+        ]);
+
+        $emailExists = UserCliente::where('email', $request->email)->exists() || 
+                      User::where('email', $request->email)->exists();
+
+        return response()->json([
+            'exists' => $emailExists,
+            'message' => $emailExists ? 'Este correo ya está registrado' : 'Correo disponible'
+        ]);
+    }
+
     /**
-     * Registro de nuevos clientes
+     * Verificar si el número de documento ya existe
+     */
+    public function checkDocumento(Request $request)
+    {
+        $request->validate([
+            'numero_documento' => 'required|string'
+        ]);
+
+        $documentoExists = UserCliente::where('numero_documento', $request->numero_documento)->exists();
+
+        return response()->json([
+            'exists' => $documentoExists,
+            'message' => $documentoExists ? 'Este número de documento ya está registrado' : 'Documento disponible'
+        ]);
+    }
+
+    /**
+     * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
      */
     public function register(Request $request)
     {
+        // Validaciones con mensajes personalizados
         $request->validate([
             'nombres' => 'required|string|max:255',
             'apellidos' => 'required|string|max:255',
@@ -113,10 +146,21 @@ class AdminController extends Controller
             
             // Datos de dirección (opcional)
             'direccion_completa' => 'nullable|string',
-            'departamento' => 'nullable|string|max:100',
-            'provincia' => 'nullable|string|max:100',
-            'distrito' => 'nullable|string|max:100'
+            'ubigeo' => 'nullable|string|exists:ubigeo_inei,id_ubigeo'
+        ], [
+            // Mensajes personalizados
+            'email.unique' => 'Este correo electrónico ya está registrado.',
+            'numero_documento.unique' => 'Este número de documento ya está registrado.',
+            'ubigeo.string' => 'El código de ubicación debe ser válido.',
+            'ubigeo.exists' => 'La ubicación seleccionada no es válida.',
+            'password.confirmed' => 'Las contraseñas no coinciden.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
+            'email.email' => 'Ingresa un correo electrónico válido.',
+            'tipo_documento_id.exists' => 'El tipo de documento seleccionado no es válido.',
         ]);
+
+        // Convertir ubigeo a string si viene como número
+        $ubigeo = $request->ubigeo ? (string) $request->ubigeo : null;
 
         try {
             // Crear cliente
@@ -134,18 +178,17 @@ class AdminController extends Controller
             ]);
 
             // Crear dirección si se proporciona
-            if ($request->direccion_completa) {
+            if ($request->direccion_completa && $ubigeo) {
                 $cliente->direcciones()->create([
                     'nombre_destinatario' => $cliente->nombre_completo,
                     'direccion_completa' => $request->direccion_completa,
-                    'departamento' => $request->departamento ?? 'Lima',
-                    'provincia' => $request->provincia ?? 'Lima',
-                    'distrito' => $request->distrito ?? 'Lima',
+                    'id_ubigeo' => $ubigeo,
                     'predeterminada' => true,
                     'activa' => true
                 ]);
             }
 
+            // Generar token
             $token = $cliente->createToken('cliente_token')->plainTextToken;
 
             return response()->json([
@@ -155,8 +198,12 @@ class AdminController extends Controller
                 'user' => [
                     'id' => $cliente->id,
                     'nombre_completo' => $cliente->nombre_completo,
+                    'nombres' => $cliente->nombres,
+                    'apellidos' => $cliente->apellidos,
                     'email' => $cliente->email,
                     'telefono' => $cliente->telefono,
+                    'numero_documento' => $cliente->numero_documento,
+                    'tipo_documento' => $cliente->tipoDocumento?->nombre,
                 ],
                 'token' => $token,
             ], 201);
@@ -168,6 +215,7 @@ class AdminController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Obtener información del usuario autenticado (admin o cliente)
