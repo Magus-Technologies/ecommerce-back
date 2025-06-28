@@ -4,7 +4,9 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\BannersPromocionalesController;
+use App\Http\Controllers\CuponesController;
 use App\Http\Controllers\MarcaProductoController;
+use App\Http\Controllers\OfertasController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\DocumentTypeController;
@@ -39,6 +41,12 @@ Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSi
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
+
+// Rutas públicas para ofertas
+Route::get('/ofertas/publicas', [OfertasController::class, 'ofertasPublicas']);
+Route::get('/ofertas/flash-sales', [OfertasController::class, 'flashSales']);
+Route::get('/ofertas/productos', [OfertasController::class, 'productosEnOferta']);
+Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -119,6 +127,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
     Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
 
+    // ✅ RUTAS PROTEGIDAS PARA OFERTAS Y CUPONES
+    Route::middleware('permission:ofertas.ver')->group(function () {
+        Route::resource('ofertas', OfertasController::class);
+        Route::get('/tipos-ofertas', [OfertasController::class, 'tiposOfertas']);
+    });
+
+    Route::middleware('permission:cupones.ver')->group(function () {
+        Route::resource('cupones', CuponesController::class);
+    });
 
     // Protección de rutas del módulo banners con sus respectivos permisos
     Route::middleware('permission:banners.ver')->group(function () {
@@ -183,4 +200,3 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/clientes/{id}', [ClientesController::class, 'destroy']);
     });
 });
-
