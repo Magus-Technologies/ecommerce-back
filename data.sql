@@ -1,4 +1,12 @@
 /*
+php artisan tinker
+use Spatie\Permission\Models\Permission;
+collect(['ver', 'create', 'show', 'edit', 'delete'])->each(function ($accion) {
+    \Spatie\Permission\Models\Permission::create([
+        'name' => "ofertas.$accion",
+        'guard_name' => 'web',
+    ]);
+});
   # Crear tabla de clientes para facturación
 
   1. Nueva Tabla
@@ -522,3 +530,76 @@ ALTER TABLE ventas ADD CONSTRAINT fk_ventas_user_cliente_id
 -- Agregar constraint para asegurar que al menos uno de los dos clientes esté presente
 ALTER TABLE ventas ADD CONSTRAINT chk_ventas_cliente 
     CHECK (cliente_id IS NOT NULL OR user_cliente_id IS NOT NULL);
+
+
+-- primero tipoo de ofertas
+ CREATE TABLE tipos_ofertas (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    icono VARCHAR(100),
+    activo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ofertas
+CREATE TABLE ofertas (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(255) NOT NULL,
+    subtitulo VARCHAR(255),
+    descripcion TEXT,
+    tipo_oferta_id INT UNSIGNED,
+    tipo_descuento ENUM('porcentaje', 'cantidad_fija') NOT NULL,
+    valor_descuento DECIMAL(10, 2) NOT NULL,
+    precio_minimo DECIMAL(10, 2),
+    fecha_inicio DATETIME NOT NULL,
+    fecha_fin DATETIME NOT NULL,
+    imagen VARCHAR(255),
+    banner_imagen VARCHAR(255),
+    color_fondo VARCHAR(20) DEFAULT '#3B82F6',
+    texto_boton VARCHAR(100) DEFAULT 'Compra ahora',
+    enlace_url VARCHAR(255) DEFAULT '/shop',
+    limite_uso INT,
+    usos_actuales INT DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    mostrar_countdown TINYINT(1) DEFAULT 0,
+    mostrar_en_slider TINYINT(1) DEFAULT 0,
+    mostrar_en_banner TINYINT(1) DEFAULT 0,
+    prioridad INT DEFAULT 0,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (tipo_oferta_id) REFERENCES tipos_ofertas(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE ofertas_productos (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    oferta_id INT UNSIGNED NOT NULL,
+    producto_id INT UNSIGNED NOT NULL,
+    precio_oferta DECIMAL(10, 2),
+    stock_oferta INT,
+    vendidos_oferta INT DEFAULT 0,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    UNIQUE KEY (oferta_id, producto_id),
+    FOREIGN KEY (oferta_id) REFERENCES ofertas(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE cupones (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(50) UNIQUE NOT NULL,
+    titulo VARCHAR(255) NOT NULL,
+    descripcion TEXT,
+    tipo_descuento ENUM('porcentaje', 'cantidad_fija') NOT NULL,
+    valor_descuento DECIMAL(10, 2) NOT NULL,
+    compra_minima DECIMAL(10, 2),
+    fecha_inicio DATETIME NOT NULL,
+    fecha_fin DATETIME NOT NULL,
+    limite_uso INT,
+    usos_actuales INT DEFAULT 0,
+    solo_primera_compra TINYINT(1) DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
