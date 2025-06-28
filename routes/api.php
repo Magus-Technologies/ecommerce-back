@@ -17,6 +17,7 @@ use App\Http\Middleware\CheckPermission;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReniecController;
 use App\Http\Controllers\ClientesController;
+use App\Http\Controllers\PedidosController;
 
 Route::aliasMiddleware('permission', CheckPermission::class);
 
@@ -59,7 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}/anular', [VentasController::class, 'anular']);
     });
 
-
+    
     // Rutas de usuarios protegidas con permiso usuarios.ver
     Route::middleware('permission:usuarios.ver')->group(function () {
         Route::get('/usuarios', [UsuariosController::class, 'index']);
@@ -80,46 +81,86 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/roles', [RoleController::class, 'getRoles']);
 
-    // Rutas para categorías
-    Route::get('/categorias', [CategoriasController::class, 'index']);
-    Route::post('/categorias', [CategoriasController::class, 'store']);
-    Route::get('/categorias/{id}', [CategoriasController::class, 'show']);
-    Route::put('/categorias/{id}', [CategoriasController::class, 'update']); // POST para manejar archivos
-    Route::delete('/categorias/{id}', [CategoriasController::class, 'destroy']);
-    Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
+  // Productos - Protección con permisos
+    Route::middleware('permission:productos.ver')->group(function () {
+        Route::get('/productos', [ProductosController::class, 'index']);
+        Route::get('/productos/stock/bajo', [ProductosController::class, 'stockBajo']);
+        Route::get('/productos/estadisticas', [ProductosController::class, 'estadisticasDashboard']);
+        Route::get('/productos/stock-critico', [ProductosController::class, 'productosStockCritico']);
+        Route::get('/productos/{id}', [ProductosController::class, 'show']);
+    });
 
-    // Rutas para secciones
-    Route::get('/secciones', [App\Http\Controllers\SeccionController::class, 'index']);
-    Route::post('/secciones', [App\Http\Controllers\SeccionController::class, 'store']);
-    Route::get('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'show']);
-    Route::put('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'update']); // ← AGREGAR ESTA LÍNEA
-    Route::delete('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'destroy']);
-    Route::patch('/categorias/{id}/migrar-seccion', [App\Http\Controllers\SeccionController::class, 'migrarCategoria']);
-    
-    // Rutas para marcas
-    Route::get('/marcas', [MarcaProductoController::class, 'index']);
-    Route::get('/marcas/activas', [MarcaProductoController::class, 'marcasActivas']); // ← MOVER ANTES
-    Route::post('/marcas', [MarcaProductoController::class, 'store']);
-    Route::get('/marcas/{id}', [MarcaProductoController::class, 'show']); // ← DESPUÉS
-    Route::put('/marcas/{id}', [MarcaProductoController::class, 'update']);
-    Route::delete('/marcas/{id}', [MarcaProductoController::class, 'destroy']);
-    Route::patch('/marcas/{id}/toggle-estado', [MarcaProductoController::class, 'toggleEstado']);
+    Route::middleware('permission:productos.create')->group(function () {
+        Route::post('/productos', [ProductosController::class, 'store']);
+    });
 
+    Route::middleware('permission:productos.edit')->group(function () {
+        Route::put('/productos/{id}', [ProductosController::class, 'update']);
+        Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
+    });
 
-    // Rutas para productos
+    Route::middleware('permission:productos.delete')->group(function () {
+        Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
+    });
 
-    Route::get('/productos/stock/bajo', [ProductosController::class, 'stockBajo']);
-    Route::get('/productos/estadisticas', [ProductosController::class, 'estadisticasDashboard']);
-    Route::get('/productos/stock-critico', [ProductosController::class, 'productosStockCritico']);
+    // Categorías - Protección con permisos
+    Route::middleware('permission:categorias.ver')->group(function () {
+        Route::get('/categorias', [CategoriasController::class, 'index']);
+        Route::get('/categorias/{id}', [CategoriasController::class, 'show']);
+    });
 
-    Route::get('/productos', [ProductosController::class, 'index']);
-    Route::post('/productos', [ProductosController::class, 'store']);
-    Route::get('/productos/{id}', [ProductosController::class, 'show']);
-    Route::put('/productos/{id}', [ProductosController::class, 'update']); // POST para manejar archivos
-    Route::delete('/productos/{id}', [ProductosController::class, 'destroy']);
-    Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
+    Route::middleware('permission:categorias.create')->group(function () {
+        Route::post('/categorias', [CategoriasController::class, 'store']);
+    });
 
+    Route::middleware('permission:categorias.edit')->group(function () {
+        Route::put('/categorias/{id}', [CategoriasController::class, 'update']);
+        Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
+        Route::patch('/categorias/{id}/migrar-seccion', [App\Http\Controllers\SeccionController::class, 'migrarCategoria']);
+    });
 
+    Route::middleware('permission:categorias.delete')->group(function () {
+        Route::delete('/categorias/{id}', [CategoriasController::class, 'destroy']);
+    });
+
+    // Marcas - Protección con permisos
+    Route::middleware('permission:marcas.ver')->group(function () {
+        Route::get('/marcas', [MarcaProductoController::class, 'index']);
+        Route::get('/marcas/activas', [MarcaProductoController::class, 'marcasActivas']);
+        Route::get('/marcas/{id}', [MarcaProductoController::class, 'show']);
+    });
+
+    Route::middleware('permission:marcas.create')->group(function () {
+        Route::post('/marcas', [MarcaProductoController::class, 'store']);
+    });
+
+    Route::middleware('permission:marcas.edit')->group(function () {
+        Route::put('/marcas/{id}', [MarcaProductoController::class, 'update']);
+        Route::patch('/marcas/{id}/toggle-estado', [MarcaProductoController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:marcas.delete')->group(function () {
+        Route::delete('/marcas/{id}', [MarcaProductoController::class, 'destroy']);
+    });
+
+    // Secciones - Protección con permisos
+    Route::middleware('permission:secciones.ver')->group(function () {
+        Route::get('/secciones', [App\Http\Controllers\SeccionController::class, 'index']);
+        Route::get('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'show']);
+    });
+
+    Route::middleware('permission:secciones.create')->group(function () {
+        Route::post('/secciones', [App\Http\Controllers\SeccionController::class, 'store']);
+    });
+
+    Route::middleware('permission:secciones.edit')->group(function () {
+        Route::put('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'update']);
+    });
+
+    Route::middleware('permission:secciones.delete')->group(function () {
+        Route::delete('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'destroy']);
+    });
+   
     // Protección de rutas del módulo banners con sus respectivos permisos
     Route::middleware('permission:banners.ver')->group(function () {
         Route::get('/banners', [BannersController::class, 'index']);
@@ -181,6 +222,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('permission:clientes.delete')->group(function () {
         Route::delete('/clientes/{id}', [ClientesController::class, 'destroy']);
+    });
+
+    // Rutas de Pedidos
+    Route::prefix('pedidos')->group(function () {
+        Route::get('/', [PedidosController::class, 'index'])->middleware('permission:pedidos.ver');
+        Route::get('/estados', [PedidosController::class, 'getEstados']);
+        Route::get('/metodos-pago', [PedidosController::class, 'getMetodosPago']);
+        Route::get('/{id}', [PedidosController::class, 'show'])->middleware('permission:pedidos.show');
+        Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit');
+        Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
     });
 });
 

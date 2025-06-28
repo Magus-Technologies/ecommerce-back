@@ -16,8 +16,7 @@ class CategoriasController extends Controller
         try {
             $query = Categoria::with('seccion')->orderBy('nombre');
             
-            // Filtrar por sección si se proporciona
-            if ($request->has('seccion') && $request->seccion !== '') {
+            if ($request->has('seccion') && $request->seccion !== '' && $request->seccion !== null) {
                 $query->where('id_seccion', $request->seccion);
             }
             
@@ -47,7 +46,7 @@ class CategoriasController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255|unique:categorias,nombre',
-            'id_seccion' => 'nullable|exists:secciones,id',
+            'id_seccion' => 'required|exists:secciones,id',
             'descripcion' => 'nullable|string',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'activo' => 'boolean'
@@ -130,7 +129,8 @@ class CategoriasController extends Controller
             'nombre' => 'required|string|max:255|unique:categorias,nombre,' . $id,
             'descripcion' => 'nullable|string',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'activo' => 'required|in:true,false,1,0'
+            'activo' => 'required|in:true,false,1,0',
+            'id_seccion' => 'required|exists:secciones,id'
         ]);
 
         if ($validator->fails()) {
