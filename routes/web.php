@@ -62,10 +62,10 @@ Route::get('/auth/google/callback', function() {
         ];
 
         // Redirigir al frontend con el token como parámetro
-        $frontendUrl = env('FRONTEND_URL', 'http://localhost:4200');
+        $frontendUrl = env('FRONTEND_URL');
         return redirect($frontendUrl . '?token=' . $token . '&user=' . urlencode(json_encode($userData)) . '&tipo_usuario=cliente');
 
     } catch (Exception $e) {
-        return redirect(env('FRONTEND_URL', 'http://localhost:4200') . '/account?error=google_auth_failed');
+        return redirect(env('FRONTEND_URL') . '/account?error=google_auth_failed');
     }
 });
