@@ -6,8 +6,10 @@ use App\Models\Oferta;
 use App\Models\TipoOferta;
 use App\Models\Cupon;
 use App\Models\OfertaProducto;
+use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class OfertasController extends Controller
 {
@@ -27,14 +29,15 @@ class OfertasController extends Controller
                     'descripcion' => $oferta->descripcion,
                     'tipo_descuento' => $oferta->tipo_descuento,
                     'valor_descuento' => $oferta->valor_descuento,
-                    'fecha_inicio' => $oferta->fecha_inicio ? $oferta->fecha_inicio->format('c') : null,
-                    'fecha_fin' => $oferta->fecha_fin ? $oferta->fecha_fin->format('c') : null,
+                    'fecha_inicio' => $oferta->fecha_inicio ? Carbon::parse($oferta->fecha_inicio)->toISOString() : null,
+                    'fecha_fin' => $oferta->fecha_fin ? Carbon::parse($oferta->fecha_fin)->toISOString() : null,
                     'imagen_url' => $oferta->imagen_url,
                     'banner_imagen_url' => $oferta->banner_imagen_url,
                     'color_fondo' => $oferta->color_fondo,
                     'texto_boton' => $oferta->texto_boton,
                     'enlace_url' => $oferta->enlace_url,
                     'mostrar_countdown' => $oferta->mostrar_countdown,
+                    'timestamp_servidor' => Carbon::now()->toISOString(),
                     'productos' => $oferta->productos->map(function ($productoOferta) use ($oferta) {
                         $producto = $productoOferta->producto;
                         return [
@@ -65,11 +68,13 @@ class OfertasController extends Controller
                     'id' => $oferta->id,
                     'titulo' => $oferta->titulo,
                     'descripcion' => $oferta->descripcion,
-                    'fecha_fin' => $oferta->fecha_fin ? $oferta->fecha_fin->format('c') : null,
+                    'fecha_fin' => $oferta->fecha_fin ? Carbon::parse($oferta->fecha_fin)->toISOString() : null,
                     'banner_imagen_url' => $oferta->banner_imagen_url,
                     'color_fondo' => $oferta->color_fondo,
                     'texto_boton' => $oferta->texto_boton,
                     'enlace_url' => $oferta->enlace_url,
+                    'mostrar_countdown' => $oferta->mostrar_countdown,
+                    'timestamp_servidor' => Carbon::now()->toISOString(),
                 ];
             });
 
@@ -99,10 +104,11 @@ class OfertasController extends Controller
                     'stock_oferta' => $productoOferta->stock_oferta,
                     'vendidos_oferta' => $productoOferta->vendidos_oferta,
                     'imagen_url' => $producto->imagen_url,
-                    'fecha_fin_oferta' => $oferta->fecha_fin ? $oferta->fecha_fin->format('c') : null,
+                    'fecha_fin_oferta' => $oferta->fecha_fin ? Carbon::parse($oferta->fecha_fin)->toISOString() : null,
                     'es_flash_sale' => $oferta->mostrar_countdown,
                     'categoria' => $producto->categoria->nombre ?? null,
                     'marca' => $producto->marca->nombre ?? null,
+                    'timestamp_servidor' => Carbon::now()->toISOString(),
                 ];
             });
 
@@ -266,5 +272,175 @@ class OfertasController extends Controller
     {
         $tipos = TipoOferta::activos()->get();
         return response()->json($tipos);
+    }
+
+    // ==================== GESTIÓN DE PRODUCTOS EN OFERTAS ====================
+
+    /**
+     * Obtener productos disponibles para agregar a una oferta
+     */
+    public function productosDisponibles(Request $request)
+    {
+        $query = Producto::where('activo', true);
+
+        // Filtrar por búsqueda
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $query->where(function($q) use ($search) {
+                $q->where('nombre', 'like', "%{$search}%")
+                  ->orWhere('codigo_producto', 'like', "%{$search}%");
+            });
+        }
+
+        // Filtrar por categoría
+        if ($request->has('categoria_id')) {
+            $query->where('categoria_id', $request->get('categoria_id'));
+        }
+
+        $productos = $query->with(['categoria', 'marca'])
+            ->select('id', 'nombre', 'codigo_producto', 'precio_venta', 'stock', 'imagen', 'categoria_id', 'marca_id')
+            ->paginate(20);
+
+        // Transformar los datos para incluir imagen_url
+        $productos->getCollection()->transform(function ($producto) {
+            return [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'codigo' => $producto->codigo_producto, // Mapear para el frontend
+                'precio_venta' => $producto->precio_venta,
+                'stock' => $producto->stock,
+                'imagen_url' => $producto->imagen_url, // Usar el accessor del modelo
+                'categoria' => $producto->categoria,
+                'marca' => $producto->marca,
+            ];
+        });
+
+        return response()->json($productos);
+    }
+
+    /**
+     * Obtener productos de una oferta específica
+     */
+    public function productosOferta($ofertaId)
+    {
+        $productos = OfertaProducto::with(['producto.categoria', 'producto.marca'])
+            ->where('oferta_id', $ofertaId)
+            ->get()
+            ->map(function ($productoOferta) {
+                $producto = $productoOferta->producto;
+                return [
+                    'id' => $productoOferta->id,
+                    'producto_id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'codigo' => $producto->codigo_producto, // Mapear para el frontend
+                    'precio_original' => $producto->precio_venta,
+                    'precio_oferta' => $productoOferta->precio_oferta,
+                    'stock_original' => $producto->stock,
+                    'stock_oferta' => $productoOferta->stock_oferta,
+                    'vendidos_oferta' => $productoOferta->vendidos_oferta,
+                    'imagen_url' => $producto->imagen_url, // Usar el accessor del modelo
+                    'categoria' => $producto->categoria->nombre ?? null,
+                    'marca' => $producto->marca->nombre ?? null,
+                ];
+            });
+
+        return response()->json($productos);
+    }
+
+    /**
+     * Agregar producto a una oferta
+     */
+    public function agregarProducto(Request $request, $ofertaId)
+    {
+        $request->validate([
+            'producto_id' => 'required|exists:productos,id',
+            'precio_oferta' => 'nullable|numeric|min:0',
+            'stock_oferta' => 'required|integer|min:1'
+        ]);
+
+        $oferta = Oferta::findOrFail($ofertaId);
+        $producto = Producto::findOrFail($request->producto_id);
+
+        // Verificar que el producto no esté ya en la oferta
+        $existe = OfertaProducto::where('oferta_id', $ofertaId)
+            ->where('producto_id', $request->producto_id)
+            ->exists();
+
+        if ($existe) {
+            return response()->json([
+                'message' => 'El producto ya está en esta oferta'
+            ], 422);
+        }
+
+        // Calcular precio de oferta si no se proporciona
+        $precioOferta = $request->precio_oferta ?? $oferta->calcularPrecioOferta($producto->precio_venta);
+
+        // Verificar que el stock de oferta no exceda el stock del producto
+        if ($request->stock_oferta > $producto->stock) {
+            return response()->json([
+                'message' => 'El stock de oferta no puede ser mayor al stock disponible del producto'
+            ], 422);
+        }
+
+        $productoOferta = OfertaProducto::create([
+            'oferta_id' => $ofertaId,
+            'producto_id' => $request->producto_id,
+            'precio_oferta' => $precioOferta,
+            'stock_oferta' => $request->stock_oferta,
+            'vendidos_oferta' => 0
+        ]);
+
+        return response()->json([
+            'message' => 'Producto agregado a la oferta correctamente',
+            'producto_oferta' => $productoOferta->load('producto')
+        ], 201);
+    }
+
+    /**
+     * Actualizar producto en oferta
+     */
+    public function actualizarProducto(Request $request, $ofertaId, $productoOfertaId)
+    {
+        $request->validate([
+            'precio_oferta' => 'required|numeric|min:0',
+            'stock_oferta' => 'required|integer|min:1'
+        ]);
+
+        $productoOferta = OfertaProducto::where('oferta_id', $ofertaId)
+            ->where('id', $productoOfertaId)
+            ->firstOrFail();
+
+        // Verificar que el stock de oferta no exceda el stock del producto
+        if ($request->stock_oferta > $productoOferta->producto->stock) {
+            return response()->json([
+                'message' => 'El stock de oferta no puede ser mayor al stock disponible del producto'
+            ], 422);
+        }
+
+        $productoOferta->update([
+            'precio_oferta' => $request->precio_oferta,
+            'stock_oferta' => $request->stock_oferta
+        ]);
+
+        return response()->json([
+            'message' => 'Producto actualizado correctamente',
+            'producto_oferta' => $productoOferta->load('producto')
+        ]);
+    }
+
+    /**
+     * Eliminar producto de oferta
+     */
+    public function eliminarProducto($ofertaId, $productoOfertaId)
+    {
+        $productoOferta = OfertaProducto::where('oferta_id', $ofertaId)
+            ->where('id', $productoOfertaId)
+            ->firstOrFail();
+
+        $productoOferta->delete();
+
+        return response()->json([
+            'message' => 'Producto eliminado de la oferta correctamente'
+        ]);
     }
 }

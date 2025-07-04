@@ -398,6 +398,47 @@ class ProductosController extends Controller
 
         return response()->json($categorias);
     }
+     public function buscarProductos(Request $request)
+    {
+        try {
+            $termino = $request->get('q', '');
+            
+            if (strlen($termino) < 2) {
+                return response()->json([]);
+            }
+
+            $productos = Producto::with(['categoria'])
+                ->where('activo', true)
+                ->where('stock', '>', 0)
+                ->where(function ($query) use ($termino) {
+                    $query->where('nombre', 'LIKE', "%{$termino}%")
+                          ->orWhere('descripcion', 'LIKE', "%{$termino}%")
+                          ->orWhere('codigo_producto', 'LIKE', "%{$termino}%");
+                })
+                ->limit(10)
+                ->get()
+                ->map(function ($producto) {
+                    return [
+                        'id' => $producto->id,
+                        'nombre' => $producto->nombre,
+                        'descripcion' => $producto->descripcion,
+                        'precio' => $producto->precio_venta,
+                        'categoria' => $producto->categoria?->nombre,
+                        'categoria_id' => $producto->categoria_id,
+                        'imagen_url' => $producto->imagen ? asset('storage/productos/' . $producto->imagen) : null,
+                        'url' => route('producto.detalle', $producto->id) // Asumiendo que tienes esta ruta
+                    ];
+                });
+
+            return response()->json($productos);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al buscar productos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
     /**
      * Obtener estadísticas de productos para dashboard
