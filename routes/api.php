@@ -38,6 +38,7 @@ Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvinci
 Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 
 Route::get('/productos-publicos', [ProductosController::class, 'productosPublicos']);
+Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
@@ -125,10 +126,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:ofertas.ver')->group(function () {
         Route::resource('ofertas', OfertasController::class);
         Route::get('/tipos-ofertas', [OfertasController::class, 'tiposOfertas']);
+        
+        // ✅ NUEVAS RUTAS PARA GESTIÓN DE PRODUCTOS EN OFERTAS
+        Route::get('/productos-disponibles', [OfertasController::class, 'productosDisponibles']);
+        Route::get('/ofertas/{oferta}/productos', [OfertasController::class, 'productosOferta']);
+        Route::post('/ofertas/{oferta}/productos', [OfertasController::class, 'agregarProducto']);
+        Route::put('/ofertas/{oferta}/productos/{productoOferta}', [OfertasController::class, 'actualizarProducto']);
+        Route::delete('/ofertas/{oferta}/productos/{productoOferta}', [OfertasController::class, 'eliminarProducto']);
     });
 
     Route::middleware('permission:cupones.ver')->group(function () {
         Route::resource('cupones', CuponesController::class);
+    });
+
     Route::middleware('permission:categorias.edit')->group(function () {
         Route::put('/categorias/{id}', [CategoriasController::class, 'update']);
         Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
@@ -239,7 +249,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:clientes.delete')->group(function () {
         Route::delete('/clientes/{id}', [ClientesController::class, 'destroy']);
     });
-});
 
     // Rutas de Pedidos
     Route::prefix('pedidos')->group(function () {
@@ -251,4 +260,3 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
     });
 });
-
