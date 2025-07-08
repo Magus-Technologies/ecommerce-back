@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReniecController;
 use App\Http\Controllers\ClientesController;
 use App\Http\Controllers\PedidosController;
+use App\Http\Controllers\PasswordResetController;
 
 Route::aliasMiddleware('permission', CheckPermission::class);
 
@@ -260,3 +261,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
     });
 });
+
+// Rutas de recuperación de contraseña
+Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
+Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+Route::post('/verify-reset-token', [PasswordResetController::class, 'verifyResetToken']);

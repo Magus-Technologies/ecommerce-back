@@ -62,7 +62,7 @@ Route::get('/auth/google/callback', function() {
         ];
 
         // Redirigir al frontend con el token como parámetro
-        $frontendUrl = env('FRONTEND_URL');
+        $frontendUrl = 'https://magus-ecommerce.com/ecommerce/dist/marketpro/browser';
         return redirect($frontendUrl . '?token=' . $token . '&user=' . urlencode(json_encode($userData)) . '&tipo_usuario=cliente');
 
     } catch (Exception $e) {
