@@ -180,7 +180,13 @@ class PasswordResetController extends Controller
 
     private function sendResetEmail($user, $token)
     {
-        $resetUrl = env('FRONTEND_URL') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+        $frontendUrl = config('app.frontend_url');
+        
+        if (!$frontendUrl) {
+            throw new \Exception('FRONTEND_URL no está configurada correctamente');
+        }
+        
+        $resetUrl = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
         
         $data = [
             'user' => $user,
@@ -190,7 +196,8 @@ class PasswordResetController extends Controller
 
         Mail::send('emails.password-reset', $data, function($message) use ($user) {
             $message->to($user->email, $user->nombre_completo)
-                   ->subject('Recuperación de contraseña - MarketPro');
+                   ->subject('Recuperación de contraseña - Ecommerce Magus')
+                   ->from(config('mail.from.address'), config('mail.from.name'));
         });
     }
 }
