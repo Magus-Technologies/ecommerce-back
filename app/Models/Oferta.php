@@ -15,7 +15,7 @@ class Oferta extends Model
         'fecha_inicio', 'fecha_fin', 'imagen', 'banner_imagen',
         'color_fondo', 'texto_boton', 'enlace_url', 'limite_uso',
         'usos_actuales', 'activo', 'mostrar_countdown', 'mostrar_en_slider',
-        'mostrar_en_banner', 'prioridad'
+        'mostrar_en_banner', 'prioridad', 'es_oferta_principal'
     ];
 
     protected $casts = [
@@ -25,6 +25,7 @@ class Oferta extends Model
         'mostrar_countdown' => 'boolean',
         'mostrar_en_slider' => 'boolean',
         'mostrar_en_banner' => 'boolean',
+        'es_oferta_principal' => 'boolean',
         'valor_descuento' => 'decimal:2',
         'precio_minimo' => 'decimal:2'
     ];
@@ -95,6 +96,12 @@ class Oferta extends Model
         return $query->where('mostrar_en_banner', true);
     }
 
+    // ✅ NUEVO SCOPE: Oferta principal del día
+    public function scopeOfertaPrincipal($query)
+    {
+        return $query->where('es_oferta_principal', true);
+    }
+
     // Métodos de utilidad
     public function calcularPrecioOferta($precioOriginal)
     {
@@ -109,5 +116,30 @@ class Oferta extends Model
         return $this->activo && 
                $this->fecha_inicio <= now() && 
                $this->fecha_fin >= now();
+    }
+
+    // ✅ NUEVO MÉTODO: Marcar como oferta principal
+    public function marcarComoPrincipal()
+    {
+        // Primero, quitar el estado principal de todas las demás ofertas
+        static::where('es_oferta_principal', true)->update(['es_oferta_principal' => false]);
+        
+        // Luego, marcar esta oferta como principal
+        $this->update(['es_oferta_principal' => true]);
+    }
+
+    // ✅ NUEVO MÉTODO: Quitar estado principal
+    public function quitarEstadoPrincipal()
+    {
+        $this->update(['es_oferta_principal' => false]);
+    }
+
+    // ✅ NUEVO MÉTODO ESTÁTICO: Obtener oferta principal activa
+    public static function obtenerOfertaPrincipalActiva()
+    {
+        return static::with(['productos.producto'])
+            ->activas()
+            ->ofertaPrincipal()
+            ->first();
     }
 }

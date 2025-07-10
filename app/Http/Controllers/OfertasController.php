@@ -37,6 +37,7 @@ class OfertasController extends Controller
                     'texto_boton' => $oferta->texto_boton,
                     'enlace_url' => $oferta->enlace_url,
                     'mostrar_countdown' => $oferta->mostrar_countdown,
+                    'es_oferta_principal' => $oferta->es_oferta_principal,
                     'timestamp_servidor' => Carbon::now()->toISOString(),
                     'productos' => $oferta->productos->map(function ($productoOferta) use ($oferta) {
                         $producto = $productoOferta->producto;
@@ -54,6 +55,61 @@ class OfertasController extends Controller
             });
 
         return response()->json($ofertas);
+    }
+
+    // ✅ NUEVO ENDPOINT: Obtener oferta principal del día
+    public function ofertaPrincipalDelDia()
+    {
+        $ofertaPrincipal = Oferta::obtenerOfertaPrincipalActiva();
+
+        if (!$ofertaPrincipal) {
+            return response()->json([
+                'oferta_principal' => null,
+                'productos' => [],
+                'mensaje' => 'No hay oferta principal activa'
+            ]);
+        }
+
+        $productos = $ofertaPrincipal->productos->map(function ($productoOferta) use ($ofertaPrincipal) {
+            $producto = $productoOferta->producto;
+            $precioOferta = $productoOferta->precio_oferta ?? $ofertaPrincipal->calcularPrecioOferta($producto->precio_venta);
+            $descuentoPorcentaje = round((($producto->precio_venta - $precioOferta) / $producto->precio_venta) * 100);
+
+            return [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'precio_original' => $producto->precio_venta,
+                'precio_oferta' => $precioOferta,
+                'descuento_porcentaje' => $descuentoPorcentaje,
+                'stock_oferta' => $productoOferta->stock_oferta,
+                'vendidos_oferta' => $productoOferta->vendidos_oferta,
+                'stock_disponible' => $productoOferta->stock_oferta - $productoOferta->vendidos_oferta,
+                'imagen_url' => $producto->imagen_url,
+                'categoria' => $producto->categoria->nombre ?? null,
+                'marca' => $producto->marca->nombre ?? null,
+            ];
+        });
+
+        return response()->json([
+            'oferta_principal' => [
+                'id' => $ofertaPrincipal->id,
+                'titulo' => $ofertaPrincipal->titulo,
+                'subtitulo' => $ofertaPrincipal->subtitulo,
+                'descripcion' => $ofertaPrincipal->descripcion,
+                'tipo_descuento' => $ofertaPrincipal->tipo_descuento,
+                'valor_descuento' => $ofertaPrincipal->valor_descuento,
+                'fecha_inicio' => $ofertaPrincipal->fecha_inicio ? Carbon::parse($ofertaPrincipal->fecha_inicio)->toISOString() : null,
+                'fecha_fin' => $ofertaPrincipal->fecha_fin ? Carbon::parse($ofertaPrincipal->fecha_fin)->toISOString() : null,
+                'imagen_url' => $ofertaPrincipal->imagen_url,
+                'banner_imagen_url' => $ofertaPrincipal->banner_imagen_url,
+                'color_fondo' => $ofertaPrincipal->color_fondo,
+                'texto_boton' => $ofertaPrincipal->texto_boton,
+                'enlace_url' => $ofertaPrincipal->enlace_url,
+                'mostrar_countdown' => $ofertaPrincipal->mostrar_countdown,
+                'timestamp_servidor' => Carbon::now()->toISOString(),
+            ],
+            'productos' => $productos
+        ]);
     }
 
     public function flashSales()
@@ -186,7 +242,8 @@ class OfertasController extends Controller
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'es_oferta_principal' => 'boolean'
         ]);
 
         $data = $request->all();
@@ -201,6 +258,11 @@ class OfertasController extends Controller
         }
 
         $oferta = Oferta::create($data);
+
+        // ✅ Si se marca como oferta principal, quitar el estado de las demás
+        if ($request->boolean('es_oferta_principal')) {
+            $oferta->marcarComoPrincipal();
+        }
 
         return response()->json($oferta->load('tipoOferta'), 201);
     }
@@ -224,7 +286,8 @@ class OfertasController extends Controller
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+            'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'es_oferta_principal' => 'boolean'
         ]);
 
         $data = $request->all();
@@ -248,7 +311,33 @@ class OfertasController extends Controller
 
         $oferta->update($data);
 
+        // ✅ Manejar estado de oferta principal
+        if ($request->boolean('es_oferta_principal')) {
+            $oferta->marcarComoPrincipal();
+        } elseif ($request->has('es_oferta_principal') && !$request->boolean('es_oferta_principal')) {
+            $oferta->quitarEstadoPrincipal();
+        }
+
         return response()->json($oferta->load('tipoOferta'));
+    }
+
+    // ✅ NUEVO ENDPOINT: Marcar/desmarcar como oferta principal
+    public function toggleOfertaPrincipal($id)
+    {
+        $oferta = Oferta::findOrFail($id);
+
+        if ($oferta->es_oferta_principal) {
+            $oferta->quitarEstadoPrincipal();
+            $mensaje = 'Oferta desmarcada como principal';
+        } else {
+            $oferta->marcarComoPrincipal();
+            $mensaje = 'Oferta marcada como principal del día';
+        }
+
+        return response()->json([
+            'message' => $mensaje,
+            'oferta' => $oferta->fresh()
+        ]);
     }
 
     public function destroy($id)
