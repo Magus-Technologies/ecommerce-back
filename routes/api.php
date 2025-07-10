@@ -49,6 +49,8 @@ Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas'
 Route::get('/ofertas/publicas', [OfertasController::class, 'ofertasPublicas']);
 Route::get('/ofertas/flash-sales', [OfertasController::class, 'flashSales']);
 Route::get('/ofertas/productos', [OfertasController::class, 'productosEnOferta']);
+// ✅ NUEVA RUTA: Oferta principal del día
+Route::get('/ofertas/principal-del-dia', [OfertasController::class, 'ofertaPrincipalDelDia']);
 Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 
 
@@ -134,6 +136,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/ofertas/{oferta}/productos', [OfertasController::class, 'agregarProducto']);
         Route::put('/ofertas/{oferta}/productos/{productoOferta}', [OfertasController::class, 'actualizarProducto']);
         Route::delete('/ofertas/{oferta}/productos/{productoOferta}', [OfertasController::class, 'eliminarProducto']);
+        
+        // ✅ NUEVA RUTA: Toggle oferta principal
+        Route::patch('/ofertas/{id}/toggle-principal', [OfertasController::class, 'toggleOfertaPrincipal']);
     });
 
     Route::middleware('permission:cupones.ver')->group(function () {
