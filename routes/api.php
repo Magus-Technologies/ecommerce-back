@@ -50,6 +50,7 @@ Route::get('/ofertas/publicas', [OfertasController::class, 'ofertasPublicas']);
 Route::get('/ofertas/flash-sales', [OfertasController::class, 'flashSales']);
 Route::get('/ofertas/productos', [OfertasController::class, 'productosEnOferta']);
 Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
+Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
 
 
 Route::middleware('auth:sanctum')->group(function () {

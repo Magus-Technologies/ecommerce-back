@@ -41,7 +41,7 @@ Route::get('/auth/google/callback', function() {
                 'tipo_documento_id' => 1, // DNI por defecto, puedes ajustar según tu lógica
                 'numero_documento' => 'GOOGLE_' . time(), // Temporal hasta que complete su perfil
                 'estado' => true,
-                'foto_url' => $userCliente->foto_url,
+                'foto_url' => null,
             ]);
         }
 
