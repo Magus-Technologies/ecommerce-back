@@ -52,6 +52,7 @@ Route::get('/ofertas/productos', [OfertasController::class, 'productosEnOferta']
 // ✅ NUEVA RUTA: Oferta principal del día
 Route::get('/ofertas/principal-del-dia', [OfertasController::class, 'ofertaPrincipalDelDia']);
 Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
+Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
 
 
 Route::middleware('auth:sanctum')->group(function () {

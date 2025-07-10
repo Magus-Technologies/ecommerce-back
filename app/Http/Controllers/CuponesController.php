@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Cupon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CuponesController extends Controller
 {
@@ -64,4 +65,38 @@ class CuponesController extends Controller
 
         return response()->json(['message' => 'Cupón eliminado correctamente']);
     }
+
+     /**
+     * Obtener cupones activos para mostrar públicamente en la tienda
+     */
+    
+    public function cuponesActivos()
+    {
+        try {
+            
+            $cupones = Cupon::where('activo', true)
+                ->where('fecha_inicio', '<=', now())
+                ->where('fecha_fin', '>=', now())
+                ->where(function($query) {
+                    $query->whereNull('limite_uso')
+                        ->orWhereRaw('usos_actuales < limite_uso');
+                })
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            
+
+            return response()->json($cupones);
+            
+        } catch (\Exception $e) {
+            
+            
+            return response()->json([
+                'error' => 'Error al obtener cupones',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
 }
