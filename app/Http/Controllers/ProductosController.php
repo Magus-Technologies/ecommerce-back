@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Producto;
 use App\Models\Categoria;
+use App\Models\ProductoDetalle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -479,4 +480,29 @@ class ProductosController extends Controller
             ], 500);
         }
     }
+    public function showPublico($id)
+{
+    try {
+        $producto = Producto::with(['categoria', 'marca'])
+            ->where('activo', true)
+            ->findOrFail($id);
+            
+        $detalles = ProductoDetalle::where('producto_id', $id)->first();
+        
+        $productosRelacionados = Producto::where('categoria_id', $producto->categoria_id)
+            ->where('id', '!=', $id)
+            ->where('activo', true)
+            ->limit(6)
+            ->get();
+            
+        return response()->json([
+            'producto' => $producto,
+            'detalles' => $detalles,
+            'productos_relacionados' => $productosRelacionados
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'Producto no encontrado'], 404);
+    }
+}
+
 }

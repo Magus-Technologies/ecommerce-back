@@ -62,8 +62,8 @@ class Producto extends Model
     {
         return $query->where(function ($q) use ($termino) {
             $q->where('nombre', 'like', "%{$termino}%")
-              ->orWhere('codigo_producto', 'like', "%{$termino}%")
-              ->orWhere('descripcion', 'like', "%{$termino}%");
+                ->orWhere('codigo_producto', 'like', "%{$termino}%")
+                ->orWhere('descripcion', 'like', "%{$termino}%");
         });
     }
 
@@ -118,5 +118,9 @@ class Producto extends Model
                 }
             }
         });
+    }
+    public function detalles()
+    {
+        return $this->hasOne(ProductoDetalle::class);
     }
 }
