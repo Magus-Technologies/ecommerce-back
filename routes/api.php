@@ -7,6 +7,7 @@ use App\Http\Controllers\BannersPromocionalesController;
 use App\Http\Controllers\CuponesController;
 use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\OfertasController;
+use App\Http\Controllers\ProductoDetallesController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\DocumentTypeController;
@@ -39,6 +40,7 @@ Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvinci
 Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 
 Route::get('/productos-publicos', [ProductosController::class, 'productosPublicos']);
+Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico']);
 Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
@@ -101,6 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/productos/estadisticas', [ProductosController::class, 'estadisticasDashboard']);
         Route::get('/productos/stock-critico', [ProductosController::class, 'productosStockCritico']);
         Route::get('/productos/{id}', [ProductosController::class, 'show']);
+        Route::get('/productos/{id}/detalles', [ProductoDetallesController::class, 'show']);
     });
 
     Route::middleware('permission:productos.create')->group(function () {
@@ -110,6 +113,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:productos.edit')->group(function () {
         Route::put('/productos/{id}', [ProductosController::class, 'update']);
         Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
+
+         Route::post('/productos/{id}/detalles', [ProductoDetallesController::class, 'store']);
+        Route::post('/productos/{id}/detalles/imagenes', [ProductoDetallesController::class, 'agregarImagenes']);
+        Route::delete('/productos/{id}/detalles/imagenes', [ProductoDetallesController::class, 'eliminarImagen']);
     });
 
     Route::middleware('permission:productos.delete')->group(function () {
@@ -272,3 +279,4 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
 Route::post('/verify-reset-token', [PasswordResetController::class, 'verifyResetToken']);
+
