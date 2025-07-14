@@ -21,6 +21,8 @@ use App\Http\Controllers\ReniecController;
 use App\Http\Controllers\ClientesController;
 use App\Http\Controllers\PedidosController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\HorariosController;
+
 
 Route::aliasMiddleware('permission', CheckPermission::class);
 
@@ -261,6 +263,30 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit');
         Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
     });
+
+    // Rutas de horarios protegidas con permisos
+    Route::middleware('permission:horarios.ver')->group(function () {
+        Route::get('/horarios', [HorariosController::class, 'index']);
+        Route::get('/horarios/plantillas', [HorariosController::class, 'plantillasHorarios']);
+        Route::get('/horarios/{userId}/usuario', [HorariosController::class, 'show'])->middleware('permission:horarios.show');
+    });
+
+    Route::middleware('permission:horarios.create')->group(function () {
+        Route::post('/horarios', [HorariosController::class, 'store']);
+        Route::post('/horarios/copiar', [HorariosController::class, 'copiarHorarios']);
+    });
+
+    Route::middleware('permission:horarios.edit')->group(function () {
+        Route::put('/horarios/{id}', [HorariosController::class, 'update']);
+    });
+
+    Route::middleware('permission:horarios.delete')->group(function () {
+        Route::delete('/horarios/{id}', [HorariosController::class, 'destroy']);
+    });
+
+    // Ruta pública para obtener asesores disponibles
+    Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
+
 });
 
 // Rutas de recuperación de contraseña

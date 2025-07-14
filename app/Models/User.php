@@ -60,6 +60,34 @@ class User extends Authenticatable
         return $this->hasMany(UserAddress::class);
     }
 
+    public function horarios()
+    {
+        return $this->hasMany(UserHorario::class);
+    }
+
+    /**
+     * Verificar si el usuario está disponible ahora
+     */
+    public function isDisponibleAhora()
+    {
+        return UserHorario::estaDisponible($this->id);
+    }
+
+    /**
+     * Obtener usuarios disponibles por rol
+     */
+    public static function usuariosDisponiblesPorRol($roleName = 'vendedor')
+    {
+        return self::whereHas('roles', function ($query) use ($roleName) {
+            $query->where('name', $roleName);
+        })
+        ->where('is_enabled', true)
+        ->get()
+        ->filter(function ($user) {
+            return $user->isDisponibleAhora();
+        });
+    }
+
     public function getRoleAttribute()
     {
         $role = $this->roles->first();
