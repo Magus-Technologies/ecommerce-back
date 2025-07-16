@@ -294,6 +294,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('permission:horarios.delete')->group(function () {
         Route::delete('/horarios/{id}', [HorariosController::class, 'destroy']);
+        Route::post('/horarios/eliminar-usuario', [HorariosController::class, 'eliminarHorariosUsuario']);
     });
 
     // Ruta pública para obtener asesores disponibles

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserHorario;
 use Illuminate\Http\Request;
@@ -9,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;        
 
 class HorariosController extends Controller
 {
@@ -124,64 +126,79 @@ class HorariosController extends Controller
         try {
             $horario = UserHorario::findOrFail($id);
             
-            $validator = Validator::make($request->all(), [
+            // Verificar permisos
+            if (!auth()->user()->can('horarios.edit')) {
+                return response()->json(['error' => 'No tienes permisos para editar horarios'], 403);
+            }
+
+            $request->validate([
                 'dia_semana' => 'required|in:lunes,martes,miercoles,jueves,viernes,sabado,domingo',
-                'hora_inicio' => 'required|date_format:H:i',
-                'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
+                'hora_inicio' => 'required', // Sin date_format
+                'hora_fin' => 'required|after:hora_inicio',
                 'es_descanso' => 'boolean',
                 'fecha_especial' => 'nullable|date',
                 'comentarios' => 'nullable|string|max:500',
                 'activo' => 'boolean'
             ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'error' => 'Datos inválidos',
-                    'details' => $validator->errors()
-                ], 422);
-            }
-
             // Validar solapamiento solo si no es descanso
-            if (!$request->get('es_descanso', false)) {
-                $haysolapamiento = UserHorario::validarSolapamiento(
+            if (!$request->es_descanso) {
+                $solapamiento = UserHorario::validarSolapamiento(
                     $horario->user_id,
                     $request->dia_semana,
                     $request->hora_inicio,
                     $request->hora_fin,
-                    $horario->id,
+                    $id, // Excluir el horario actual
                     $request->fecha_especial
                 );
 
-                if ($haysolapamiento) {
+                if ($solapamiento) {
                     return response()->json([
-                        'error' => 'Hay solapamiento con otro horario existente'
+                        'error' => 'Ya existe un horario que se solapa con el horario especificado'
                     ], 422);
                 }
             }
 
             $horario->update($request->all());
-            
+
             return response()->json([
-                'message' => 'Horario actualizado exitosamente',
-                'horario' => $horario->load('user')
+                'message' => 'Horario actualizado correctamente',
+                'horario' => $horario
             ]);
+
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al actualizar horario'], 500);
+            return response()->json([
+                'error' => 'Error al actualizar el horario: ' . $e->getMessage()
+            ], 500);
         }
     }
 
     public function destroy($id)
     {
         try {
-            $horario = UserHorario::findOrFail($id);
-            $horario->delete();
+            // Cargar el horario con la relación user
+            $horario = UserHorario::with('user')->findOrFail($id);
             
-            return response()->json(['message' => 'Horario eliminado exitosamente']);
+            // Verificar permisos
+            if (!auth()->user()->can('horarios.delete')) {
+                return response()->json(['error' => 'No tienes permisos para eliminar horarios'], 403);
+            }
+
+            $nombreUsuario = $horario->user->name;
+            $diaHorario = $horario->dia_semana;
+            
+            $horario->delete();
+
+            return response()->json([
+                'message' => "Horario de {$nombreUsuario} para {$diaHorario} eliminado correctamente"
+            ]);
+
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al eliminar horario'], 500);
+            return response()->json([
+                'error' => 'Error al eliminar el horario: ' . $e->getMessage()
+            ], 500);
         }
     }
-
     /**
      * Copiar horarios de un usuario a otro
      */
@@ -344,5 +361,33 @@ class HorariosController extends Controller
         ];
 
         return response()->json(['plantillas' => $plantillas]);
+    }
+
+    public function eliminarHorariosUsuario(Request $request)
+    {
+        try {
+            $request->validate([
+                'user_id' => 'required|exists:users,id',
+                'dias' => 'required|array',
+                'dias.*' => 'in:lunes,martes,miercoles,jueves,viernes,sabado,domingo'
+            ]);
+
+            // Verificar permisos
+            if (!auth()->user()->can('horarios.delete')) {
+                return response()->json(['error' => 'No tienes permisos para eliminar horarios'], 403);
+            }
+
+            UserHorario::where('user_id', $request->user_id)
+                ->whereIn('dia_semana', $request->dias)
+                ->whereNull('fecha_especial')
+                ->delete();
+
+            return response()->json(['message' => 'Horarios eliminados correctamente']);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Error al eliminar horarios: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
