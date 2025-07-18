@@ -504,5 +504,69 @@ class ProductosController extends Controller
         return response()->json(['error' => 'Producto no encontrado'], 404);
     }
 }
+    /**
+ * Toggle destacado del producto
+ */
+public function toggleDestacado(Request $request, $id)
+{
+    $validator = Validator::make($request->all(), [
+        'destacado' => 'required|boolean'
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Datos de validación incorrectos',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        $producto = Producto::findOrFail($id);
+        $producto->update(['destacado' => (bool) $request->destacado]);
+        $producto->load(['categoria', 'marca']);
+
+        if ($producto->imagen) {
+            $producto->imagen_url = asset('storage/productos/' . $producto->imagen);
+        }
+
+        return response()->json([
+            'message' => 'Estado destacado actualizado exitosamente',
+            'producto' => $producto
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error al actualizar estado destacado',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+/**
+ * Obtener productos destacados
+ */
+public function productosDestacados()
+{
+    try {
+        $productos = Producto::with(['categoria', 'marca'])
+            ->where('destacado', true)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get();
+
+        $productos->transform(function ($producto) {
+            if ($producto->imagen) {
+                $producto->imagen_url = asset('storage/productos/' . $producto->imagen);
+            }
+            return $producto;
+        });
+
+        return response()->json($productos);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error al obtener productos destacados',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 
 }

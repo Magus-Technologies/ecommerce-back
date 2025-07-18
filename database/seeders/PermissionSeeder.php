@@ -78,6 +78,11 @@ class PermissionSeeder extends Seeder
             'cupones.create',
             'cupones.edit',
             'cupones.delete',
+            // horarios
+            'horarios.ver',
+            'horarios.create',
+            'horarios.edit',
+            'horarios.delete',
 
           
         ];

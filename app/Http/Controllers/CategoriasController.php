@@ -263,13 +263,22 @@ class CategoriasController extends Controller
         }
     }
 
-    public function categoriasPublicas()
+    // ✅ MÉTODO MODIFICADO: Ahora acepta parámetro de sección
+    public function categoriasPublicas(Request $request)
     {
         try {
-            $categorias = Categoria::activas()
-            ->withCount('productos')
-                ->orderBy('nombre')
-                ->get(['id', 'nombre', 'descripcion', 'imagen']);
+            $query = Categoria::activas()
+                ->withCount(['productos' => function($q) {
+                    $q->where('activo', true)->where('stock', '>', 0);
+                }])
+                ->orderBy('nombre');
+            
+            // ✅ NUEVO: Filtrar por sección si se proporciona
+            if ($request->has('seccion') && $request->seccion !== '' && $request->seccion !== null) {
+                $query->where('id_seccion', $request->seccion);
+            }
+            
+            $categorias = $query->get(['id', 'nombre', 'descripcion', 'imagen']);
             
             // Agregar ruta completa de imagen
             $categorias->transform(function ($categoria) {

@@ -237,4 +237,5 @@ class ProductoDetallesController extends Controller
             return null;
         }
     }
+
 }
