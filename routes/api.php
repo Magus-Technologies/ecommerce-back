@@ -8,6 +8,7 @@ use App\Http\Controllers\CuponesController;
 use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\OfertasController;
 use App\Http\Controllers\ProductoDetallesController;
+use App\Http\Controllers\SeccionController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\DocumentTypeController;
@@ -42,12 +43,15 @@ Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvinci
 Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 
 Route::get('/productos-publicos', [ProductosController::class, 'productosPublicos']);
+Route::get('/productos-destacados', [ProductosController::class, 'productosDestacados']);
 Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico']);
 Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
+Route::get('/marcas/por-categoria', [MarcaProductoController::class, 'marcasPorCategoria']);
+
 
 // Rutas públicas para ofertas
 Route::get('/ofertas/publicas', [OfertasController::class, 'ofertasPublicas']);
@@ -115,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:productos.edit')->group(function () {
         Route::put('/productos/{id}', [ProductosController::class, 'update']);
         Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
+        Route::patch('/productos/{id}/toggle-destacado', [ProductosController::class, 'toggleDestacado']);
 
          Route::post('/productos/{id}/detalles', [ProductoDetallesController::class, 'store']);
         Route::post('/productos/{id}/detalles/imagenes', [ProductoDetallesController::class, 'agregarImagenes']);
@@ -158,7 +163,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:categorias.edit')->group(function () {
         Route::put('/categorias/{id}', [CategoriasController::class, 'update']);
         Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
-        Route::patch('/categorias/{id}/migrar-seccion', [App\Http\Controllers\SeccionController::class, 'migrarCategoria']);
+        Route::patch('/categorias/{id}/migrar-seccion', [SeccionController::class, 'migrarCategoria']);
     });
 
     Route::middleware('permission:categorias.delete')->group(function () {
@@ -187,20 +192,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Secciones - Protección con permisos
     Route::middleware('permission:secciones.ver')->group(function () {
-        Route::get('/secciones', [App\Http\Controllers\SeccionController::class, 'index']);
-        Route::get('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'show']);
+        Route::get('/secciones', [SeccionController::class, 'index']);
+        Route::get('/secciones/{id}', [SeccionController::class, 'show']);
     });
 
     Route::middleware('permission:secciones.create')->group(function () {
-        Route::post('/secciones', [App\Http\Controllers\SeccionController::class, 'store']);
+        Route::post('/secciones', [SeccionController::class, 'store']);
     });
 
     Route::middleware('permission:secciones.edit')->group(function () {
-        Route::put('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'update']);
+        Route::put('/secciones/{id}', [SeccionController::class, 'update']);
     });
 
     Route::middleware('permission:secciones.delete')->group(function () {
-        Route::delete('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'destroy']);
+        Route::delete('/secciones/{id}', [SeccionController::class, 'destroy']);
     });
    
     // Protección de rutas del módulo banners con sus respectivos permisos

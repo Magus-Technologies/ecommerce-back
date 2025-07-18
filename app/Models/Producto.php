@@ -20,7 +20,8 @@ class Producto extends Model
         'stock',
         'stock_minimo',
         'imagen',
-        'activo'
+        'activo',
+        'destacado'
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Producto extends Model
         'stock' => 'integer',
         'stock_minimo' => 'integer',
         'activo' => 'boolean',
+        'destacado' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
