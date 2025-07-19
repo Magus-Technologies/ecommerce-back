@@ -40,6 +40,7 @@ class BannersPromocionalesController extends Controller
                     'id' => $banner->id,
                     'titulo' => $banner->titulo,
                     'precio' => $banner->precio ? 'S/ ' . number_format($banner->precio, 2) : null,
+                    'texto_boton' => $banner->texto_boton,
                     'imagen_url' => $banner->imagen_completa,
                     'enlace_url' => $banner->enlace_url,
                     'animacion_delay' => $banner->animacion_delay,

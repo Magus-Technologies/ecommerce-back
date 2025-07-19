@@ -15,6 +15,7 @@ class BannerPromocional extends Model
     protected $fillable = [
         'titulo',
         'precio',
+        'texto_boton',
         'imagen_url',
         'enlace_url',
         'orden',
