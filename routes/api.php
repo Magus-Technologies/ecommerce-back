@@ -64,7 +64,6 @@ Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
 Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
-        Route::get('/empresa-info', [EmpresaInfoController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -308,6 +307,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Rutas de información de empresa
     Route::middleware('permission:empresa_info.ver')->group(function () {
         Route::get('/empresa-info/{id}', [EmpresaInfoController::class, 'show']);
+        Route::get('/empresa-info', [EmpresaInfoController::class, 'index']);
+
     });
 
     Route::middleware('permission:empresa_info.edit')->group(function () {
