@@ -23,6 +23,7 @@ use App\Http\Controllers\ClientesController;
 use App\Http\Controllers\PedidosController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\HorariosController;
+use App\Http\Controllers\EmailVerificationController;
 
 
 Route::aliasMiddleware('permission', CheckPermission::class);
@@ -307,3 +308,6 @@ Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword
 Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
 Route::post('/verify-reset-token', [PasswordResetController::class, 'verifyResetToken']);
 
+// Rutas de verificación de email
+Route::post('/verify-email', [EmailVerificationController::class, 'verify']);
+Route::post('/resend-verification', [EmailVerificationController::class, 'resendVerification']);

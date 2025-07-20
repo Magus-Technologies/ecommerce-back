@@ -8,6 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\EmailVerificationMail;
+use App\Mail\WelcomeEmail;
 
 class AdminController extends Controller
 {
@@ -66,6 +70,16 @@ class AdminController extends Controller
                 ], 401);
             }
 
+            // NUEVO: Verificar si el email está verificado
+            if (!$cliente->email_verified_at) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Debes verificar tu correo electrónico antes de iniciar sesión.',
+                    'requires_verification' => true
+                ], 403);
+            }
+
+
             $token = $cliente->createToken('cliente_token')->plainTextToken;
 
             return response()->json([
@@ -82,7 +96,8 @@ class AdminController extends Controller
                     'numero_documento' => $cliente->numero_documento,
                     'tipo_documento' => $cliente->tipoDocumento?->nombre,
                     'puede_facturar' => $cliente->puedeFacturar(),
-                    'foto_url' => $cliente->foto_url
+                    'foto_url' => $cliente->foto_url,
+                    'email_verified_at' => $cliente->email_verified_at
                 ],
                 'token' => $token,
             ]);
@@ -130,6 +145,9 @@ class AdminController extends Controller
     /**
      * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
      */
+        /**
+     * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
+     */
     public function register(Request $request)
     {
         // Validaciones con mensajes personalizados
@@ -163,7 +181,10 @@ class AdminController extends Controller
         $ubigeo = $request->ubigeo ? (string) $request->ubigeo : null;
 
         try {
-            // Crear cliente
+            // Generar token de verificación
+            $verificationToken = Str::random(60);
+
+            // Crear cliente (INACTIVO hasta verificar email)
             $cliente = UserCliente::create([
                 'nombres' => $request->nombres,
                 'apellidos' => $request->apellidos,
@@ -174,7 +195,8 @@ class AdminController extends Controller
                 'numero_documento' => $request->numero_documento,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
-                'estado' => true
+                'estado' => false, // INACTIVO hasta verificar
+                'verification_token' => $verificationToken // NUEVO
             ]);
 
             // Crear dirección si se proporciona
@@ -188,13 +210,16 @@ class AdminController extends Controller
                 ]);
             }
 
-            // Generar token
-            $token = $cliente->createToken('cliente_token')->plainTextToken;
+            // Crear URL de verificación
+            $verificationUrl = env('FRONTEND_URL', 'http://localhost:4200') . "/verify-email?token={$verificationToken}&email=" . urlencode($cliente->email);
+
+            // Enviar correo de verificación
+            Mail::to($cliente->email)->send(new EmailVerificationMail($cliente, $verificationUrl));
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Cliente registrado exitosamente',
-                'tipo_usuario' => 'cliente',
+                'message' => 'Cliente registrado exitosamente. Revisa tu correo para verificar tu cuenta.',
+                'requires_verification' => true,
                 'user' => [
                     'id' => $cliente->id,
                     'nombre_completo' => $cliente->nombre_completo,
@@ -205,7 +230,6 @@ class AdminController extends Controller
                     'numero_documento' => $cliente->numero_documento,
                     'tipo_documento' => $cliente->tipoDocumento?->nombre,
                 ],
-                'token' => $token,
             ], 201);
 
         } catch (\Exception $e) {
@@ -215,6 +239,7 @@ class AdminController extends Controller
             ], 500);
         }
     }
+
 
 
     /**
@@ -253,7 +278,8 @@ class AdminController extends Controller
                     'numero_documento' => $user->numero_documento,
                     'tipo_documento' => $user->tipoDocumento?->nombre,
                     'puede_facturar' => $user->puedeFacturar(),
-                    'foto_url' => $user->foto_url
+                    'foto_url' => $user->foto_url,
+                    'email_verified_at' => $user->email_verified_at
                 ],
             ]);
         }
