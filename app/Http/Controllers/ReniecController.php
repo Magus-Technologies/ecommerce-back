@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
 
 class ReniecController extends Controller
 {
@@ -21,14 +23,15 @@ class ReniecController extends Controller
         $response = Http::withoutVerifying()->get($url);
 
         if ($response->successful()) {
-            $data = $response->json();
 
+            $data = $response->json();
+            
             if (strlen($doc) == 8) {
                 $data["nombre"] = $data["nombres"] . " " . $data["apellidoPaterno"] . " " . $data["apellidoMaterno"];
             } else {
                 $data["nombre"] = $data["razonSocial"];
             }
-
+            
             return response()->json($data);
         } else {
             return response()->json([

@@ -7,7 +7,9 @@ use App\Models\UserCliente;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use App\Http\Controllers\UsuariosController;
-
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeEmail;
+use App\Http\Controllers\EmailVerificationController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -28,27 +30,47 @@ Route::get('/auth/google/callback', function() {
     try {
         $googleUser = Socialite::driver('google')->user();
 
-        // Buscar en la tabla user_clientes en lugar de users
+        // Buscar en la tabla user_clientes
         $userCliente = UserCliente::where('email', $googleUser->getEmail())->first();
 
+        $isNewUser = false;
+        
         if(!$userCliente) {
             // Crear nuevo cliente con datos de Google
             $userCliente = UserCliente::create([
                 'nombres' => $googleUser->getName() ?: 'Usuario',
-                'apellidos' => 'Google', // Valor por defecto ya que Google no separa apellidos
+                'apellidos' => 'Google',
                 'email' => $googleUser->getEmail(),
-                'password' => bcrypt(uniqid()), // Password temporal
-                'tipo_documento_id' => 1, // DNI por defecto, puedes ajustar según tu lógica
-                'numero_documento' => 'GOOGLE_' . time(), // Temporal hasta que complete su perfil
+                'password' => bcrypt(uniqid()),
+                'tipo_documento_id' => 1,
+                'numero_documento' => 'GOOGLE_' . time(),
                 'estado' => true,
-                'foto_url' => null,
+                'email_verified_at' => now(), // Google users are pre-verified
+                'is_first_google_login' => true,
+                'foto' => null,
             ]);
+            
+            $isNewUser = true;
+        } else {
+            // Verificar si es el primer login con Google
+            if (!$userCliente->email_verified_at) {
+                $userCliente->update([
+                    'email_verified_at' => now(),
+                    'estado' => true
+                ]);
+                $isNewUser = true;
+            }
+        }
+
+        // Enviar correo de bienvenida solo si es nuevo usuario o primer login
+        if ($isNewUser) {
+            Mail::to($userCliente->email)->send(new WelcomeEmail($userCliente));
         }
 
         // Crear token para el cliente
         $token = $userCliente->createToken('auth_token')->plainTextToken;
 
-        // Preparar datos de respuesta similar al login tradicional
+        // Preparar datos de respuesta
         $userData = [
             'id' => $userCliente->id,
             'nombre_completo' => $userCliente->nombre_completo,
@@ -58,10 +80,11 @@ Route::get('/auth/google/callback', function() {
             'telefono' => $userCliente->telefono,
             'foto' => $userCliente->foto_url,
             'roles' => [],
-            'permissions' => []
+            'permissions' => [],
+            'email_verified_at' => $userCliente->email_verified_at
         ];
 
-        // Redirigir al frontend con el token como parámetro
+        // Redirigir al frontend con el token
         $frontendUrl = 'https://magus-ecommerce.com/';
         return redirect($frontendUrl . '?token=' . $token . '&user=' . urlencode(json_encode($userData)) . '&tipo_usuario=cliente');
 
@@ -69,3 +92,7 @@ Route::get('/auth/google/callback', function() {
         return redirect(env('FRONTEND_URL') . '/account?error=google_auth_failed');
     }
 });
+
+Route::get('/verify-email-link', [EmailVerificationController::class, 'verifyByLink']);
+
+

@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\EmailVerificationMail;
+use App\Mail\WelcomeEmail;
+use Illuminate\Support\Facades\Log;
 
 class AdminController extends Controller
 {
@@ -66,6 +71,16 @@ class AdminController extends Controller
                 ], 401);
             }
 
+            // NUEVO: Verificar si el email está verificado
+            if (!$cliente->email_verified_at) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Debes verificar tu correo electrónico antes de iniciar sesión.',
+                    'requires_verification' => true
+                ], 403);
+            }
+
+
             $token = $cliente->createToken('cliente_token')->plainTextToken;
 
             return response()->json([
@@ -82,7 +97,8 @@ class AdminController extends Controller
                     'numero_documento' => $cliente->numero_documento,
                     'tipo_documento' => $cliente->tipoDocumento?->nombre,
                     'puede_facturar' => $cliente->puedeFacturar(),
-                    'foto_url' => $cliente->foto_url
+                    'foto_url' => $cliente->foto_url,
+                    'email_verified_at' => $cliente->email_verified_at
                 ],
                 'token' => $token,
             ]);
@@ -130,8 +146,20 @@ class AdminController extends Controller
     /**
      * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
      */
+        /**
+     * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
+     */
     public function register(Request $request)
     {
+        // LOG: Datos recibidos inicialmente
+        Log::info('AuthController@register - Iniciando registro de cliente', [
+            'request_data' => $request->all(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
+
+        Log::info('AuthController@register - Iniciando validación de datos');
+
         // Validaciones con mensajes personalizados
         $request->validate([
             'nombres' => 'required|string|max:255',
@@ -159,11 +187,45 @@ class AdminController extends Controller
             'tipo_documento_id.exists' => 'El tipo de documento seleccionado no es válido.',
         ]);
 
+        Log::info('AuthController@register - Validación exitosa');
+
         // Convertir ubigeo a string si viene como número
+        $ubigeoOriginal = $request->ubigeo;
         $ubigeo = $request->ubigeo ? (string) $request->ubigeo : null;
+        
+        Log::debug('AuthController@register - Procesando ubigeo', [
+            'ubigeo_original' => $ubigeoOriginal,
+            'ubigeo_converted' => $ubigeo,
+            'ubigeo_type' => gettype($ubigeo)
+        ]);
+
+        Log::info('AuthController@register - Iniciando transacción para crear cliente');
 
         try {
-            // Crear cliente
+            
+            $verificationToken = Str::random(60);
+            $verificationCode = strtoupper(Str::random(6)); // Generar código de 6 caracteres
+            
+            Log::info('AuthController@register - Token de verificación generado', [
+                'token_length' => strlen($verificationToken),
+                'token_preview' => substr($verificationToken, 0, 10) . '...'
+            ]);
+
+            Log::info('AuthController@register - Creando cliente en base de datos', [
+                'nombres' => $request->nombres,
+                'apellidos' => $request->apellidos,
+                'email' => $request->email,
+                'tipo_documento_id' => $request->tipo_documento_id,
+                'numero_documento' => $request->numero_documento,
+                'telefono' => $request->telefono,
+                'fecha_nacimiento' => $request->fecha_nacimiento,
+                'genero' => $request->genero,
+                'has_password' => !empty($request->password),
+                'estado' => false
+            ]);
+
+            // Crear cliente (INACTIVO hasta verificar email)
+            // Crear cliente (INACTIVO hasta verificar email)
             $cliente = UserCliente::create([
                 'nombres' => $request->nombres,
                 'apellidos' => $request->apellidos,
@@ -174,27 +236,75 @@ class AdminController extends Controller
                 'numero_documento' => $request->numero_documento,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
-                'estado' => true
+                'estado' => false, // INACTIVO hasta verificar
+                'verification_token' => $verificationToken,
+                'verification_code' => $verificationCode // NUEVO
+            ]);
+
+            Log::info('AuthController@register - Cliente creado exitosamente', [
+                'cliente_id' => $cliente->id,
+                'cliente_email' => $cliente->email,
+                'cliente_estado' => $cliente->estado,
+                'nombre_completo' => $cliente->nombre_completo,
+                'verification_code' => $cliente->verification_code // <-- aquí lo agregas
             ]);
 
             // Crear dirección si se proporciona
             if ($request->direccion_completa && $ubigeo) {
-                $cliente->direcciones()->create([
+                Log::info('AuthController@register - Creando dirección del cliente', [
+                    'cliente_id' => $cliente->id,
+                    'direccion_completa' => $request->direccion_completa,
+                    'id_ubigeo' => $ubigeo,
+                    'nombre_destinatario' => $cliente->nombre_completo
+                ]);
+
+                $direccion = $cliente->direcciones()->create([
                     'nombre_destinatario' => $cliente->nombre_completo,
                     'direccion_completa' => $request->direccion_completa,
                     'id_ubigeo' => $ubigeo,
                     'predeterminada' => true,
                     'activa' => true
                 ]);
+
+                Log::info('AuthController@register - Dirección creada exitosamente', [
+                    'direccion_id' => $direccion->id,
+                    'direccion' => $direccion->toArray()
+                ]);
+            } else {
+                Log::info('AuthController@register - No se creará dirección', [
+                    'has_direccion_completa' => !empty($request->direccion_completa),
+                    'has_ubigeo' => !empty($ubigeo),
+                    'direccion_completa' => $request->direccion_completa,
+                    'ubigeo' => $ubigeo
+                ]);
             }
 
-            // Generar token
-            $token = $cliente->createToken('cliente_token')->plainTextToken;
+            // Crear URL de verificación
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:4200');
+            $appUrl = env('APP_URL', 'http://localhost:8000');
+            $verificationUrl = rtrim($appUrl, '/') . "/api/verify-email-link?token={$verificationToken}&email=" . urlencode($cliente->email);
 
-            return response()->json([
+            
+            Log::info('AuthController@register - URL de verificación generada', [
+                'frontend_url' => $frontendUrl,
+                'verification_url' => $verificationUrl,
+                'encoded_email' => urlencode($cliente->email)
+            ]);
+
+            Log::info('AuthController@register - Enviando correo de verificación', [
+                'destinatario' => $cliente->email,
+                'cliente_id' => $cliente->id
+            ]);
+
+            // Enviar correo de verificación
+            Mail::to($cliente->email)->send(new EmailVerificationMail($cliente, $verificationUrl, $verificationCode));
+
+            Log::info('AuthController@register - Correo de verificación enviado exitosamente');
+
+            $responseData = [
                 'status' => 'success',
-                'message' => 'Cliente registrado exitosamente',
-                'tipo_usuario' => 'cliente',
+                'message' => 'Cliente registrado exitosamente. Revisa tu correo para verificar tu cuenta.',
+                'requires_verification' => true,
                 'user' => [
                     'id' => $cliente->id,
                     'nombre_completo' => $cliente->nombre_completo,
@@ -205,17 +315,30 @@ class AdminController extends Controller
                     'numero_documento' => $cliente->numero_documento,
                     'tipo_documento' => $cliente->tipoDocumento?->nombre,
                 ],
-                'token' => $token,
-            ], 201);
+            ];
+
+            Log::info('AuthController@register - Registro completado exitosamente', [
+                'cliente_id' => $cliente->id,
+                'response_data' => $responseData
+            ]);
+
+            return response()->json($responseData, 201);
 
         } catch (\Exception $e) {
+            Log::error('AuthController@register - Error durante el registro', [
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'error_trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+
             return response()->json([
                 'message' => 'Error al registrar cliente',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
-
 
     /**
      * Obtener información del usuario autenticado (admin o cliente)
@@ -253,7 +376,8 @@ class AdminController extends Controller
                     'numero_documento' => $user->numero_documento,
                     'tipo_documento' => $user->tipoDocumento?->nombre,
                     'puede_facturar' => $user->puedeFacturar(),
-                    'foto_url' => $user->foto_url
+                    'foto_url' => $user->foto_url,
+                    'email_verified_at' => $user->email_verified_at
                 ],
             ]);
         }
