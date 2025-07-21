@@ -11,8 +11,8 @@
         .logo { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
         .content { padding: 30px 20px; }
         .verification-box { background: #f8f9ff; padding: 25px; border-radius: 8px; border: 2px solid #667eea; margin: 25px 0; text-align: center; }
-        .btn { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-        .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; border-radius: 0 0 10px 10px; }
+        .btn { display: inline-block; background: #667eea; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; transition: background-color 0.3s ease; }
+        .btn:hover { background: #5a67d8; color: white !important; text-decoration: none; }
         .warning { background: #fff3cd; padding: 15px; border-radius: 6px; border-left: 4px solid #ffc107; margin: 20px 0; }
     </style>
 </head>
@@ -30,8 +30,23 @@
             
             <div class="verification-box">
                 <h3>🔐 Verifica tu cuenta</h3>
-                <p>Haz clic en el botón de abajo para verificar tu cuenta:</p>
+                <p><strong>Opción 1:</strong> Haz clic en el botón de abajo para verificar automáticamente:</p>
                 <a href="{{ $verificationUrl }}" class="btn">✅ Verificar mi cuenta</a>
+                
+                <div style="margin: 20px 0; text-align: center; color: #666;">
+                    <hr style="margin: 15px 0;">
+                    <span style="background: white; padding: 0 15px;">O</span>
+                    <hr style="margin: 15px 0;">
+                </div>
+                
+                <p><strong>Opción 2:</strong> Ingresa este código en el formulario de verificación:</p>
+                <div style="background: #667eea; color: white; padding: 15px; border-radius: 6px; font-size: 20px; font-weight: bold; letter-spacing: 2px; margin: 15px 0; text-align: center;">
+                    {{ $verificationCode }}
+                </div>
+                <p style="font-size: 12px; color: #666; text-align: center;">
+                    Visita: <a href="{{ env('FRONTEND_URL') }}/verify-email" style="color: #667eea;">{{ env('FRONTEND_URL') }}/verify-email</a>
+                </p>
+
             </div>
 
             <div class="warning">

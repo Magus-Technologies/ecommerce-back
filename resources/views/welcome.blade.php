@@ -5,17 +5,125 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>¡Bienvenido a MarketPro!</title>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .logo { font-size: 28px; font-weight: bold; margin-bottom: 10px; }
-        .content { padding: 30px 20px; }
-        .highlight { background: #f8f9ff; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 20px 0; }
-        .products { display: flex; justify-content: space-around; margin: 30px 0; }
-        .product { text-align: center; padding: 15px; }
-        .product img { width: 80px; height: 80px; border-radius: 8px; }
-        .btn { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-        .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; border-radius: 0 0 10px 10px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f4f4f4; 
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 0; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
+            overflow: hidden;
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 40px 30px; 
+            text-align: center; 
+        }
+        .logo { 
+            font-size: 32px; 
+            font-weight: bold; 
+            margin-bottom: 15px; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header p {
+            font-size: 16px;
+            opacity: 0.95;
+            margin: 0;
+        }
+        .content { 
+            padding: 40px 30px; 
+        }
+        .greeting {
+            font-size: 24px;
+            color: #667eea;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        .welcome-text {
+            font-size: 16px;
+            margin-bottom: 30px;
+            color: #555;
+        }
+        .highlight { 
+            background-color: #f8f9ff; 
+            padding: 25px; 
+            border-radius: 10px; 
+            border-left: 5px solid #667eea; 
+            margin: 30px 0; 
+        }
+        .highlight h3 {
+            margin-top: 0;
+            color: #667eea;
+            font-size: 20px;
+        }
+        .highlight ul {
+            margin: 15px 0;
+            padding-left: 0;
+            list-style: none;
+        }
+        .highlight li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        .highlight li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .products { 
+            display: table; 
+            width: 100%;
+            margin: 40px 0; 
+        }
+        .product { 
+            display: table-cell;
+            text-align: center; 
+            padding: 20px 15px; 
+            background-color: #fafbff;
+            border-radius: 10px;
+            width: 33.33%;
+        }
+        .product img { 
+            width: 80px; 
+            height: 80px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .product p {
+            margin: 15px 0 0 0;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 14px;
+        }
+        .footer { 
+            background-color: #f8f9fa; 
+            padding: 25px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .footer p:last-child {
+            font-size: 12px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
@@ -26,9 +134,11 @@
         </div>
         
         <div class="content">
-            <h2>¡Hola {{ $user->nombres ?? $user->name }}! 👋</h2>
+            <div class="greeting">¡Hola {{ $user->nombres ?? $user->name }}! 👋</div>
             
-            <p>¡Bienvenido a <strong>MarketPro</strong>! Nos emociona tenerte como parte de nuestra comunidad de gamers y tech lovers.</p>
+            <div class="welcome-text">
+                ¡Bienvenido a <strong>MarketPro</strong>! Nos emociona tenerte como parte de nuestra comunidad de gamers y tech lovers.
+            </div>
             
             <div class="highlight">
                 <h3>🚀 ¿Qué puedes encontrar en MarketPro?</h3>
@@ -55,21 +165,9 @@
                 </div>
             </div>
 
-            <div style="text-align: center;">
-                <a href="https://magus-ecommerce.com/" class="btn">🛒 Explorar Productos</a>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="https://magus-ecommerce.com/" class="btn">🛒 Explorar Nuestra Tienda</a>
             </div>
-
-            <div class="highlight">
-                <h3>🎁 Oferta de Bienvenida</h3>
-                <p>Como nuevo miembro, obtén <strong>10% de descuento</strong> en tu primera compra con el código:</p>
-                <p style="font-size: 20px; font-weight: bold; color: #667eea; text-align: center;">BIENVENIDO10</p>
-            </div>
-
-            <p>Si tienes alguna pregunta, nuestro equipo de expertos está aquí para ayudarte. ¡No dudes en contactarnos!</p>
-            
-            <p>¡Que tengas un excelente día gaming! 🎮</p>
-            
-            <p><strong>El equipo de MarketPro</strong></p>
         </div>
         
         <div class="footer">

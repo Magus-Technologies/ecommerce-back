@@ -311,3 +311,5 @@ Route::post('/verify-reset-token', [PasswordResetController::class, 'verifyReset
 // Rutas de verificación de email
 Route::post('/verify-email', [EmailVerificationController::class, 'verify']);
 Route::post('/resend-verification', [EmailVerificationController::class, 'resendVerification']);
+// Ruta para verificación por enlace (GET)
+Route::get('/verify-email-link', [EmailVerificationController::class, 'verifyByLink']);

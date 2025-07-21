@@ -21,7 +21,7 @@ class WelcomeEmail extends Mailable
     /**
      * Create a new message instance.
      */
-    public function __construct()
+    public function __construct($user)
     {
         $this->user = $user;
         // Determinar el tipo de usuario basado en el modelo
@@ -32,7 +32,7 @@ class WelcomeEmail extends Mailable
     public function build()
     {
         return $this->subject('¡Bienvenido a MarketPro - Tu tienda especializada en tecnología!')
-                    ->view('emails.welcome')
+                    ->view('welcome')
                     ->with([
                         'user' => $this->user,
                         'userType' => $this->userType

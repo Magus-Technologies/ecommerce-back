@@ -4,39 +4,33 @@ namespace App\Mail;
 
 use App\Models\UserCliente;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class EmailVerificationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $user;
+    public $cliente;
     public $verificationUrl;
+    public $verificationCode;
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct()
+    public function __construct(UserCliente $cliente, $verificationUrl, $verificationCode)
     {
-        $this->user = $user;
+        $this->cliente = $cliente;
         $this->verificationUrl = $verificationUrl;
+        $this->verificationCode = $verificationCode; // ← NUEVO PARÁMETRO
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function build()
     {
         return $this->subject('Verifica tu cuenta en MarketPro')
                     ->view('emails.email-verification')
                     ->with([
-                        'user' => $this->user,
-                        'verificationUrl' => $this->verificationUrl
+                        'user' => $this->cliente, // ← Mantener como estaba
+                        'verificationUrl' => $this->verificationUrl,
+                        'verificationCode' => $this->verificationCode // ← NUEVO
                     ]);
     }
-    
+
 }

@@ -28,6 +28,7 @@ class UserCliente extends Authenticatable
         'cliente_facturacion_id',
         'email_verified_at',        // NUEVO
         'verification_token',       // NUEVO
+        'verification_code', 
         'is_first_google_login', 
     ];
 
