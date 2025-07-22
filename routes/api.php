@@ -26,7 +26,6 @@ use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\EmailVerificationController;
 
 
-Route::aliasMiddleware('permission', CheckPermission::class);
 
 Route::post('/login', [AdminController::class, 'login']);
 Route::post('/register', [AdminController::class, 'register']); 
