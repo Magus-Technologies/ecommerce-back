@@ -5,9 +5,11 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\BannersPromocionalesController;
 use App\Http\Controllers\CuponesController;
+use App\Http\Controllers\EmpresaInfoController;
 use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\OfertasController;
 use App\Http\Controllers\ProductoDetallesController;
+use App\Http\Controllers\SeccionController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\DocumentTypeController;
@@ -28,7 +30,7 @@ use App\Http\Controllers\EmailVerificationController;
 
 
 Route::post('/login', [AdminController::class, 'login']);
-Route::post('/register', [AdminController::class, 'register']); 
+Route::post('/register', [AdminController::class, 'register']);
 Route::post('/check-email', [AdminController::class, 'checkEmail']);
 Route::post('/check-documento', [AdminController::class, 'checkDocumento']);
 // Rutas para tipos de documentos
@@ -42,12 +44,15 @@ Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvinci
 Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 
 Route::get('/productos-publicos', [ProductosController::class, 'productosPublicos']);
+Route::get('/productos-destacados', [ProductosController::class, 'productosDestacados']);
 Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico']);
 Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
+Route::get('/marcas/por-categoria', [MarcaProductoController::class, 'marcasPorCategoria']);
+
 
 // Rutas públicas para ofertas
 Route::get('/ofertas/publicas', [OfertasController::class, 'ofertasPublicas']);
@@ -57,7 +62,8 @@ Route::get('/ofertas/productos', [OfertasController::class, 'productosEnOferta']
 Route::get('/ofertas/principal-del-dia', [OfertasController::class, 'ofertaPrincipalDelDia']);
 Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
-
+Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
+Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -65,7 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/refresh-permissions', [AdminController::class, 'refreshPermissions']); // ← NUEVO
     Route::post('/logout', [AdminController::class, 'logout']);
 
-      // NUEVAS RUTAS DE VENTAS
+    // NUEVAS RUTAS DE VENTAS
     Route::prefix('ventas')->group(function () {
         Route::get('/', [VentasController::class, 'index']);
         Route::post('/', [VentasController::class, 'store']);
@@ -77,7 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/{id}/anular', [VentasController::class, 'anular']);
     });
 
-    
+
     // Rutas de usuarios protegidas con permiso usuarios.ver
     Route::middleware('permission:usuarios.ver')->group(function () {
         Route::get('/usuarios', [UsuariosController::class, 'index']);
@@ -87,7 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/usuarios/register', [UserRegistrationController::class, 'store'])->middleware('permission:usuarios.create');
     });
 
-    
+
     Route::get('/permissions', [RoleController::class, 'getPermissions']);
     Route::get('/roles/{id}/permissions', [RoleController::class, 'getRolePermissions']);
     Route::put('/roles/{id}/permissions', [RoleController::class, 'updateRolePermissions']);
@@ -98,7 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/roles', [RoleController::class, 'getRoles']);
 
-  // Productos - Protección con permisos
+    // Productos - Protección con permisos
     Route::middleware('permission:productos.ver')->group(function () {
         Route::get('/productos', [ProductosController::class, 'index']);
         Route::get('/productos/stock/bajo', [ProductosController::class, 'stockBajo']);
@@ -115,8 +121,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:productos.edit')->group(function () {
         Route::put('/productos/{id}', [ProductosController::class, 'update']);
         Route::patch('/productos/{id}/toggle-estado', [ProductosController::class, 'toggleEstado']);
+        Route::patch('/productos/{id}/toggle-destacado', [ProductosController::class, 'toggleDestacado']);
 
-         Route::post('/productos/{id}/detalles', [ProductoDetallesController::class, 'store']);
+        Route::post('/productos/{id}/detalles', [ProductoDetallesController::class, 'store']);
         Route::post('/productos/{id}/detalles/imagenes', [ProductoDetallesController::class, 'agregarImagenes']);
         Route::delete('/productos/{id}/detalles/imagenes', [ProductoDetallesController::class, 'eliminarImagen']);
     });
@@ -139,14 +146,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:ofertas.ver')->group(function () {
         Route::resource('ofertas', OfertasController::class);
         Route::get('/tipos-ofertas', [OfertasController::class, 'tiposOfertas']);
-        
+
         // ✅ NUEVAS RUTAS PARA GESTIÓN DE PRODUCTOS EN OFERTAS
         Route::get('/productos-disponibles', [OfertasController::class, 'productosDisponibles']);
         Route::get('/ofertas/{oferta}/productos', [OfertasController::class, 'productosOferta']);
         Route::post('/ofertas/{oferta}/productos', [OfertasController::class, 'agregarProducto']);
         Route::put('/ofertas/{oferta}/productos/{productoOferta}', [OfertasController::class, 'actualizarProducto']);
         Route::delete('/ofertas/{oferta}/productos/{productoOferta}', [OfertasController::class, 'eliminarProducto']);
-        
+
         // ✅ NUEVA RUTA: Toggle oferta principal
         Route::patch('/ofertas/{id}/toggle-principal', [OfertasController::class, 'toggleOfertaPrincipal']);
     });
@@ -158,7 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:categorias.edit')->group(function () {
         Route::put('/categorias/{id}', [CategoriasController::class, 'update']);
         Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
-        Route::patch('/categorias/{id}/migrar-seccion', [App\Http\Controllers\SeccionController::class, 'migrarCategoria']);
+        Route::patch('/categorias/{id}/migrar-seccion', [SeccionController::class, 'migrarCategoria']);
     });
 
     Route::middleware('permission:categorias.delete')->group(function () {
@@ -187,22 +194,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Secciones - Protección con permisos
     Route::middleware('permission:secciones.ver')->group(function () {
-        Route::get('/secciones', [App\Http\Controllers\SeccionController::class, 'index']);
-        Route::get('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'show']);
+        Route::get('/secciones', [SeccionController::class, 'index']);
+        Route::get('/secciones/{id}', [SeccionController::class, 'show']);
     });
 
     Route::middleware('permission:secciones.create')->group(function () {
-        Route::post('/secciones', [App\Http\Controllers\SeccionController::class, 'store']);
+        Route::post('/secciones', [SeccionController::class, 'store']);
     });
 
     Route::middleware('permission:secciones.edit')->group(function () {
-        Route::put('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'update']);
+        Route::put('/secciones/{id}', [SeccionController::class, 'update']);
     });
 
     Route::middleware('permission:secciones.delete')->group(function () {
-        Route::delete('/secciones/{id}', [App\Http\Controllers\SeccionController::class, 'destroy']);
+        Route::delete('/secciones/{id}', [SeccionController::class, 'destroy']);
     });
-   
+
     // Protección de rutas del módulo banners con sus respectivos permisos
     Route::middleware('permission:banners.ver')->group(function () {
         Route::get('/banners', [BannersController::class, 'index']);
@@ -226,7 +233,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/banners/reordenar', [BannersController::class, 'reordenar']);
 
 
-    
+
     // Protección de rutas del módulo banners promocionales con sus respectivos permisos
     Route::middleware('permission:banners_promocionales.ver')->group(function () {
         Route::get('/banners-promocionales', [BannersPromocionalesController::class, 'index']);
@@ -250,10 +257,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:clientes.ver')->group(function () {
         Route::get('/clientes', [ClientesController::class, 'index']);
         Route::get('/clientes/estadisticas', [ClientesController::class, 'estadisticas']);
-        
+
     });
 
-    Route::middleware('permission:clientes.show')->group(function(){
+    Route::middleware('permission:clientes.show')->group(function () {
         Route::get('/clientes/{id}', [ClientesController::class, 'show']);
     });
 
@@ -297,8 +304,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/horarios/eliminar-usuario', [HorariosController::class, 'eliminarHorariosUsuario']);
     });
 
-    // Ruta pública para obtener asesores disponibles
-    Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
+    // Rutas de información de empresa
+    Route::middleware('permission:empresa_info.ver')->group(function () {
+        Route::get('/empresa-info/{id}', [EmpresaInfoController::class, 'show']);
+        Route::get('/empresa-info', [EmpresaInfoController::class, 'index']);
+
+    });
+
+    Route::middleware('permission:empresa_info.edit')->group(function () {
+        Route::post('/empresa-info', [EmpresaInfoController::class, 'store']);
+        Route::put('/empresa-info/{id}', [EmpresaInfoController::class, 'update']); // POST para manejar archivos
+    });
+
 
 });
 

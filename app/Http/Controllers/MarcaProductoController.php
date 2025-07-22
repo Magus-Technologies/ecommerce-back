@@ -297,4 +297,46 @@ class MarcaProductoController extends Controller
             ], 500);
         }
     }
+    public function marcasPorCategoria(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'categoria_id' => 'required|exists:categorias,id', // Valida que el ID de categoría sea requerido y exista
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'ID de categoría no válido',
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    try {
+        $categoriaId = $request->input('categoria_id');
+
+        // Obtener marcas activas que tienen productos activos y con stock en la categoría especificada
+        $marcas = MarcaProducto::activas()
+            ->whereHas('productos', function ($query) use ($categoriaId) {
+                $query->where('categoria_id', $categoriaId)
+                      ->where('activo', true)
+                      ->where('stock', '>', 0);
+            })
+            ->orderBy('nombre')
+            ->get();
+
+        // Agregar la URL completa de la imagen para cada marca
+        $marcas->transform(function ($marca) {
+            if ($marca->imagen) {
+                $marca->imagen_url = asset('storage/marcas_productos/' . $marca->imagen);
+            }
+            return $marca;
+        });
+
+        return response()->json($marcas);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Error al obtener marcas por categoría',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 }
