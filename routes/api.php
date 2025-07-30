@@ -60,6 +60,8 @@ Route::get('/ofertas/flash-sales', [OfertasController::class, 'flashSales']);
 Route::get('/ofertas/productos', [OfertasController::class, 'productosEnOferta']);
 // ✅ NUEVA RUTA: Oferta principal del día
 Route::get('/ofertas/principal-del-dia', [OfertasController::class, 'ofertaPrincipalDelDia']);
+
+Route::get('/ofertas/semana-activa', [OfertasController::class, 'ofertaSemanaActiva']);
 Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
@@ -156,6 +158,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // ✅ NUEVA RUTA: Toggle oferta principal
         Route::patch('/ofertas/{id}/toggle-principal', [OfertasController::class, 'toggleOfertaPrincipal']);
+        // ✅ NUEVA RUTA: Toggle oferta de la semana
+Route::patch('/ofertas/{id}/toggle-semana', [OfertasController::class, 'toggleOfertaSemana']);
     });
 
     Route::middleware('permission:cupones.ver')->group(function () {
