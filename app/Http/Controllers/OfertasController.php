@@ -14,7 +14,7 @@ use Carbon\Carbon;
 class OfertasController extends Controller
 {
     // ==================== MÉTODOS PÚBLICOS ====================
-    
+
     public function ofertasPublicas()
     {
         $ofertas = Oferta::with(['tipoOferta', 'productos.producto'])
@@ -38,6 +38,7 @@ class OfertasController extends Controller
                     'enlace_url' => $oferta->enlace_url,
                     'mostrar_countdown' => $oferta->mostrar_countdown,
                     'es_oferta_principal' => $oferta->es_oferta_principal,
+                    'es_oferta_semana' => $oferta->es_oferta_semana,
                     'timestamp_servidor' => Carbon::now()->toISOString(),
                     'productos' => $oferta->productos->map(function ($productoOferta) use ($oferta) {
                         $producto = $productoOferta->producto;
@@ -111,6 +112,60 @@ class OfertasController extends Controller
             'productos' => $productos
         ]);
     }
+    // ✅ NUEVO ENDPOINT: Obtener oferta de la semana
+    public function ofertaSemanaActiva()
+    {
+        $ofertaSemana = Oferta::obtenerOfertaSemanaActiva();
+
+        if (!$ofertaSemana) {
+            return response()->json([
+                'oferta_semana' => null,
+                'productos' => [],
+                'mensaje' => 'No hay oferta de la semana activa'
+            ]);
+        }
+
+        $productos = $ofertaSemana->productos->map(function ($productoOferta) use ($ofertaSemana) {
+            $producto = $productoOferta->producto;
+            $precioOferta = $productoOferta->precio_oferta ?? $ofertaSemana->calcularPrecioOferta($producto->precio_venta);
+            $descuentoPorcentaje = round((($producto->precio_venta - $precioOferta) / $producto->precio_venta) * 100);
+
+            return [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'precio_original' => $producto->precio_venta,
+                'precio_oferta' => $precioOferta,
+                'descuento_porcentaje' => $descuentoPorcentaje,
+                'stock_oferta' => $productoOferta->stock_oferta,
+                'vendidos_oferta' => $productoOferta->vendidos_oferta,
+                'stock_disponible' => $productoOferta->stock_oferta - $productoOferta->vendidos_oferta,
+                'imagen_url' => $producto->imagen_url,
+                'categoria' => $producto->categoria->nombre ?? null,
+                'marca' => $producto->marca->nombre ?? null,
+            ];
+        });
+
+        return response()->json([
+            'oferta_semana' => [
+                'id' => $ofertaSemana->id,
+                'titulo' => $ofertaSemana->titulo,
+                'subtitulo' => $ofertaSemana->subtitulo,
+                'descripcion' => $ofertaSemana->descripcion,
+                'tipo_descuento' => $ofertaSemana->tipo_descuento,
+                'valor_descuento' => $ofertaSemana->valor_descuento,
+                'fecha_inicio' => $ofertaSemana->fecha_inicio ? Carbon::parse($ofertaSemana->fecha_inicio)->toISOString() : null,
+                'fecha_fin' => $ofertaSemana->fecha_fin ? Carbon::parse($ofertaSemana->fecha_fin)->toISOString() : null,
+                'imagen_url' => $ofertaSemana->imagen_url,
+                'banner_imagen_url' => $ofertaSemana->banner_imagen_url,
+                'color_fondo' => $ofertaSemana->color_fondo,
+                'texto_boton' => $ofertaSemana->texto_boton,
+                'enlace_url' => $ofertaSemana->enlace_url,
+                'mostrar_countdown' => $ofertaSemana->mostrar_countdown,
+                'timestamp_servidor' => Carbon::now()->toISOString(),
+            ],
+            'productos' => $productos
+        ]);
+    }
 
     public function flashSales()
     {
@@ -147,7 +202,7 @@ class OfertasController extends Controller
             ->map(function ($productoOferta) {
                 $producto = $productoOferta->producto;
                 $oferta = $productoOferta->oferta;
-                
+
                 $precioOferta = $productoOferta->precio_oferta ?? $oferta->calcularPrecioOferta($producto->precio_venta);
                 $descuentoPorcentaje = round((($producto->precio_venta - $precioOferta) / $producto->precio_venta) * 100);
 
@@ -187,7 +242,7 @@ class OfertasController extends Controller
 
         if (!$cupon) {
             return response()->json([
-                'valido' => false, 
+                'valido' => false,
                 'mensaje' => 'Cupón no válido o expirado'
             ]);
         }
@@ -195,13 +250,13 @@ class OfertasController extends Controller
         if (!$cupon->puedeUsarse($total)) {
             if ($cupon->compra_minima && $total < $cupon->compra_minima) {
                 return response()->json([
-                    'valido' => false, 
+                    'valido' => false,
                     'mensaje' => "Compra mínima requerida: $" . number_format($cupon->compra_minima, 2)
                 ]);
             }
 
             return response()->json([
-                'valido' => false, 
+                'valido' => false,
                 'mensaje' => 'Cupón no disponible'
             ]);
         }
@@ -243,7 +298,8 @@ class OfertasController extends Controller
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'es_oferta_principal' => 'boolean'
+            'es_oferta_principal' => 'boolean',
+            'es_oferta_semana' => 'boolean'
         ]);
 
         $data = $request->all();
@@ -262,6 +318,9 @@ class OfertasController extends Controller
         // ✅ Si se marca como oferta principal, quitar el estado de las demás
         if ($request->boolean('es_oferta_principal')) {
             $oferta->marcarComoPrincipal();
+        }
+        if ($request->boolean('es_oferta_semana')) {
+            $oferta->marcarComoOfertaSemana();
         }
 
         return response()->json($oferta->load('tipoOferta'), 201);
@@ -287,7 +346,8 @@ class OfertasController extends Controller
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'es_oferta_principal' => 'boolean'
+            'es_oferta_principal' => 'boolean',
+            'es_oferta_semana' => 'boolean'
         ]);
 
         $data = $request->all();
@@ -318,6 +378,12 @@ class OfertasController extends Controller
             $oferta->quitarEstadoPrincipal();
         }
 
+        if ($request->boolean('es_oferta_semana')) {
+            $oferta->marcarComoOfertaSemana();
+        } elseif ($request->has('es_oferta_semana') && !$request->boolean('es_oferta_semana')) {
+            $oferta->quitarEstadoOfertaSemana();
+        }
+
         return response()->json($oferta->load('tipoOferta'));
     }
 
@@ -339,6 +405,23 @@ class OfertasController extends Controller
             'oferta' => $oferta->fresh()
         ]);
     }
+    public function toggleOfertaSemana($id)
+{
+    $oferta = Oferta::findOrFail($id);
+
+    if ($oferta->es_oferta_semana) {
+        $oferta->quitarEstadoOfertaSemana();
+        $mensaje = 'Oferta desmarcada como oferta de la semana';
+    } else {
+        $oferta->marcarComoOfertaSemana();
+        $mensaje = 'Oferta marcada como oferta de la semana';
+    }
+
+    return response()->json([
+        'message' => $mensaje,
+        'oferta' => $oferta->fresh()
+    ]);
+}
 
     public function destroy($id)
     {
@@ -375,9 +458,9 @@ class OfertasController extends Controller
         // Filtrar por búsqueda
         if ($request->has('search')) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('nombre', 'like', "%{$search}%")
-                  ->orWhere('codigo_producto', 'like', "%{$search}%");
+                    ->orWhere('codigo_producto', 'like', "%{$search}%");
             });
         }
 
