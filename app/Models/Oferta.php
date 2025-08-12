@@ -10,12 +10,29 @@ class Oferta extends Model
     use HasFactory;
 
     protected $fillable = [
-        'titulo', 'subtitulo', 'descripcion', 'tipo_oferta_id',
-        'tipo_descuento', 'valor_descuento', 'precio_minimo',
-        'fecha_inicio', 'fecha_fin', 'imagen', 'banner_imagen',
-        'color_fondo', 'texto_boton', 'enlace_url', 'limite_uso',
-        'usos_actuales', 'activo', 'mostrar_countdown', 'mostrar_en_slider',
-        'mostrar_en_banner', 'prioridad', 'es_oferta_principal'
+        'titulo',
+        'subtitulo',
+        'descripcion',
+        'tipo_oferta_id',
+        'tipo_descuento',
+        'valor_descuento',
+        'precio_minimo',
+        'fecha_inicio',
+        'fecha_fin',
+        'imagen',
+        'banner_imagen',
+        'color_fondo',
+        'texto_boton',
+        'enlace_url',
+        'limite_uso',
+        'usos_actuales',
+        'activo',
+        'mostrar_countdown',
+        'mostrar_en_slider',
+        'mostrar_en_banner',
+        'prioridad',
+        'es_oferta_principal',
+        'es_oferta_semana'
     ];
 
     protected $casts = [
@@ -26,6 +43,7 @@ class Oferta extends Model
         'mostrar_en_slider' => 'boolean',
         'mostrar_en_banner' => 'boolean',
         'es_oferta_principal' => 'boolean',
+        'es_oferta_semana' => 'boolean',
         'valor_descuento' => 'decimal:2',
         'precio_minimo' => 'decimal:2'
     ];
@@ -50,12 +68,12 @@ class Oferta extends Model
         if (!$this->imagen) {
             return null;
         }
-        
+
         // Si ya contiene la URL completa, devolverla tal como está
         if (str_starts_with($this->imagen, 'http')) {
             return $this->imagen;
         }
-        
+
         return asset('storage/' . $this->imagen);
     }
 
@@ -64,12 +82,12 @@ class Oferta extends Model
         if (!$this->banner_imagen) {
             return null;
         }
-        
+
         // Si ya contiene la URL completa, devolverla tal como está
         if (str_starts_with($this->banner_imagen, 'http')) {
             return $this->banner_imagen;
         }
-        
+
         return asset('storage/' . $this->banner_imagen);
     }
 
@@ -77,8 +95,8 @@ class Oferta extends Model
     public function scopeActivas($query)
     {
         return $query->where('activo', true)
-                    ->where('fecha_inicio', '<=', now())
-                    ->where('fecha_fin', '>=', now());
+            ->where('fecha_inicio', '<=', now())
+            ->where('fecha_fin', '>=', now());
     }
 
     public function scopeFlashSales($query)
@@ -101,6 +119,10 @@ class Oferta extends Model
     {
         return $query->where('es_oferta_principal', true);
     }
+    public function scopeOfertaSemana($query)
+    {
+        return $query->where('es_oferta_semana', true);
+    }
 
     // Métodos de utilidad
     public function calcularPrecioOferta($precioOriginal)
@@ -113,9 +135,9 @@ class Oferta extends Model
 
     public function estaVigente()
     {
-        return $this->activo && 
-               $this->fecha_inicio <= now() && 
-               $this->fecha_fin >= now();
+        return $this->activo &&
+            $this->fecha_inicio <= now() &&
+            $this->fecha_fin >= now();
     }
 
     // ✅ NUEVO MÉTODO: Marcar como oferta principal
@@ -123,7 +145,7 @@ class Oferta extends Model
     {
         // Primero, quitar el estado principal de todas las demás ofertas
         static::where('es_oferta_principal', true)->update(['es_oferta_principal' => false]);
-        
+
         // Luego, marcar esta oferta como principal
         $this->update(['es_oferta_principal' => true]);
     }
@@ -132,6 +154,19 @@ class Oferta extends Model
     public function quitarEstadoPrincipal()
     {
         $this->update(['es_oferta_principal' => false]);
+    }
+    public function marcarComoOfertaSemana()
+    {
+        // Quitar el estado de oferta de la semana de todas las demás ofertas
+        static::where('es_oferta_semana', true)->update(['es_oferta_semana' => false]);
+
+        // Marcar esta oferta como oferta de la semana
+        $this->update(['es_oferta_semana' => true]);
+    }
+
+    public function quitarEstadoOfertaSemana()
+    {
+        $this->update(['es_oferta_semana' => false]);
     }
 
     // ✅ NUEVO MÉTODO ESTÁTICO: Obtener oferta principal activa
@@ -142,4 +177,11 @@ class Oferta extends Model
             ->ofertaPrincipal()
             ->first();
     }
+    public static function obtenerOfertaSemanaActiva()
+{
+    return static::with(['productos.producto'])
+        ->activas()
+        ->ofertaSemana()
+        ->first();
+}
 }
