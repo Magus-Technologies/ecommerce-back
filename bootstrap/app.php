@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+        ]);
+
         // ✅ AGREGAR estas líneas para registrar los middleware de Spatie:
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
