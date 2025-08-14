@@ -2,7 +2,6 @@
 
 namespace App\Mail;
 
-use App\Models\User;
 use App\Models\UserCliente;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,38 +10,36 @@ use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class WelcomeEmail extends Mailable
+class PasswordResetMail extends Mailable
 {
     use Queueable, SerializesModels;
 
     public $user;
-    public $userType;
+    public $resetUrl;
     public $template;
-    
+
     /**
      * Create a new message instance.
      */
-    // Modificar el constructor:
-    public function __construct($user, $template = null)
+    public function __construct(UserCliente $user, $resetUrl, $template = null)
     {
         $this->user = $user;
+        $this->resetUrl = $resetUrl;
         $this->template = $template;
-        $this->userType = $user instanceof UserCliente ? 'cliente' : 'admin';
     }
 
     public function build()
     {
         $empresaInfo = \App\Models\EmpresaInfo::first();
-        $subject = $this->template ? $this->template->subject : "¡Bienvenido a {$empresaInfo->nombre_empresa} - Tu tienda especializada en tecnología!";
+        $subject = $this->template ? $this->template->subject : "Recuperación de contraseña - {$empresaInfo->nombre_empresa}";
         
         return $this->subject($subject)
-                    ->view('emails.welcome-dynamic')
+                    ->view('emails.password-reset-dynamic')
                     ->with([
                         'user' => $this->user,
-                        'userType' => $this->userType,
+                        'resetUrl' => $this->resetUrl,
                         'template' => $this->template,
                         'empresaInfo' => $empresaInfo
                     ]);
     }
-
 }

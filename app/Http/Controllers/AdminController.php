@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\EmailVerificationMail;
 use App\Mail\WelcomeEmail;
 use Illuminate\Support\Facades\Log;
+use App\Models\EmailTemplate;
+
 
 class AdminController extends Controller
 {
@@ -296,8 +298,18 @@ class AdminController extends Controller
                 'cliente_id' => $cliente->id
             ]);
 
-            // Enviar correo de verificación
-            Mail::to($cliente->email)->send(new EmailVerificationMail($cliente, $verificationUrl, $verificationCode));
+            // Obtener plantilla de verificación
+            $template = EmailTemplate::where('name', 'verification')->where('is_active', true)->first();
+            if (!$template) {
+                // Crear plantilla por defecto si no existe
+                $template = EmailTemplate::create([
+                    'name' => 'verification',
+                    'use_default' => true,
+                    'is_active' => true
+                ]);
+            }
+
+            Mail::to($cliente->email)->send(new EmailVerificationMail($cliente, $verificationUrl, $verificationCode, $template));
 
             Log::info('AuthController@register - Correo de verificación enviado exitosamente');
 

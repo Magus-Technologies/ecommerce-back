@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Models\UserCliente;
 use Carbon\Carbon;
+use App\Models\EmailTemplate;
+
 
 class PasswordResetController extends Controller
 {
@@ -178,6 +180,7 @@ class PasswordResetController extends Controller
         ]);
     }
 
+    // REEMPLAZAR completamente el método sendResetEmail:
     private function sendResetEmail($user, $token)
     {
         $frontendUrl = config('app.frontend_url');
@@ -188,16 +191,17 @@ class PasswordResetController extends Controller
         
         $resetUrl = $frontendUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
         
-        $data = [
-            'user' => $user,
-            'resetUrl' => $resetUrl,
-            'token' => $token
-        ];
+        // Obtener plantilla de reset password
+        $template = EmailTemplate::where('name', 'password_reset')->where('is_active', true)->first();
+        if (!$template) {
+            $template = EmailTemplate::create([
+                'name' => 'password_reset',
+                'use_default' => true,
+                'is_active' => true
+            ]);
+        }
 
-        Mail::send('emails.password-reset', $data, function($message) use ($user) {
-            $message->to($user->email, $user->nombre_completo)
-                   ->subject('Recuperación de contraseña - Ecommerce Magus')
-                   ->from(config('mail.from.address'), config('mail.from.name'));
-        });
+        Mail::to($user->email)->send(new \App\Mail\PasswordResetMail($user, $resetUrl, $template));
     }
+
 }

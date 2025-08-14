@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Models\EmailTemplate;
+
 
 class EmailVerificationController extends Controller
 {
@@ -100,7 +102,17 @@ class EmailVerificationController extends Controller
         // Enviar correo de bienvenida después de la verificación
         try {
             Log::info('Enviando correo de bienvenida', ['email' => $user->email]);
-            Mail::to($user->email)->send(new WelcomeEmail($user));
+            // Obtener plantilla de bienvenida
+            $template = EmailTemplate::where('name', 'welcome')->where('is_active', true)->first();
+            if (!$template) {
+                $template = EmailTemplate::create([
+                    'name' => 'welcome',
+                    'use_default' => true,
+                    'is_active' => true
+                ]);
+            }
+
+            Mail::to($user->email)->send(new WelcomeEmail($user, $template));
             Log::info('Correo de bienvenida enviado exitosamente');
         } catch (\Exception $e) {
             Log::error('Error enviando correo de bienvenida: ' . $e->getMessage());
@@ -206,7 +218,19 @@ class EmailVerificationController extends Controller
 
         // Enviar correo de bienvenida
         try {
-            Mail::to($user->email)->send(new WelcomeEmail($user));
+            Log::info('Enviando correo de bienvenida', ['email' => $user->email]);
+            // Obtener plantilla de bienvenida
+            $template = EmailTemplate::where('name', 'welcome')->where('is_active', true)->first();
+            if (!$template) {
+                $template = EmailTemplate::create([
+                    'name' => 'welcome',
+                    'use_default' => true,
+                    'is_active' => true
+                ]);
+            }
+
+            Mail::to($user->email)->send(new WelcomeEmail($user, $template));
+            Log::info('Correo de bienvenida enviado exitosamente');
         } catch (\Exception $e) {
             Log::error('Error enviando correo de bienvenida: ' . $e->getMessage());
         }

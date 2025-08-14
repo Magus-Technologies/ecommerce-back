@@ -15,21 +15,31 @@ class EmailVerificationMail extends Mailable
     public $verificationUrl;
     public $verificationCode;
 
-    public function __construct(UserCliente $cliente, $verificationUrl, $verificationCode)
+    public $template;
+
+    public function __construct(UserCliente $cliente, $verificationUrl, $verificationCode, $template = null)
     {
         $this->cliente = $cliente;
         $this->verificationUrl = $verificationUrl;
-        $this->verificationCode = $verificationCode; // ← NUEVO PARÁMETRO
+        $this->verificationCode = $verificationCode;
+        $this->template = $template;
     }
 
+    // Antes de: return $this->subject($subject)
+    // Después de: public function build()
     public function build()
     {
-        return $this->subject('Verifica tu cuenta en MarketPro')
-                    ->view('emails.email-verification')
+        $empresaInfo = \App\Models\EmpresaInfo::first();
+        $subject = $this->template ? $this->template->subject : "Verifica tu cuenta en {$empresaInfo->nombre_empresa}";
+        
+        return $this->subject($subject)
+                    ->view('emails.email-verification-dynamic')
                     ->with([
-                        'user' => $this->cliente, // ← Mantener como estaba
+                        'user' => $this->cliente,
                         'verificationUrl' => $this->verificationUrl,
-                        'verificationCode' => $this->verificationCode // ← NUEVO
+                        'verificationCode' => $this->verificationCode,
+                        'template' => $this->template,
+                        'empresaInfo' => $empresaInfo
                     ]);
     }
 

@@ -333,3 +333,16 @@ Route::post('/verify-email', [EmailVerificationController::class, 'verify']);
 Route::post('/resend-verification', [EmailVerificationController::class, 'resendVerification']);
 // Ruta para verificación por enlace (GET)
 Route::get('/verify-email-link', [EmailVerificationController::class, 'verifyByLink']);
+
+// Rutas para gestión de plantillas de correo
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::prefix('email-templates')->group(function () {
+        Route::get('/', [App\Http\Controllers\EmailTemplateController::class, 'index']);
+        Route::get('/{name}', [App\Http\Controllers\EmailTemplateController::class, 'show']);
+        Route::put('/{name}', [App\Http\Controllers\EmailTemplateController::class, 'update']);
+        Route::post('/upload-image', [App\Http\Controllers\EmailTemplateController::class, 'uploadImage']);
+        Route::get('/{name}/preview', [App\Http\Controllers\EmailTemplateController::class, 'preview']);
+        Route::get('/empresa/info', [App\Http\Controllers\EmailTemplateController::class, 'getEmpresaInfo']);
+    });
+});
+
