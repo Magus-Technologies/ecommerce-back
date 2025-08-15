@@ -137,7 +137,7 @@ class EmailTemplateController extends Controller
 
         try {
             $image = $request->file('image');
-            $filename = time() . '_' . $image->getClientOriginalName();
+            $filename = time() . '_' . $this->sanitizeFilename($image->getClientOriginalName());
             $path = $image->storeAs('email-templates', $filename, 'public');
             
             $url = Storage::url($path);
@@ -272,4 +272,21 @@ class EmailTemplateController extends Controller
 
         $template->update($templateDefaults);
     }
+
+    /**
+     * Limpia el nombre del archivo eliminando espacios y caracteres especiales
+     */
+    private function sanitizeFilename($filename)
+    {
+        // Obtener la extensión
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $name = pathinfo($filename, PATHINFO_FILENAME);
+        
+        // Limpiar el nombre: espacios por guiones bajos, eliminar caracteres especiales
+        $cleanName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $name);
+        $cleanName = preg_replace('/_+/', '_', $cleanName); // Múltiples guiones bajos por uno solo
+        
+        return $cleanName . '.' . $extension;
+    }
+    
 }
