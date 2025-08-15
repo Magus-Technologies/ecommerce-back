@@ -183,7 +183,7 @@
                         @if($template->secondary_content)
                             {{ $template->secondary_content }}
                         @else
-                            🚀 ¿Qué puedes encontrar en MarketPro?
+                            🚀 ¿Qué puedes encontrar en nuestra tienda?
                         @endif
                     </h3>
                     <ul>
@@ -194,7 +194,7 @@
                 </div>
             @else
                 <div class="highlight">
-                    <h3>🚀 ¿Qué puedes encontrar en MarketPro?</h3>
+                    <h3>🚀 ¿Qué puedes encontrar en nuestra tienda?</h3>
                     <ul>
                         <li><strong>🎮 Gaming:</strong> Tarjetas gráficas de última generación, periféricos gaming, y accesorios</li>
                         <li><strong>💻 Laptops:</strong> Equipos de alto rendimiento para gaming y trabajo profesional</li>
