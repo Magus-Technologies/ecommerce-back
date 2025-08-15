@@ -183,7 +183,7 @@
                         @if($template->secondary_content)
                             {{ $template->secondary_content }}
                         @else
-                            🚀 ¿Qué puedes encontrar en MarketPro?
+                            🚀 ¿Qué puedes encontrar en Market?
                         @endif
                     </h3>
                     <ul>
