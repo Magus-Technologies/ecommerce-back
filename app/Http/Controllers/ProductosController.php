@@ -330,6 +330,13 @@ class ProductosController extends Controller
             $query->where('categoria_id', $request->categoria);
         }
 
+        // ✅ NUEVO: Filtrar por sección si se proporciona
+        if ($request->has('seccion') && $request->seccion !== '' && $request->seccion !== null) {
+            $query->whereHas('categoria', function($q) use ($request) {
+                $q->where('id_seccion', $request->seccion);
+            });
+        }
+
         // Filtrar por búsqueda si se proporciona
         if ($request->has('search')) {
             $search = $request->search;
@@ -337,6 +344,47 @@ class ProductosController extends Controller
                 $q->where('nombre', 'LIKE', "%{$search}%")
                     ->orWhere('descripcion', 'LIKE', "%{$search}%");
             });
+        }
+
+        // Filtro por rango de precios (basado en precio_venta)
+        if ($request->has('minPrice')) {
+            $query->where('precio_venta', '>=', $request->minPrice);
+        }
+        if ($request->has('maxPrice')) {
+            $query->where('precio_venta', '<=', $request->maxPrice);
+        }
+
+        // Filtro por categorías (string de IDs separados por comas)
+        if ($request->has('categoryIds')) {
+            $categoryIds = explode(',', $request->categoryIds);
+            $query->whereIn('categoria_id', $categoryIds);
+        }
+
+        // Filtro por marca (marca_id)
+        if ($request->has('brand')) {
+            $query->where('marca_id', $request->brand);
+        }
+
+        // Ordenamiento
+        if ($request->has('sortBy')) {
+            switch ($request->sortBy) {
+                case 'price_asc':
+                    $query->orderBy('precio_venta', 'asc');
+                    break;
+                case 'price_desc':
+                    $query->orderBy('precio_venta', 'desc');
+                    break;
+                case 'name_asc':
+                    $query->orderBy('nombre', 'asc');
+                    break;
+                case 'popularity_desc':
+                    $query->orderBy('stock', 'desc'); // Simulado con stock, ya que no hay popularidad
+                    break;
+                default:
+                    $query->orderBy('nombre', 'asc');
+            }
+        } else {
+            $query->orderBy('nombre', 'asc');
         }
 
         $productos = $query->paginate(20);
