@@ -45,7 +45,7 @@ Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class
 
 Route::get('/productos-publicos', [ProductosController::class, 'productosPublicos']);
 Route::get('/productos-destacados', [ProductosController::class, 'productosDestacados']);
-Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico']);
+Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico'])->name('producto.detalle');
 Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);

@@ -181,7 +181,7 @@
                 <div class="highlight">
                     <h3>
                         @if($template->secondary_content)
-                            {{ $template->secondary_content }}
+                            {!! $template->secondary_content !!}
                         @else
                             🚀 ¿Qué puedes encontrar en Market?
                         @endif
