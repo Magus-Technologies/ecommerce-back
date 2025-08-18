@@ -12,18 +12,18 @@ class Pedido extends Model
     protected $fillable = [
         'codigo_pedido',
         'cliente_id',
-        'direccion_id',
-        'tienda_id',
-        'estado_pedido_id',
-        'metodo_pago_id',
+        'user_cliente_id',
+        'fecha_pedido',
         'subtotal',
         'igv',
         'descuento_total',
         'total',
-        'requiere_factura',
+        'estado_pedido_id',
+        'metodo_pago',
         'observaciones',
-        'moneda',
-        'tipo_cambio'
+        'direccion_envio',
+        'telefono_contacto',
+        'user_id'
     ];
 
     protected $casts = [
@@ -31,39 +31,58 @@ class Pedido extends Model
         'igv' => 'decimal:2',
         'descuento_total' => 'decimal:2',
         'total' => 'decimal:2',
-        'tipo_cambio' => 'decimal:2',
-        'requiere_factura' => 'boolean',
+        'fecha_pedido' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
 
+    // Relación con Cliente (para ventas tradicionales)
     public function cliente()
     {
-        return $this->belongsTo(UserCliente::class, 'cliente_id');
+        return $this->belongsTo(Cliente::class, 'cliente_id');
     }
 
-    public function direccion()
+    // Relación con UserCliente (para e-commerce)
+    public function userCliente()
     {
-        return $this->belongsTo(UserClienteDireccion::class, 'direccion_id');
+        return $this->belongsTo(UserCliente::class, 'user_cliente_id');
     }
 
-    public function tienda()
-    {
-        return $this->belongsTo(Tienda::class, 'tienda_id');
-    }
-
+    // Relación con Estado del Pedido
     public function estadoPedido()
     {
         return $this->belongsTo(EstadoPedido::class, 'estado_pedido_id');
     }
 
-    public function metodoPago()
+    // Relación con Usuario que creó el pedido
+    public function user()
     {
-        return $this->belongsTo(MetodoPago::class, 'metodo_pago_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
+    // Relación con Detalles del Pedido
     public function detalles()
     {
         return $this->hasMany(PedidoDetalle::class, 'pedido_id');
+    }
+
+    // Accessor para obtener el nombre del cliente
+    public function getClienteNombreAttribute()
+    {
+        if ($this->userCliente) {
+            return $this->userCliente->nombres . ' ' . $this->userCliente->apellidos;
+        }
+        
+        if ($this->cliente) {
+            return $this->cliente->razon_social ?: $this->cliente->nombre_comercial;
+        }
+        
+        return 'Cliente no especificado';
+    }
+
+    // Accessor para obtener el tipo de pedido
+    public function getTipoPedidoAttribute()
+    {
+        return $this->user_cliente_id ? 'E-commerce' : 'Tradicional';
     }
 }
