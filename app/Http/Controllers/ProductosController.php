@@ -447,7 +447,9 @@ class ProductosController extends Controller
 
         return response()->json($categorias);
     }
-     public function buscarProductos(Request $request)
+    
+    // Encuentra este método existente:
+    public function buscarProductos(Request $request)
     {
         try {
             $termino = $request->get('q', '');
@@ -456,15 +458,22 @@ class ProductosController extends Controller
                 return response()->json([]);
             }
 
-            $productos = Producto::with(['categoria'])
+            // MODIFICAR: Agregar filtro por categoría
+            $query = Producto::with(['categoria'])
                 ->where('activo', true)
                 ->where('stock', '>', 0)
                 ->where(function ($query) use ($termino) {
                     $query->where('nombre', 'LIKE', "%{$termino}%")
-                          ->orWhere('descripcion', 'LIKE', "%{$termino}%")
-                          ->orWhere('codigo_producto', 'LIKE', "%{$termino}%");
-                })
-                ->limit(10)
+                        ->orWhere('descripcion', 'LIKE', "%{$termino}%")
+                        ->orWhere('codigo_producto', 'LIKE', "%{$termino}%");
+                });
+
+            // ✅ NUEVO: Filtrar por categoría si se proporciona
+            if ($request->has('categoria') && $request->categoria !== '') {
+                $query->where('categoria_id', $request->categoria);
+            }
+
+            $productos = $query->limit(10)
                 ->get()
                 ->map(function ($producto) {
                     return [
@@ -487,7 +496,6 @@ class ProductosController extends Controller
             ], 500);
         }
     }
-
 
     /**
      * Obtener estadísticas de productos para dashboard
