@@ -293,4 +293,158 @@ class ClientesController extends Controller
             ], 500);
         }
     }
+
+    /**
+ * Obtener direcciones del cliente autenticado
+ */
+public function misDirecciones(Request $request)
+{
+    $cliente = $request->user();
+    
+    $direcciones = $cliente->direcciones()
+        ->with(['ubigeo'])
+        ->orderBy('predeterminada', 'desc')
+        ->orderBy('created_at', 'desc')
+        ->get();
+    
+    return response()->json([
+        'status' => 'success',
+        'direcciones' => $direcciones
+    ]);
+}
+
+/**
+ * Crear nueva dirección
+ */
+public function crearDireccion(Request $request)
+{
+    $request->validate([
+        'nombre_destinatario' => 'required|string|max:255',
+        'direccion_completa' => 'required|string',
+        'ubigeo_id' => 'required|string|exists:ubigeo_inei,id_ubigeo',
+        'telefono' => 'nullable|string|max:20',
+        'predeterminada' => 'boolean'
+    ]);
+
+    $cliente = $request->user();
+    
+    // Si es predeterminada, quitar predeterminada de las demás
+    if ($request->predeterminada) {
+        $cliente->direcciones()->update(['predeterminada' => false]);
+    }
+    
+    $direccion = $cliente->direcciones()->create([
+        'nombre_destinatario' => $request->nombre_destinatario,
+        'direccion_completa' => $request->direccion_completa,
+        'ubigeo_id' => $request->ubigeo_id,
+        'telefono' => $request->telefono,
+        'predeterminada' => $request->predeterminada ?? false,
+        'activa' => true
+    ]);
+    
+    $direccion->load('ubigeo');
+    
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Dirección creada exitosamente',
+        'direccion' => $direccion
+    ], 201);
+}
+// Agregar estos métodos al ClientesController.php después del método crearDireccion()
+
+/**
+ * Actualizar dirección existente
+ */
+public function actualizarDireccion(Request $request, $id)
+{
+    $request->validate([
+        'nombre_destinatario' => 'required|string|max:255',
+        'direccion_completa' => 'required|string',
+        'ubigeo_id' => 'required|string|exists:ubigeo_inei,id_ubigeo',
+        'telefono' => 'nullable|string|max:20',
+        'predeterminada' => 'boolean'
+    ]);
+
+    $cliente = $request->user();
+    
+    // Buscar la dirección que pertenece al cliente autenticado
+    $direccion = $cliente->direcciones()->findOrFail($id);
+    
+    // Si es predeterminada, quitar predeterminada de las demás
+    if ($request->predeterminada) {
+        $cliente->direcciones()->where('id', '!=', $id)->update(['predeterminada' => false]);
+    }
+    
+    $direccion->update([
+        'nombre_destinatario' => $request->nombre_destinatario,
+        'direccion_completa' => $request->direccion_completa,
+        'ubigeo_id' => $request->ubigeo_id,
+        'telefono' => $request->telefono,
+        'predeterminada' => $request->predeterminada ?? false
+    ]);
+    
+    $direccion->load('ubigeo');
+    
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Dirección actualizada exitosamente',
+        'direccion' => $direccion
+    ]);
+}
+
+/**
+ * Eliminar dirección
+ */
+public function eliminarDireccion(Request $request, $id)
+{
+    $cliente = $request->user();
+    
+    // Buscar la dirección que pertenece al cliente autenticado
+    $direccion = $cliente->direcciones()->findOrFail($id);
+    
+    // No permitir eliminar si es la única dirección
+    if ($cliente->direcciones()->count() <= 1) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'No puedes eliminar tu única dirección'
+        ], 400);
+    }
+    
+    $esPredeterminada = $direccion->predeterminada;
+    
+    $direccion->delete();
+    
+    // Si era predeterminada, establecer otra como predeterminada
+    if ($esPredeterminada) {
+        $cliente->direcciones()->first()?->update(['predeterminada' => true]);
+    }
+    
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Dirección eliminada exitosamente'
+    ]);
+}
+
+/**
+ * Establecer dirección como predeterminada
+ */
+public function establecerPredeterminada(Request $request, $id)
+{
+    $cliente = $request->user();
+    
+    // Buscar la dirección que pertenece al cliente autenticado
+    $direccion = $cliente->direcciones()->findOrFail($id);
+    
+    // Quitar predeterminada de todas las direcciones del cliente
+    $cliente->direcciones()->update(['predeterminada' => false]);
+    
+    // Establecer esta como predeterminada
+    $direccion->update(['predeterminada' => true]);
+    
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Dirección establecida como predeterminada',
+        'direccion' => $direccion
+    ]);
+}
 }

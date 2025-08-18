@@ -32,7 +32,7 @@ class Oferta extends Model
         'mostrar_en_banner',
         'prioridad',
         'es_oferta_principal',
-        'es_oferta_semana'
+        'es_oferta_semana' 
     ];
 
     protected $casts = [

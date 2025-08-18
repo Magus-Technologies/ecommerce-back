@@ -159,7 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // ✅ NUEVA RUTA: Toggle oferta principal
         Route::patch('/ofertas/{id}/toggle-principal', [OfertasController::class, 'toggleOfertaPrincipal']);
         // ✅ NUEVA RUTA: Toggle oferta de la semana
-Route::patch('/ofertas/{id}/toggle-semana', [OfertasController::class, 'toggleOfertaSemana']);
+        Route::patch('/ofertas/{id}/toggle-semana', [OfertasController::class, 'toggleOfertaSemana']);
     });
 
     Route::middleware('permission:cupones.ver')->group(function () {
@@ -282,8 +282,12 @@ Route::patch('/ofertas/{id}/toggle-semana', [OfertasController::class, 'toggleOf
         Route::get('/', [PedidosController::class, 'index'])->middleware('permission:pedidos.ver');
         Route::get('/estados', [PedidosController::class, 'getEstados']);
         Route::get('/metodos-pago', [PedidosController::class, 'getMetodosPago']);
+        Route::get('/estadisticas', [PedidosController::class, 'estadisticas']);
+        Route::post('/ecommerce', [PedidosController::class, 'crearPedidoEcommerce']); // Para carrito
+        Route::get('/mis-pedidos', [PedidosController::class, 'misPedidos']); // Para clientes
         Route::get('/{id}', [PedidosController::class, 'show'])->middleware('permission:pedidos.show');
         Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit');
+        Route::patch('/{id}/estado', [PedidosController::class, 'actualizarEstado'])->middleware('permission:pedidos.edit');
         Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
     });
 
@@ -320,7 +324,13 @@ Route::patch('/ofertas/{id}/toggle-semana', [OfertasController::class, 'toggleOf
         Route::put('/empresa-info/{id}', [EmpresaInfoController::class, 'update']); // POST para manejar archivos
     });
 
-
+    Route::prefix('mis-direcciones')->group(function () {
+        Route::get('/', [ClientesController::class, 'misDirecciones']);
+        Route::post('/', [ClientesController::class, 'crearDireccion']);
+        Route::put('/{id}', [ClientesController::class, 'actualizarDireccion']);
+        Route::delete('/{id}', [ClientesController::class, 'eliminarDireccion']);
+        Route::patch('/{id}/predeterminada', [ClientesController::class, 'establecerPredeterminada']);
+    });
 });
 
 // Rutas de recuperación de contraseña

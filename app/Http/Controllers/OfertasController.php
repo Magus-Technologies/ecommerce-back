@@ -510,7 +510,7 @@ class OfertasController extends Controller
                     'stock_original' => $producto->stock,
                     'stock_oferta' => $productoOferta->stock_oferta,
                     'vendidos_oferta' => $productoOferta->vendidos_oferta,
-                    'imagen_url' => $producto->imagen_url, // Usar el accessor del modelo
+                    'imagen_url' => $producto->imagen_url, // Usar el accessor del modelos
                     'categoria' => $producto->categoria->nombre ?? null,
                     'marca' => $producto->marca->nombre ?? null,
                 ];

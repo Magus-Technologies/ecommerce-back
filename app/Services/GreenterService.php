@@ -31,19 +31,22 @@ class GreenterService
         $this->configurarEmpresa();
     }
 
-    private function configurarSee()
-    {
-        // Configurar certificados
-        $this->see->setCertificate(file_get_contents(config('services.greenter.cert_path')));
-        $this->see->setPrivateKey(file_get_contents(config('services.greenter.private_key_path')));
-        $this->see->setCredentials(
-            config('services.greenter.fe_user'),
-            config('services.greenter.fe_password')
-        );
+   private function configurarSee()
+{
+    // Configurar certificado (que incluye la clave privada)
+    $this->see->setCertificate(file_get_contents(config('services.greenter.cert_path')));
+    
+    // Si tu certificado tiene contraseña, úsala aquí
+    // $this->see->setClave('tu_password_del_certificado');
+    
+    $this->see->setCredentials(
+        config('services.greenter.fe_user'),
+        config('services.greenter.fe_password')
+    );
 
-        // Configurar servicios SUNAT
-        $this->see->setService(SunatEndpoints::FE_BETA); // Para producción usar SunatEndpoints::FE_PRODUCCION
-    }
+    // Configurar servicios SUNAT
+    $this->see->setService(SunatEndpoints::FE_BETA); // Para producción usar SunatEndpoints::FE_PRODUCCION
+}
 
     private function configurarEmpresa()
     {

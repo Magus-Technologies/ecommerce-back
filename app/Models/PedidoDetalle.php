@@ -14,15 +14,17 @@ class PedidoDetalle extends Model
     protected $fillable = [
         'pedido_id',
         'producto_id',
+        'codigo_producto',
+        'nombre_producto',
         'cantidad',
         'precio_unitario',
-        'subtotal'
+        'subtotal_linea'
     ];
 
     protected $casts = [
         'cantidad' => 'integer',
         'precio_unitario' => 'decimal:2',
-        'subtotal' => 'decimal:2'
+        'subtotal_linea' => 'decimal:2'
     ];
 
     public function pedido()
