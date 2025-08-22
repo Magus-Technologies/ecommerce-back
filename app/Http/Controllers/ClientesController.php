@@ -3,11 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\UserCliente;
-use App\Models\UserClienteDireccion;
-use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
 
 class ClientesController extends Controller
 {
@@ -299,18 +296,54 @@ class ClientesController extends Controller
  */
 public function misDirecciones(Request $request)
 {
-    $cliente = $request->user();
-    
-    $direcciones = $cliente->direcciones()
-        ->with(['ubigeo'])
-        ->orderBy('predeterminada', 'desc')
-        ->orderBy('created_at', 'desc')
-        ->get();
-    
-    return response()->json([
-        'status' => 'success',
-        'direcciones' => $direcciones
-    ]);
+    try {
+        $cliente = $request->user();
+        \Log::info('Cliente autenticado:', ['id' => $cliente->id, 'email' => $cliente->email]);
+        
+        $direcciones = $cliente->direcciones()
+            ->with(['ubigeo'])
+            ->orderBy('predeterminada', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        \Log::info('Direcciones encontradas:', ['count' => $direcciones->count()]);
+        
+        // Transformar los datos del ubigeo para mostrar nombres en lugar de códigos
+        $direcciones->transform(function ($direccion) {
+            if ($direccion->ubigeo) {
+                $direccion->ubigeo->departamento_nombre = $direccion->ubigeo->departamento_nombre;
+                $direccion->ubigeo->provincia_nombre = $direccion->ubigeo->provincia_nombre;
+                $direccion->ubigeo->distrito_nombre = $direccion->ubigeo->distrito_nombre;
+            }
+            return $direccion;
+        });
+        
+        // Log de cada dirección para debuggear
+        foreach ($direcciones as $index => $direccion) {
+            \Log::info("Dirección {$index}:", [
+                'id' => $direccion->id,
+                'nombre_destinatario' => $direccion->nombre_destinatario,
+                'id_ubigeo' => $direccion->id_ubigeo,
+                'ubigeo_loaded' => $direccion->relationLoaded('ubigeo'),
+                'ubigeo_data' => $direccion->ubigeo
+            ]);
+        }
+        
+        return response()->json([
+            'status' => 'success',
+            'direcciones' => $direcciones
+        ]);
+    } catch (\Exception $e) {
+        \Log::error('Error en misDirecciones:', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error al obtener direcciones: ' . $e->getMessage()
+        ], 500);
+    }
 }
 
 /**
@@ -336,7 +369,7 @@ public function crearDireccion(Request $request)
     $direccion = $cliente->direcciones()->create([
         'nombre_destinatario' => $request->nombre_destinatario,
         'direccion_completa' => $request->direccion_completa,
-        'ubigeo_id' => $request->ubigeo_id,
+        'id_ubigeo' => $request->ubigeo_id, // Usar id_ubigeo en lugar de ubigeo_id
         'telefono' => $request->telefono,
         'predeterminada' => $request->predeterminada ?? false,
         'activa' => true
@@ -350,7 +383,6 @@ public function crearDireccion(Request $request)
         'direccion' => $direccion
     ], 201);
 }
-// Agregar estos métodos al ClientesController.php después del método crearDireccion()
 
 /**
  * Actualizar dirección existente
@@ -378,11 +410,13 @@ public function actualizarDireccion(Request $request, $id)
     $direccion->update([
         'nombre_destinatario' => $request->nombre_destinatario,
         'direccion_completa' => $request->direccion_completa,
-        'ubigeo_id' => $request->ubigeo_id,
+        'id_ubigeo' => $request->ubigeo_id, // Usar id_ubigeo en lugar de ubigeo_id
         'telefono' => $request->telefono,
         'predeterminada' => $request->predeterminada ?? false
     ]);
     
+    // Recargar la dirección con la relación ubigeo
+    $direccion->refresh();
     $direccion->load('ubigeo');
     
     return response()->json([
@@ -440,6 +474,10 @@ public function establecerPredeterminada(Request $request, $id)
     
     // Establecer esta como predeterminada
     $direccion->update(['predeterminada' => true]);
+    
+    // Recargar la dirección con la relación ubigeo
+    $direccion->refresh();
+    $direccion->load('ubigeo');
     
     return response()->json([
         'status' => 'success',

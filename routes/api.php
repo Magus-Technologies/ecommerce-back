@@ -26,6 +26,7 @@ use App\Http\Controllers\PedidosController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\EmailVerificationController;
+use App\Http\Controllers\CartController;
 
 
 
@@ -39,9 +40,11 @@ Route::get('/document-types', [DocumentTypeController::class, 'getDocumentTypes'
 Route::get('/reniec/buscar/{doc}', [ReniecController::class, 'buscar']);
 // Rutas para ubigeo
 Route::get('/departamentos', [UbigeoController::class, 'getDepartamentos']);
-Route::get('/categorias/publicas', [CategoriasController::class, 'categoriasPublicas']);
 Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
 Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
+Route::get('ubigeo-chain/{ubigeoId}', [UbigeoController::class, 'getUbigeoChain']);
+
+Route::get('/categorias/publicas', [CategoriasController::class, 'categoriasPublicas']);
 
 Route::get('/productos-publicos', [ProductosController::class, 'productosPublicos']);
 Route::get('/productos-destacados', [ProductosController::class, 'productosDestacados']);
@@ -285,6 +288,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/estadisticas', [PedidosController::class, 'estadisticas']);
         Route::post('/ecommerce', [PedidosController::class, 'crearPedidoEcommerce']); // Para carrito
         Route::get('/mis-pedidos', [PedidosController::class, 'misPedidos']); // Para clientes
+        Route::get('/usuario/{userId}', [PedidosController::class, 'pedidosPorUsuario']); // Para obtener pedidos de un usuario específico
         Route::get('/{id}', [PedidosController::class, 'show'])->middleware('permission:pedidos.show');
         Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit');
         Route::patch('/{id}/estado', [PedidosController::class, 'actualizarEstado'])->middleware('permission:pedidos.edit');
@@ -331,7 +335,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [ClientesController::class, 'eliminarDireccion']);
         Route::patch('/{id}/predeterminada', [ClientesController::class, 'establecerPredeterminada']);
     });
+
+    // ✅ RUTAS DEL CARRITO PROTEGIDAS
+    Route::prefix('cart')->group(function () {
+        Route::get('/', [CartController::class, 'index']);
+        Route::post('/add', [CartController::class, 'add']);
+        Route::put('/update/{producto_id}', [CartController::class, 'update']);
+        Route::delete('/remove/{producto_id}', [CartController::class, 'remove']);
+        Route::delete('/clear', [CartController::class, 'clear']);
+        Route::post('/sync', [CartController::class, 'sync']);
+    });
 });
+
 
 // Rutas de recuperación de contraseña
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
@@ -354,5 +369,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/{name}/preview', [App\Http\Controllers\EmailTemplateController::class, 'preview']);
         Route::get('/empresa/info', [App\Http\Controllers\EmailTemplateController::class, 'getEmpresaInfo']);
     });
+});
+
+// Rutas de cotización (públicas para el checkout)
+Route::prefix('cotizacion')->group(function () {
+    Route::post('/generar-pdf', [App\Http\Controllers\CotizacionController::class, 'generarPDF']);
+    Route::post('/enviar-email', [App\Http\Controllers\CotizacionController::class, 'enviarEmail']);
 });
 

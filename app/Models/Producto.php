@@ -35,6 +35,8 @@ class Producto extends Model
         'updated_at' => 'datetime'
     ];
 
+    protected $appends = ['imagen_url'];
+
     // Relación con categoría
     public function categoria()
     {
