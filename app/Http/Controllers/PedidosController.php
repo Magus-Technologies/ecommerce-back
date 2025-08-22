@@ -16,7 +16,12 @@ class PedidosController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Pedido::with(['cliente', 'estadoPedido']);
+            $query = Pedido::with([
+                'cliente', 
+                'userCliente', 
+                'estadoPedido',
+                'detalles.producto'
+            ]);
 
             // Filtros
             if ($request->has('estado_pedido_id') && $request->estado_pedido_id !== '') {
@@ -51,11 +56,57 @@ class PedidosController extends Controller
                 });
             }
 
-            $pedidos = $query->orderBy('fecha_pedido', 'desc')->paginate(20);
+            $pedidos = $query->orderBy('fecha_pedido', 'desc')->get();
 
-            return response()->json($pedidos);
+            // Transformar los datos para incluir los accessors
+            $pedidosTransformados = $pedidos->map(function ($pedido) {
+                return [
+                    'id' => $pedido->id,
+                    'codigo_pedido' => $pedido->codigo_pedido,
+                    'cliente_id' => $pedido->cliente_id,
+                    'user_cliente_id' => $pedido->user_cliente_id,
+                    'fecha_pedido' => $pedido->fecha_pedido,
+                    'subtotal' => $pedido->subtotal,
+                    'igv' => $pedido->igv,
+                    'descuento_total' => $pedido->descuento_total,
+                    'total' => $pedido->total,
+                    'estado_pedido_id' => $pedido->estado_pedido_id,
+                    'metodo_pago' => $pedido->metodo_pago,
+                    'observaciones' => $pedido->observaciones,
+                    'direccion_envio' => $pedido->direccion_envio,
+                    'telefono_contacto' => $pedido->telefono_contacto,
+                    'user_id' => $pedido->user_id,
+                    'created_at' => $pedido->created_at,
+                    'updated_at' => $pedido->updated_at,
+                    'cliente_nombre' => $pedido->cliente_nombre,
+                    'tipo_pedido' => $pedido->tipo_pedido,
+                    'cliente' => $pedido->cliente,
+                    'user_cliente' => $pedido->userCliente,
+                    'estado_pedido' => $pedido->estadoPedido,
+                    'detalles' => $pedido->detalles->map(function ($detalle) {
+                        return [
+                            'id' => $detalle->id,
+                            'pedido_id' => $detalle->pedido_id,
+                            'producto_id' => $detalle->producto_id,
+                            'codigo_producto' => $detalle->codigo_producto,
+                            'nombre_producto' => $detalle->nombre_producto,
+                            'cantidad' => $detalle->cantidad,
+                            'precio_unitario' => $detalle->precio_unitario,
+                            'subtotal_linea' => $detalle->subtotal_linea,
+                            'imagen_url' => $detalle->imagen_url,
+                            'producto' => $detalle->producto
+                        ];
+                    })
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'pedidos' => $pedidosTransformados
+            ]);
         } catch (\Exception $e) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Error al obtener pedidos',
                 'error' => $e->getMessage()
             ], 500);
@@ -304,6 +355,63 @@ class PedidosController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al eliminar pedido',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener pedidos de un usuario específico
+     */
+    public function pedidosPorUsuario($userId)
+    {
+        try {
+            $pedidos = Pedido::with([
+                'detalles.producto', 
+                'estadoPedido',
+                'userCliente'
+            ])
+            ->where('user_cliente_id', $userId)
+            ->orderBy('fecha_pedido', 'desc')
+            ->get();
+
+            // Transformar los pedidos para incluir información adicional
+            $pedidosTransformados = $pedidos->map(function ($pedido) {
+                return [
+                    'id' => $pedido->id,
+                    'codigo_pedido' => $pedido->codigo_pedido,
+                    'fecha_pedido' => $pedido->fecha_pedido,
+                    'total' => $pedido->total,
+                    'metodo_pago' => $pedido->metodo_pago,
+                    'direccion_envio' => $pedido->direccion_envio,
+                    'telefono_contacto' => $pedido->telefono_contacto,
+                    'observaciones' => $pedido->observaciones,
+                    'estado_pedido' => $pedido->estadoPedido,
+                    'user_cliente' => $pedido->userCliente,
+                    'detalles' => $pedido->detalles->map(function ($detalle) {
+                        return [
+                            'id' => $detalle->id,
+                            'codigo_producto' => $detalle->codigo_producto,
+                            'nombre_producto' => $detalle->nombre_producto,
+                            'cantidad' => $detalle->cantidad,
+                            'precio_unitario' => $detalle->precio_unitario,
+                            'subtotal_linea' => $detalle->subtotal_linea,
+                            'imagen_url' => $detalle->imagen_url,
+                            'producto' => $detalle->producto
+                        ];
+                    })
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'pedidos' => $pedidosTransformados
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener pedidos del usuario',
                 'error' => $e->getMessage()
             ], 500);
         }

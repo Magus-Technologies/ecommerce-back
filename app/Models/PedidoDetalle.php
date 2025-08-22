@@ -27,6 +27,8 @@ class PedidoDetalle extends Model
         'subtotal_linea' => 'decimal:2'
     ];
 
+    protected $appends = ['imagen_url'];
+
     public function pedido()
     {
         return $this->belongsTo(Pedido::class, 'pedido_id');
@@ -35,5 +37,14 @@ class PedidoDetalle extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class, 'producto_id');
+    }
+
+    // Accessor para obtener la URL completa de la imagen
+    public function getImagenUrlAttribute()
+    {
+        if ($this->producto && $this->producto->imagen) {
+            return $this->producto->imagen_url;
+        }
+        return asset('images/no-image.png'); // Imagen por defecto
     }
 }
