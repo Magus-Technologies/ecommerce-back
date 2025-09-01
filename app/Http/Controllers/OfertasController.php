@@ -316,10 +316,13 @@ class OfertasController extends Controller
         $oferta = Oferta::create($data);
 
         // ✅ Si se marca como oferta principal, quitar el estado de las demás
-        if ($request->boolean('es_oferta_principal')) {
+        $esOfertaPrincipal = $this->convertirABoolean($request->input('es_oferta_principal'));
+        if ($esOfertaPrincipal) {
             $oferta->marcarComoPrincipal();
         }
-        if ($request->boolean('es_oferta_semana')) {
+        
+        $esOfertaSemana = $this->convertirABoolean($request->input('es_oferta_semana'));
+        if ($esOfertaSemana) {
             $oferta->marcarComoOfertaSemana();
         }
 
@@ -352,6 +355,10 @@ class OfertasController extends Controller
 
         $data = $request->all();
 
+        // ✅ ELIMINAR los campos booleanos especiales antes de la actualización masiva
+        unset($data['es_oferta_principal']);
+        unset($data['es_oferta_semana']);
+
         // Manejar subida de imágenes
         if ($request->hasFile('imagen')) {
             // Eliminar imagen anterior
@@ -369,20 +376,43 @@ class OfertasController extends Controller
             $data['banner_imagen'] = $request->file('banner_imagen')->store('ofertas/banners', 'public');
         }
 
+        // ✅ PRIMERO: Manejar estados booleanos especiales ANTES de la actualización masiva
+        $esOfertaPrincipal = $this->convertirABoolean($request->input('es_oferta_principal'));
+        \Log::info('🔄 Controller - Procesando es_oferta_principal', [
+            'valor_recibido' => $request->input('es_oferta_principal'),
+            'valor_convertido' => $esOfertaPrincipal,
+            'has_campo' => $request->has('es_oferta_principal')
+        ]);
+        
+        if ($request->has('es_oferta_principal')) {
+            if ($esOfertaPrincipal) {
+                \Log::info('🔄 Controller - Ejecutando marcarComoPrincipal() para oferta ID: ' . $oferta->id);
+                $oferta->marcarComoPrincipal();
+            } else {
+                \Log::info('🔄 Controller - Ejecutando quitarEstadoPrincipal() para oferta ID: ' . $oferta->id);
+                $oferta->quitarEstadoPrincipal();
+            }
+        }
+
+        $esOfertaSemana = $this->convertirABoolean($request->input('es_oferta_semana'));
+        if ($request->has('es_oferta_semana')) {
+            if ($esOfertaSemana) {
+                $oferta->marcarComoOfertaSemana();
+            } else {
+                $oferta->quitarEstadoOfertaSemana();
+            }
+        }
+
+        // ✅ DESPUÉS: Actualizar campos normales (esto NO debe afectar los booleanos especiales)
+        \Log::info('🔄 Controller - Actualizando campos normales DESPUÉS de manejar estados especiales');
+        \Log::info('🔍 Controller - Contenido de $data antes de update()', [
+            'data_keys' => array_keys($data),
+            'tiene_es_oferta_principal' => array_key_exists('es_oferta_principal', $data),
+            'tiene_es_oferta_semana' => array_key_exists('es_oferta_semana', $data),
+            'es_oferta_principal_value' => $data['es_oferta_principal'] ?? 'NO_EXISTE',
+            'es_oferta_semana_value' => $data['es_oferta_semana'] ?? 'NO_EXISTE'
+        ]);
         $oferta->update($data);
-
-        // ✅ Manejar estado de oferta principal
-        if ($request->boolean('es_oferta_principal')) {
-            $oferta->marcarComoPrincipal();
-        } elseif ($request->has('es_oferta_principal') && !$request->boolean('es_oferta_principal')) {
-            $oferta->quitarEstadoPrincipal();
-        }
-
-        if ($request->boolean('es_oferta_semana')) {
-            $oferta->marcarComoOfertaSemana();
-        } elseif ($request->has('es_oferta_semana') && !$request->boolean('es_oferta_semana')) {
-            $oferta->quitarEstadoOfertaSemana();
-        }
 
         return response()->json($oferta->load('tipoOferta'));
     }
@@ -614,5 +644,23 @@ class OfertasController extends Controller
         return response()->json([
             'message' => 'Producto eliminado de la oferta correctamente'
         ]);
+    }
+
+    // ✅ Método helper para convertir valores a boolean de forma robusta
+    private function convertirABoolean($value)
+    {
+        if (is_null($value)) {
+            return false;
+        }
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_string($value)) {
+            return in_array(strtolower($value), ['true', '1', 'yes', 'on']);
+        }
+        if (is_numeric($value)) {
+            return (int)$value === 1;
+        }
+        return (bool)$value;
     }
 }

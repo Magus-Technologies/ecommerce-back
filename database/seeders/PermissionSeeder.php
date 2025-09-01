@@ -84,9 +84,15 @@ class PermissionSeeder extends Seeder
             'horarios.edit',
             'horarios.delete',
 
+            // Empresa Info
             'empresa_info.ver',
             'empresa_info.edit',
 
+            // Reclamos
+            'reclamos.ver',
+            'reclamos.show',
+            'reclamos.edit',
+            'reclamos.delete',
 
         ];
 

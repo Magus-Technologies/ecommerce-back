@@ -46,8 +46,6 @@ CREATE TABLE `cart_items` (
 -- El sistema está intentando usar user_id = 2, pero no existe
 -- Ejecuta esta consulta para crear el usuario faltante:
 
-INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `remember_token`, `is_enabled`, `created_at`, `updated_at`) VALUES
-(2, 'Usuario Carrito', 'usuario@carrito.com', NULL, '$2y$12$1HlGmMzDtit03XChNUfyh.2V1gpHtzwN/BdsJX4XRBvg/b0BGECd2', NULL, 1, NOW(), NOW());
 
 -- =================================================================
 -- ALTERNATIVA: Si prefieres usar un usuario existente

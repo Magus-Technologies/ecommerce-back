@@ -27,6 +27,7 @@ use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\CartController;
+use App\Http\Controllers\ReclamosController;
 
 
 
@@ -69,6 +70,13 @@ Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
 Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
+
+// Rutas públicas de reclamos
+Route::post('/reclamos/crear', [ReclamosController::class, 'crear']);
+Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'buscarPorNumero']);
+
+// ✅ NUEVAS RUTAS PÚBLICAS - Arma tu PC
+Route::get('/arma-pc/categorias', [CategoriasController::class, 'categoriasArmaPc']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -145,6 +153,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('permission:categorias.create')->group(function () {
         Route::post('/categorias', [CategoriasController::class, 'store']);
+    });
+
+    Route::middleware('permission:categorias.edit')->group(function () {
+        Route::put('/categorias/{id}', [CategoriasController::class, 'update']);
+        Route::patch('/categorias/{id}/toggle-estado', [CategoriasController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:categorias.delete')->group(function () {
+        Route::delete('/categorias/{id}', [CategoriasController::class, 'destroy']);
+    });
+
+    // ✅ NUEVAS RUTAS DE ADMIN - Arma tu PC
+    Route::middleware('permission:categorias.ver')->group(function () {
+        Route::get('/arma-pc/configuracion', [CategoriasController::class, 'configuracionArmaPc']);
+    });
+
+    Route::middleware('permission:categorias.edit')->group(function () {
+        Route::post('/arma-pc/configuracion', [CategoriasController::class, 'guardarConfiguracionArmaPc']);
+        Route::put('/arma-pc/configuracion/orden', [CategoriasController::class, 'actualizarOrdenArmaPc']);
     });
 
     // ✅ RUTAS PROTEGIDAS PARA OFERTAS Y CUPONES
@@ -344,6 +371,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/remove/{producto_id}', [CartController::class, 'remove']);
         Route::delete('/clear', [CartController::class, 'clear']);
         Route::post('/sync', [CartController::class, 'sync']);
+    });
+
+    // Rutas de reclamos para usuarios autenticados
+    Route::prefix('reclamos')->group(function () {
+        Route::get('/mis-reclamos', [ReclamosController::class, 'misReclamos']);
+        
+        // Rutas para administradores
+        Route::middleware('permission:reclamos.ver')->group(function () {
+            Route::get('/', [ReclamosController::class, 'index']);
+            Route::get('/estadisticas', [ReclamosController::class, 'estadisticas']);
+            Route::get('/{id}', [ReclamosController::class, 'show'])->middleware('permission:reclamos.show');
+        });
+        
+        Route::middleware('permission:reclamos.edit')->group(function () {
+            Route::patch('/{id}/respuesta', [ReclamosController::class, 'actualizarRespuesta']);
+            Route::patch('/{id}/estado', [ReclamosController::class, 'cambiarEstado']);
+        });
+        
+        Route::middleware('permission:reclamos.delete')->group(function () {
+            Route::delete('/{id}', [ReclamosController::class, 'destroy']);
+        });
     });
 });
 

@@ -143,11 +143,22 @@ class Oferta extends Model
     // ✅ NUEVO MÉTODO: Marcar como oferta principal
     public function marcarComoPrincipal()
     {
-        // Primero, quitar el estado principal de todas las demás ofertas
-        static::where('es_oferta_principal', true)->update(['es_oferta_principal' => false]);
+        \Log::info('🎯 marcarComoPrincipal() - Iniciando para oferta ID: ' . $this->id);
+        
+        // ✅ USAR TRANSACCIÓN EXPLÍCITA para garantizar consistencia
+        \DB::transaction(function () {
+            // Primero, quitar el estado principal de todas las demás ofertas
+            $affected = \DB::table('ofertas')->where('es_oferta_principal', 1)->update(['es_oferta_principal' => 0]);
+            \Log::info('🎯 marcarComoPrincipal() - Ofertas desmarcadas: ' . $affected);
 
-        // Luego, marcar esta oferta como principal
-        $this->update(['es_oferta_principal' => true]);
+            // Luego, marcar esta oferta como principal usando query directa
+            $updated = \DB::table('ofertas')->where('id', $this->id)->update(['es_oferta_principal' => 1]);
+            \Log::info('🎯 marcarComoPrincipal() - Query directa ejecutada. Filas afectadas: ' . $updated);
+        });
+        
+        // Verificar que se actualizó correctamente
+        $this->refresh();
+        \Log::info('🎯 marcarComoPrincipal() - Verificación final. es_oferta_principal = ' . ($this->es_oferta_principal ? 'TRUE' : 'FALSE'));
     }
 
     // ✅ NUEVO MÉTODO: Quitar estado principal
@@ -157,11 +168,22 @@ class Oferta extends Model
     }
     public function marcarComoOfertaSemana()
     {
-        // Quitar el estado de oferta de la semana de todas las demás ofertas
-        static::where('es_oferta_semana', true)->update(['es_oferta_semana' => false]);
+        \Log::info('📅 marcarComoOfertaSemana() - Iniciando para oferta ID: ' . $this->id);
+        
+        // ✅ USAR TRANSACCIÓN EXPLÍCITA para garantizar consistencia
+        \DB::transaction(function () {
+            // Quitar el estado de oferta de la semana de todas las demás ofertas
+            $affected = \DB::table('ofertas')->where('es_oferta_semana', 1)->update(['es_oferta_semana' => 0]);
+            \Log::info('📅 marcarComoOfertaSemana() - Ofertas desmarcadas: ' . $affected);
 
-        // Marcar esta oferta como oferta de la semana
-        $this->update(['es_oferta_semana' => true]);
+            // Marcar esta oferta como oferta de la semana usando query directa
+            $updated = \DB::table('ofertas')->where('id', $this->id)->update(['es_oferta_semana' => 1]);
+            \Log::info('📅 marcarComoOfertaSemana() - Query directa ejecutada. Filas afectadas: ' . $updated);
+        });
+        
+        // Verificar que se actualizó correctamente
+        $this->refresh();
+        \Log::info('📅 marcarComoOfertaSemana() - Verificación final. es_oferta_semana = ' . ($this->es_oferta_semana ? 'TRUE' : 'FALSE'));
     }
 
     public function quitarEstadoOfertaSemana()

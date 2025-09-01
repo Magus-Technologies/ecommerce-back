@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Categoria;
+use App\Models\ArmaPcConfiguracion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -362,6 +363,209 @@ class CategoriasController extends Controller
 
             return response()->json([
                 'message' => 'Error al obtener categorías públicas',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ====================================
+    // ✅ NUEVOS MÉTODOS PARA ARMA TU PC
+    // ====================================
+
+    /**
+     * Obtener categorías públicas configuradas para Arma tu PC
+     * Ruta pública: GET /api/arma-pc/categorias
+     */
+    public function categoriasArmaPc()
+    {
+        try {
+            Log::info('categoriasArmaPc: Obteniendo categorías configuradas para Arma tu PC');
+            
+            $categorias = ArmaPcConfiguracion::getCategoriasConfiguradas();
+            
+            Log::info('categoriasArmaPc: Categorías obtenidas', [
+                'total_categorias' => $categorias->count()
+            ]);
+
+            return response()->json($categorias);
+            
+        } catch (\Exception $e) {
+            Log::error('categoriasArmaPc: Error al obtener categorías', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al obtener categorías de Arma tu PC',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener configuración actual de Arma tu PC (para administradores)
+     * Ruta protegida: GET /api/arma-pc/configuracion
+     */
+    public function configuracionArmaPc()
+    {
+        try {
+            Log::info('configuracionArmaPc: Obteniendo configuración actual');
+
+            // Obtener configuraciones actuales con sus categorías
+            $configuraciones = ArmaPcConfiguracion::with(['categoria' => function($query) {
+                $query->withCount(['productos' => function($q) {
+                    $q->where('activo', true)->where('stock', '>', 0);
+                }]);
+            }])
+            ->ordenado()
+            ->get();
+
+            // Transformar datos para el frontend
+            $categorias = $configuraciones->map(function($config) {
+                $categoria = $config->categoria;
+                if ($categoria) {
+                    return [
+                        'id' => $categoria->id,
+                        'nombre' => $categoria->nombre,
+                        'img' => $categoria->imagen ? asset('storage/categorias/' . $categoria->imagen) : null,
+                        'productos_count' => $categoria->productos_count,
+                        'orden' => $config->orden,
+                        'activo' => $config->activo
+                    ];
+                }
+                return null;
+            })->filter()->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Configuración obtenida exitosamente',
+                'categorias' => $categorias
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('configuracionArmaPc: Error al obtener configuración', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener configuración de Arma tu PC',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Guardar configuración de Arma tu PC (para administradores)
+     * Ruta protegida: POST /api/arma-pc/configuracion
+     */
+    public function guardarConfiguracionArmaPc(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'categorias' => 'required|array|min:1',
+            'categorias.*.id' => 'required|integer|exists:categorias,id',
+            'categorias.*.orden' => 'required|integer|min:1',
+            'categorias.*.activo' => 'boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            Log::info('guardarConfiguracionArmaPc: Iniciando guardado', [
+                'categorias_count' => count($request->categorias)
+            ]);
+
+            // Usar transacción para asegurar consistencia
+            \DB::transaction(function() use ($request) {
+                // Eliminar configuraciones existentes (usar delete en lugar de truncate)
+                ArmaPcConfiguracion::query()->delete();
+
+                // Crear nuevas configuraciones
+                foreach ($request->categorias as $categoriaData) {
+                    ArmaPcConfiguracion::create([
+                        'categoria_id' => $categoriaData['id'],
+                        'orden' => $categoriaData['orden'],
+                        'activo' => $categoriaData['activo'] ?? true
+                    ]);
+                }
+            });
+
+            Log::info('guardarConfiguracionArmaPc: Configuración guardada exitosamente');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Configuración de Arma tu PC guardada exitosamente'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('guardarConfiguracionArmaPc: Error al guardar configuración', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al guardar configuración de Arma tu PC',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Actualizar orden de categorías en Arma tu PC (para administradores)
+     * Ruta protegida: PUT /api/arma-pc/configuracion/orden
+     */
+    public function actualizarOrdenArmaPc(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'categorias' => 'required|array|min:1',
+            'categorias.*.id' => 'required|integer',
+            'categorias.*.orden' => 'required|integer|min:1'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            Log::info('actualizarOrdenArmaPc: Iniciando actualización de orden');
+
+            foreach ($request->categorias as $categoriaData) {
+                ArmaPcConfiguracion::where('categoria_id', $categoriaData['id'])
+                    ->update(['orden' => $categoriaData['orden']]);
+            }
+
+            Log::info('actualizarOrdenArmaPc: Orden actualizado exitosamente');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Orden de categorías actualizado exitosamente'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('actualizarOrdenArmaPc: Error al actualizar orden', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar orden de categorías',
                 'error' => $e->getMessage()
             ], 500);
         }
