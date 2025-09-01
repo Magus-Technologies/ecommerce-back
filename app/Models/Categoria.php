@@ -28,7 +28,7 @@ class Categoria extends Model
     // Relación con productos
     public function productos()
     {
-        return $this->hasMany(Producto::class);
+        return $this->hasMany(Producto::class, 'categoria_id');
     }
 
     // Relación con sección
