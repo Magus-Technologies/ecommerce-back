@@ -59,7 +59,11 @@ class ProductosController extends Controller
             'stock' => 'required|integer|min:0',
             'stock_minimo' => 'required|integer|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'activo' => 'boolean'
+            'activo' => 'boolean',
+            'mostrar_igv' => 'boolean',
+            'destacado' => 'boolean',        // <- NUEVA LÍNEA
+            'mostrar_igv' => 'boolean',
+
         ]);
 
         if ($validator->fails()) {
@@ -79,10 +83,14 @@ class ProductosController extends Controller
                 'precio_venta',
                 'stock',
                 'stock_minimo',
-                'activo'
+                'activo',
+                'destacado',        // <- NUEVA LÍNEA
+                'mostrar_igv'
             ]);
 
             $data['activo'] = $request->has('activo') ? (bool) $request->activo : true;
+            $data['destacado'] = $request->has('destacado') ? (bool) $request->destacado : false;     // <- NUEVA LÍNEA
+            $data['mostrar_igv'] = $request->has('mostrar_igv') ? (bool) $request->mostrar_igv : true;
 
             // MÉTODO MANUAL - Manejar imagen directamente en public/storage
             if ($request->hasFile('imagen')) {
@@ -147,6 +155,13 @@ class ProductosController extends Controller
      */
    public function update(Request $request, $id)
     {
+        // Convertir mostrar_igv a booleano antes de validar
+        if ($request->has('mostrar_igv')) {
+            $request->merge([
+                'mostrar_igv' => filter_var($request->input('mostrar_igv'), FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
+        
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
@@ -158,7 +173,8 @@ class ProductosController extends Controller
             'stock' => 'required|integer|min:0',
             'stock_minimo' => 'required|integer|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'activo' => 'required|in:true,false,1,0'
+            'activo' => 'required|in:true,false,1,0',
+            'mostrar_igv' => 'boolean'
         ]);
 
         if ($validator->fails()) {
@@ -172,10 +188,13 @@ class ProductosController extends Controller
             $producto = Producto::findOrFail($id);
             $data = $request->only([
                 'nombre', 'descripcion', 'codigo_producto', 'categoria_id', 'marca_id',
-                'precio_compra', 'precio_venta', 'stock', 'stock_minimo'
+                'precio_compra', 'precio_venta', 'stock', 'stock_minimo',
+                'destacado',  // <- AGREGAR ESTA LÍNEA
+                'mostrar_igv'
             ]);
             
             $data['activo'] = filter_var($request->activo, FILTER_VALIDATE_BOOLEAN);
+            $data['destacado'] = filter_var($request->destacado, FILTER_VALIDATE_BOOLEAN);  // <- AGREGAR ESTA LÍNEA
 
             // MÉTODO MANUAL - Manejar imagen
             if ($request->hasFile('imagen')) {
@@ -411,7 +430,8 @@ class ProductosController extends Controller
                 'sold_count' => rand(10, 30),
                 'total_stock' => $producto->stock + rand(10, 30),
                 'is_on_sale' => false, // Por ahora false, luego puedes implementar ofertas
-                'discount_percentage' => 0
+                'discount_percentage' => 0,
+                'mostrar_igv' => $producto->mostrar_igv
             ];
         });
 

@@ -21,7 +21,8 @@ class Producto extends Model
         'stock_minimo',
         'imagen',
         'activo',
-        'destacado'
+        'destacado',
+        'mostrar_igv' 
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class Producto extends Model
         'stock_minimo' => 'integer',
         'activo' => 'boolean',
         'destacado' => 'boolean',
+        'mostrar_igv' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

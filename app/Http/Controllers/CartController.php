@@ -42,7 +42,6 @@ class CartController extends Controller
             'items' => $cartItems->toArray()
         ]);
 
-        // Formatear la respuesta para que coincida con la estructura del carrito local
         $formattedItems = $cartItems->map(function ($item) {
             return [
                 'id' => $item->id, // ID del item del carrito
@@ -53,6 +52,7 @@ class CartController extends Controller
                 'cantidad' => (int) $item->cantidad,
                 'stock_disponible' => (int) $item->producto->stock,
                 'codigo_producto' => $item->producto->codigo_producto,
+                'mostrar_igv' => (bool) $item->producto->mostrar_igv,  // <- NUEVA LÍNEA
             ];
         });
 
