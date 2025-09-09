@@ -23,7 +23,20 @@ class Pedido extends Model
         'observaciones',
         'direccion_envio',
         'telefono_contacto',
-        'user_id'
+        'user_id',
+        // Nuevos campos
+        'numero_documento',
+        'cliente_nombre',
+        'cliente_email',
+        'forma_envio',
+        'costo_envio',
+        'departamento_id',
+        'provincia_id',
+        'distrito_id',
+        'departamento_nombre',
+        'provincia_nombre',
+        'distrito_nombre',
+        'ubicacion_completa'
     ];
 
     protected $casts = [
@@ -84,5 +97,31 @@ class Pedido extends Model
     public function getTipoPedidoAttribute()
     {
         return $this->user_cliente_id ? 'E-commerce' : 'Tradicional';
+    }
+
+    // Relación con tracking
+    public function tracking()
+    {
+        return $this->hasMany(PedidoTracking::class)->orderBy('fecha_cambio', 'asc');
+    }
+
+    // Verificar si es un pedido a provincia
+    public function esEnvioAProvincia(): bool
+    {
+        return $this->forma_envio === 'envio_provincia';
+    }
+
+    // Obtener estados disponibles según el tipo de envío
+    public function getEstadosDisponibles()
+    {
+        if ($this->esEnvioAProvincia()) {
+            // Estados específicos para envío a provincia
+            return EstadoPedido::whereIn('id', [1, 2, 7, 8, 5, 6])->orderBy('orden')->get();
+            // 1: Pendiente, 2: Confirmado, 7: En Recepción, 8: Enviado a Provincia, 5: Entregado, 6: Cancelado
+        } else {
+            // Estados normales para delivery y recojo en tienda
+            return EstadoPedido::whereIn('id', [1, 2, 3, 4, 5, 6])->orderBy('orden')->get();
+            // 1: Pendiente, 2: Confirmado, 3: En Preparación, 4: Enviado, 5: Entregado, 6: Cancelado
+        }
     }
 }

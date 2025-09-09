@@ -311,9 +311,22 @@ public function misDirecciones(Request $request)
         // Transformar los datos del ubigeo para mostrar nombres en lugar de códigos
         $direcciones->transform(function ($direccion) {
             if ($direccion->ubigeo) {
-                $direccion->ubigeo->departamento_nombre = $direccion->ubigeo->departamento_nombre;
-                $direccion->ubigeo->provincia_nombre = $direccion->ubigeo->provincia_nombre;
-                $direccion->ubigeo->distrito_nombre = $direccion->ubigeo->distrito_nombre;
+                // Obtener el departamento
+                $departamento = \App\Models\UbigeoInei::where('departamento', $direccion->ubigeo->departamento)
+                    ->where('provincia', '00')
+                    ->where('distrito', '00')
+                    ->first();
+                
+                // Obtener la provincia
+                $provincia = \App\Models\UbigeoInei::where('departamento', $direccion->ubigeo->departamento)
+                    ->where('provincia', $direccion->ubigeo->provincia)
+                    ->where('distrito', '00')
+                    ->first();
+                
+                // Asignar los nombres
+                $direccion->ubigeo->departamento_nombre = $departamento ? $departamento->nombre : 'N/A';
+                $direccion->ubigeo->provincia_nombre = $provincia ? $provincia->nombre : 'N/A';
+                $direccion->ubigeo->distrito_nombre = $direccion->ubigeo->nombre; // El distrito ya tiene su nombre correcto
             }
             return $direccion;
         });
@@ -354,7 +367,7 @@ public function crearDireccion(Request $request)
     $request->validate([
         'nombre_destinatario' => 'required|string|max:255',
         'direccion_completa' => 'required|string',
-        'ubigeo_id' => 'required|string|exists:ubigeo_inei,id_ubigeo',
+        'id_ubigeo' => 'required|string|exists:ubigeo_inei,id_ubigeo',
         'telefono' => 'nullable|string|max:20',
         'predeterminada' => 'boolean'
     ]);
@@ -369,7 +382,7 @@ public function crearDireccion(Request $request)
     $direccion = $cliente->direcciones()->create([
         'nombre_destinatario' => $request->nombre_destinatario,
         'direccion_completa' => $request->direccion_completa,
-        'id_ubigeo' => $request->ubigeo_id, // Usar id_ubigeo en lugar de ubigeo_id
+        'id_ubigeo' => $request->id_ubigeo,
         'telefono' => $request->telefono,
         'predeterminada' => $request->predeterminada ?? false,
         'activa' => true
@@ -392,7 +405,7 @@ public function actualizarDireccion(Request $request, $id)
     $request->validate([
         'nombre_destinatario' => 'required|string|max:255',
         'direccion_completa' => 'required|string',
-        'ubigeo_id' => 'required|string|exists:ubigeo_inei,id_ubigeo',
+        'id_ubigeo' => 'required|string|exists:ubigeo_inei,id_ubigeo',
         'telefono' => 'nullable|string|max:20',
         'predeterminada' => 'boolean'
     ]);
@@ -410,7 +423,7 @@ public function actualizarDireccion(Request $request, $id)
     $direccion->update([
         'nombre_destinatario' => $request->nombre_destinatario,
         'direccion_completa' => $request->direccion_completa,
-        'id_ubigeo' => $request->ubigeo_id, // Usar id_ubigeo en lugar de ubigeo_id
+        'id_ubigeo' => $request->id_ubigeo,
         'telefono' => $request->telefono,
         'predeterminada' => $request->predeterminada ?? false
     ]);

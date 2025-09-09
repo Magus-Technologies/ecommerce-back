@@ -42,7 +42,7 @@ Route::get('/reniec/buscar/{doc}', [ReniecController::class, 'buscar']);
 // Rutas para ubigeo
 Route::get('/departamentos', [UbigeoController::class, 'getDepartamentos']);
 Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
-Route::get('distritos/{deparatamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
+Route::get('distritos/{departamentoId}/{provinciaId}', [UbigeoController::class, 'getDistritos']);
 Route::get('ubigeo-chain/{ubigeoId}', [UbigeoController::class, 'getUbigeoChain']);
 
 Route::get('/categorias/publicas', [CategoriasController::class, 'categoriasPublicas']);
@@ -77,6 +77,7 @@ Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'busc
 
 // ✅ NUEVAS RUTAS PÚBLICAS - Arma tu PC
 Route::get('/arma-pc/categorias', [CategoriasController::class, 'categoriasArmaPc']);
+Route::get('/categorias/{id}/compatibles', [CategoriasController::class, 'getCategoriasCompatibles']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -172,6 +173,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:categorias.edit')->group(function () {
         Route::post('/arma-pc/configuracion', [CategoriasController::class, 'guardarConfiguracionArmaPc']);
         Route::put('/arma-pc/configuracion/orden', [CategoriasController::class, 'actualizarOrdenArmaPc']);
+        Route::get('/arma-pc/compatibilidades', [CategoriasController::class, 'obtenerCompatibilidades']);
+        Route::post('/arma-pc/compatibilidades', [CategoriasController::class, 'gestionarCompatibilidades']);
     });
 
     // ✅ RUTAS PROTEGIDAS PARA OFERTAS Y CUPONES
@@ -315,10 +318,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/estadisticas', [PedidosController::class, 'estadisticas']);
         Route::post('/ecommerce', [PedidosController::class, 'crearPedidoEcommerce']); // Para carrito
         Route::get('/mis-pedidos', [PedidosController::class, 'misPedidos']); // Para clientes
+        Route::get('/{id}/tracking', [PedidosController::class, 'getTrackingPedido']); // Tracking para clientes
         Route::get('/usuario/{userId}', [PedidosController::class, 'pedidosPorUsuario']); // Para obtener pedidos de un usuario específico
         Route::get('/{id}', [PedidosController::class, 'show'])->middleware('permission:pedidos.show');
         Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit');
         Route::patch('/{id}/estado', [PedidosController::class, 'actualizarEstado'])->middleware('permission:pedidos.edit');
+        Route::post('/{id}/cambiar-estado', [PedidosController::class, 'cambiarEstado'])->middleware('permission:pedidos.edit'); // Nuevo método con tracking
         Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
     });
 
