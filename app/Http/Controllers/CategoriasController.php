@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Categoria;
 use App\Models\ArmaPcConfiguracion;
+use App\Models\CategoriaCompatibilidad;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -468,7 +469,10 @@ class CategoriasController extends Controller
             'categorias' => 'required|array|min:1',
             'categorias.*.id' => 'required|integer|exists:categorias,id',
             'categorias.*.orden' => 'required|integer|min:1',
-            'categorias.*.activo' => 'boolean'
+            'categorias.*.activo' => 'boolean',
+            'categorias.*.nombre_paso' => 'nullable|string|max:255',
+            'categorias.*.descripcion_paso' => 'nullable|string',
+            'categorias.*.es_requerido' => 'boolean'
         ]);
 
         if ($validator->fails()) {
@@ -494,7 +498,10 @@ class CategoriasController extends Controller
                     ArmaPcConfiguracion::create([
                         'categoria_id' => $categoriaData['id'],
                         'orden' => $categoriaData['orden'],
-                        'activo' => $categoriaData['activo'] ?? true
+                        'activo' => $categoriaData['activo'] ?? true,
+                        'nombre_paso' => $categoriaData['nombre_paso'] ?? "Paso {$categoriaData['orden']}",
+                        'descripcion_paso' => $categoriaData['descripcion_paso'] ?? 'Selecciona un componente de esta categoría',
+                        'es_requerido' => $categoriaData['es_requerido'] ?? true
                     ]);
                 }
             });
@@ -566,6 +573,162 @@ class CategoriasController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al actualizar orden de categorías',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ====================================
+    // ✅ NUEVOS MÉTODOS PARA COMPATIBILIDADES
+    // ====================================
+
+    /**
+     * Obtener categorías compatibles con una categoría específica
+     * Ruta pública: GET /api/categorias/{id}/compatibles
+     */
+    public function getCategoriasCompatibles($id)
+    {
+        try {
+            $categoria = Categoria::findOrFail($id);
+            $compatibles = $categoria->getCategoriasCompatibles();
+
+            // Agregar URLs de imagen
+            $compatibles->transform(function ($categoria) {
+                if ($categoria->imagen) {
+                    $categoria->imagen_url = asset('storage/categorias/' . $categoria->imagen);
+                }
+                return $categoria;
+            });
+
+            return response()->json([
+                'success' => true,
+                'categoria' => $categoria->nombre,
+                'compatibles' => $compatibles
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('getCategoriasCompatibles: Error', [
+                'error' => $e->getMessage(),
+                'categoria_id' => $id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener categorías compatibles',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Gestionar compatibilidades entre categorías (para administradores)
+     * Ruta protegida: POST /api/arma-pc/compatibilidades
+     */
+    public function gestionarCompatibilidades(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'categoria_principal_id' => 'required|integer|exists:categorias,id',
+            'categorias_compatibles' => 'required|array',
+            'categorias_compatibles.*' => 'integer|exists:categorias,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $categoriaPrincipalId = $request->categoria_principal_id;
+            $categoriasCompatibles = $request->categorias_compatibles;
+
+            Log::info('gestionarCompatibilidades: Iniciando gestión', [
+                'categoria_principal' => $categoriaPrincipalId,
+                'compatibles_count' => count($categoriasCompatibles)
+            ]);
+
+            \DB::transaction(function() use ($categoriaPrincipalId, $categoriasCompatibles) {
+                // Eliminar compatibilidades existentes de esta categoría
+                CategoriaCompatibilidad::where('categoria_principal_id', $categoriaPrincipalId)->delete();
+
+                // Crear nuevas compatibilidades
+                foreach ($categoriasCompatibles as $categoriaCompatibleId) {
+                    // Evitar que una categoría sea compatible consigo misma
+                    if ($categoriaPrincipalId != $categoriaCompatibleId) {
+                        CategoriaCompatibilidad::create([
+                            'categoria_principal_id' => $categoriaPrincipalId,
+                            'categoria_compatible_id' => $categoriaCompatibleId
+                        ]);
+                    }
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Compatibilidades actualizadas exitosamente'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('gestionarCompatibilidades: Error', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al gestionar compatibilidades',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener configuración completa de compatibilidades (para administradores)
+     * Ruta protegida: GET /api/arma-pc/compatibilidades
+     */
+    public function obtenerCompatibilidades()
+    {
+        try {
+            // Obtener todas las categorías en arma PC con sus compatibilidades
+            $configuraciones = ArmaPcConfiguracion::with(['categoria', 'compatibilidadesPrincipales.categoriaCompatible'])
+                ->ordenado()
+                ->get();
+
+            $result = $configuraciones->map(function($config) {
+                $categoria = $config->categoria;
+                if ($categoria) {
+                    return [
+                        'id' => $categoria->id,
+                        'nombre' => $categoria->nombre,
+                        'orden' => $config->orden,
+                        'nombre_paso' => $config->nombre_paso,
+                        'compatibles' => $config->compatibilidadesPrincipales->map(function($comp) {
+                            return [
+                                'id' => $comp->categoriaCompatible->id,
+                                'nombre' => $comp->categoriaCompatible->nombre
+                            ];
+                        })
+                    ];
+                }
+                return null;
+            })->filter();
+
+            return response()->json([
+                'success' => true,
+                'compatibilidades' => $result
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('obtenerCompatibilidades: Error', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener compatibilidades',
                 'error' => $e->getMessage()
             ], 500);
         }

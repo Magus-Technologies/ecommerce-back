@@ -144,10 +144,24 @@ if ($authenticatedUser instanceof \App\Models\User) {
             return response()->json($validator->errors(), 400);
         }
 
-        $user = Auth::user();
-        $cartItem = CartItem::where('user_id', $user->id)
-            ->where('producto_id', $producto_id)
-            ->firstOrFail();
+        $authenticatedUser = $request->user();
+
+        if (!$authenticatedUser) {
+            return response()->json(['message' => 'Usuario no autenticado.'], 401);
+        }
+
+        $query = CartItem::where('producto_id', $producto_id);
+        
+        // Verificar si es un User (admin) o UserCliente (cliente e-commerce)
+        if ($authenticatedUser instanceof \App\Models\User) {
+            $query->where('user_id', $authenticatedUser->id);
+        } elseif ($authenticatedUser instanceof \App\Models\UserCliente) {
+            $query->where('user_cliente_id', $authenticatedUser->id);
+        } else {
+            return response()->json(['message' => 'Tipo de usuario no válido.'], 401);
+        }
+        
+        $cartItem = $query->firstOrFail();
 
         $producto = Producto::find($producto_id);
         if ($producto->stock < $request->cantidad) {
@@ -166,12 +180,26 @@ if ($authenticatedUser instanceof \App\Models\User) {
     /**
      * Eliminar un producto del carrito.
      */
-    public function remove($producto_id)
+    public function remove(Request $request, $producto_id)
     {
-        $user = Auth::user();
-        $cartItem = CartItem::where('user_id', $user->id)
-            ->where('producto_id', $producto_id)
-            ->firstOrFail();
+        $authenticatedUser = $request->user();
+
+        if (!$authenticatedUser) {
+            return response()->json(['message' => 'Usuario no autenticado.'], 401);
+        }
+
+        $query = CartItem::where('producto_id', $producto_id);
+        
+        // Verificar si es un User (admin) o UserCliente (cliente e-commerce)
+        if ($authenticatedUser instanceof \App\Models\User) {
+            $query->where('user_id', $authenticatedUser->id);
+        } elseif ($authenticatedUser instanceof \App\Models\UserCliente) {
+            $query->where('user_cliente_id', $authenticatedUser->id);
+        } else {
+            return response()->json(['message' => 'Tipo de usuario no válido.'], 401);
+        }
+        
+        $cartItem = $query->firstOrFail();
 
         $cartItem->delete();
 
@@ -181,10 +209,26 @@ if ($authenticatedUser instanceof \App\Models\User) {
     /**
      * Vaciar todo el carrito del usuario.
      */
-    public function clear()
+    public function clear(Request $request)
     {
-        $user = Auth::user();
-        CartItem::where('user_id', $user->id)->delete();
+        $authenticatedUser = $request->user();
+
+        if (!$authenticatedUser) {
+            return response()->json(['message' => 'Usuario no autenticado.'], 401);
+        }
+
+        $query = CartItem::query();
+        
+        // Verificar si es un User (admin) o UserCliente (cliente e-commerce)
+        if ($authenticatedUser instanceof \App\Models\User) {
+            $query->where('user_id', $authenticatedUser->id);
+        } elseif ($authenticatedUser instanceof \App\Models\UserCliente) {
+            $query->where('user_cliente_id', $authenticatedUser->id);
+        } else {
+            return response()->json(['message' => 'Tipo de usuario no válido.'], 401);
+        }
+        
+        $query->delete();
 
         return response()->json(['message' => 'Carrito vaciado exitosamente.']);
     }

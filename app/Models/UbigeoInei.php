@@ -8,6 +8,7 @@ class UbigeoInei extends Model
 {
     protected $table = 'ubigeo_inei';
     protected $primaryKey = 'id_ubigeo';
+    public $timestamps = false; // La tabla no tiene timestamps
     
     protected $fillable = [
         'id_ubigeo',
@@ -20,23 +21,25 @@ class UbigeoInei extends Model
     // Accessors para obtener nombres en lugar de códigos
     public function getDepartamentoNombreAttribute()
     {
-        return $this->getNombreUbigeo($this->departamento . '000000');
+        $departamento = static::where('departamento', $this->departamento)
+            ->where('provincia', '00')
+            ->where('distrito', '00')
+            ->first();
+        return $departamento ? $departamento->nombre : 'N/A';
     }
 
     public function getProvinciaNombreAttribute()
     {
-        return $this->getNombreUbigeo($this->departamento . $this->provincia . '000');
+        $provincia = static::where('departamento', $this->departamento)
+            ->where('provincia', $this->provincia)
+            ->where('distrito', '00')
+            ->first();
+        return $provincia ? $provincia->nombre : 'N/A';
     }
 
     public function getDistritoNombreAttribute()
     {
         return $this->nombre; // El nombre del distrito ya está en el campo 'nombre'
-    }
-
-    private function getNombreUbigeo($codigoUbigeo)
-    {
-        $ubigeo = static::where('id_ubigeo', $codigoUbigeo)->first();
-        return $ubigeo ? $ubigeo->nombre : 'N/A';
     }
 
     // Scope para obtener departamentos

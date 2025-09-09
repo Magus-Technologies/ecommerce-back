@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pedido;
 use App\Models\PedidoDetalle;
 use App\Models\EstadoPedido;
+use App\Models\PedidoTracking;
 use App\Models\UserCliente;
 use App\Models\Producto;
 use Illuminate\Http\Request;
@@ -80,6 +81,19 @@ class PedidosController extends Controller
                     'updated_at' => $pedido->updated_at,
                     'cliente_nombre' => $pedido->cliente_nombre,
                     'tipo_pedido' => $pedido->tipo_pedido,
+                    // Nuevos campos del checkout
+                    'numero_documento' => $pedido->numero_documento,
+                    'cliente_email' => $pedido->cliente_email,
+                    'forma_envio' => $pedido->forma_envio,
+                    'costo_envio' => $pedido->costo_envio,
+                    'departamento_id' => $pedido->departamento_id,
+                    'provincia_id' => $pedido->provincia_id,
+                    'distrito_id' => $pedido->distrito_id,
+                    'departamento_nombre' => $pedido->departamento_nombre,
+                    'provincia_nombre' => $pedido->provincia_nombre,
+                    'distrito_nombre' => $pedido->distrito_nombre,
+                    'ubicacion_completa' => $pedido->ubicacion_completa,
+                    // Relaciones
                     'cliente' => $pedido->cliente,
                     'user_cliente' => $pedido->userCliente,
                     'estado_pedido' => $pedido->estadoPedido,
@@ -189,7 +203,7 @@ class PedidosController extends Controller
             $igv = $subtotal * 0.18;
             $total = $subtotal + $igv;
 
-            // Crear pedido
+            // Crear pedido con toda la información
             $pedido = Pedido::create([
                 'codigo_pedido' => 'PED-' . date('Ymd') . '-' . str_pad(Pedido::count() + 1, 4, '0', STR_PAD_LEFT),
                 'cliente_id' => null, // Para e-commerce usamos user_cliente_id
@@ -204,7 +218,20 @@ class PedidosController extends Controller
                 'direccion_envio' => $request->direccion_envio,
                 'telefono_contacto' => $request->telefono_contacto,
                 'observaciones' => $request->observaciones,
-                'user_id' => 1 // ID del sistema para pedidos de e-commerce
+                'user_id' => 1, // ID del sistema para pedidos de e-commerce
+                // Información adicional del checkout
+                'numero_documento' => $request->numero_documento,
+                'cliente_nombre' => $request->cliente_nombre,
+                'cliente_email' => $request->cliente_email,
+                'forma_envio' => $request->forma_envio,
+                'costo_envio' => $request->costo_envio ?? 0,
+                'departamento_id' => $request->departamento_id,
+                'provincia_id' => $request->provincia_id,
+                'distrito_id' => $request->distrito_id,
+                'departamento_nombre' => $request->departamento_nombre,
+                'provincia_nombre' => $request->provincia_nombre,
+                'distrito_nombre' => $request->distrito_nombre,
+                'ubicacion_completa' => $request->ubicacion_completa
             ]);
 
             // Crear detalles y actualizar stock
@@ -240,10 +267,157 @@ class PedidosController extends Controller
         }
     }
 
+    /**
+     * Cambiar estado del pedido con tracking
+     */
+    public function cambiarEstado(Request $request, $pedidoId)
+    {
+        $validator = Validator::make($request->all(), [
+            'estado_pedido_id' => 'required|exists:estados_pedido,id',
+            'comentario' => 'nullable|string|max:500'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $pedido = Pedido::findOrFail($pedidoId);
+            $estadoAnterior = $pedido->estado_pedido_id;
+            
+            DB::beginTransaction();
+            
+            // Actualizar estado del pedido
+            $pedido->update([
+                'estado_pedido_id' => $request->estado_pedido_id
+            ]);
+            
+            // Crear registro de tracking
+            PedidoTracking::create([
+                'pedido_id' => $pedido->id,
+                'estado_pedido_id' => $request->estado_pedido_id,
+                'comentario' => $request->comentario,
+                'usuario_id' => auth()->id(),
+                'fecha_cambio' => now()
+            ]);
+            
+            DB::commit();
+            
+            // Recargar pedido con relaciones
+            $pedidoActualizado = Pedido::with(['estadoPedido', 'tracking.estadoPedido', 'tracking.usuario'])
+                ->findOrFail($pedidoId);
+            
+            return response()->json([
+                'message' => 'Estado del pedido actualizado exitosamente',
+                'pedido' => $pedidoActualizado,
+                'tracking' => $pedidoActualizado->tracking
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'message' => 'Error al cambiar estado del pedido: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener tracking de un pedido específico para el cliente
+     */
+    public function getTrackingPedido($pedidoId)
+    {
+        try {
+            $pedido = Pedido::with([
+                'estadoPedido', 
+                'tracking.estadoPedido', 
+                'tracking.usuario'
+            ])->findOrFail($pedidoId);
+            
+            // Verificar que el pedido pertenece al usuario autenticado
+            $user = request()->user();
+            if ($pedido->user_cliente_id !== $user->id) {
+                return response()->json(['message' => 'No autorizado'], 403);
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'pedido' => [
+                    'id' => $pedido->id,
+                    'codigo_pedido' => $pedido->codigo_pedido,
+                    'forma_envio' => $pedido->forma_envio,
+                    'estado_actual' => $pedido->estadoPedido,
+                    'es_envio_provincia' => $pedido->esEnvioAProvincia(),
+                    'tracking' => $pedido->tracking->map(function($track) {
+                        return [
+                            'id' => $track->id,
+                            'estado' => $track->estadoPedido,
+                            'comentario' => $track->comentario,
+                            'fecha_cambio' => $track->fecha_cambio,
+                            'usuario' => $track->usuario ? $track->usuario->name : 'Sistema'
+                        ];
+                    })
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener tracking: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener pedidos del cliente con información de tracking
+     */
+    public function misPedidos(Request $request)
+    {
+        try {
+            $userCliente = $request->user();
+            
+            $pedidos = Pedido::with([
+                'estadoPedido',
+                'detalles.producto',
+                'tracking.estadoPedido'
+            ])
+            ->where('user_cliente_id', $userCliente->id)
+            ->orderBy('fecha_pedido', 'desc')
+            ->get();
+            
+            return response()->json([
+                'status' => 'success',
+                'pedidos' => $pedidos->map(function($pedido) {
+                    return [
+                        'id' => $pedido->id,
+                        'codigo_pedido' => $pedido->codigo_pedido,
+                        'fecha_pedido' => $pedido->fecha_pedido,
+                        'total' => $pedido->total,
+                        'estado_actual' => $pedido->estadoPedido,
+                        'forma_envio' => $pedido->forma_envio,
+                        'es_envio_provincia' => $pedido->esEnvioAProvincia(),
+                        'tiene_tracking' => $pedido->tracking->count() > 0,
+                        'ultimo_estado' => $pedido->tracking->last()?->estadoPedido,
+                        'detalles_count' => $pedido->detalles->count()
+                    ];
+                })
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener pedidos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function actualizarEstado(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'estado_pedido_id' => 'required|exists:estados_pedido,id'
+            'estado_pedido_id' => 'required|exists:estados_pedido,id',
+            'comentario' => 'nullable|string|max:500'
         ]);
 
         if ($validator->fails()) {
@@ -255,16 +429,39 @@ class PedidosController extends Controller
 
         try {
             $pedido = Pedido::findOrFail($id);
+            
+            DB::beginTransaction();
+            
+            // Actualizar estado del pedido
             $pedido->update([
                 'estado_pedido_id' => $request->estado_pedido_id
             ]);
+            
+            // Crear registro de tracking (solo si no existe ya un registro para este cambio)
+            $existeTracking = PedidoTracking::where('pedido_id', $pedido->id)
+                ->where('estado_pedido_id', $request->estado_pedido_id)
+                ->whereDate('fecha_cambio', now()->toDateString())
+                ->exists();
+                
+            if (!$existeTracking) {
+                PedidoTracking::create([
+                    'pedido_id' => $pedido->id,
+                    'estado_pedido_id' => $request->estado_pedido_id,
+                    'comentario' => $request->comentario ?? 'Estado actualizado desde panel administrativo',
+                    'usuario_id' => auth()->id(),
+                    'fecha_cambio' => now()
+                ]);
+            }
+            
+            DB::commit();
 
             return response()->json([
                 'message' => 'Estado del pedido actualizado correctamente',
-                'pedido' => $pedido->load('estadoPedido')
+                'pedido' => $pedido->load(['estadoPedido', 'tracking'])
             ]);
 
         } catch (\Exception $e) {
+            DB::rollback();
             return response()->json([
                 'message' => 'Error al actualizar estado del pedido',
                 'error' => $e->getMessage()
@@ -272,15 +469,29 @@ class PedidosController extends Controller
         }
     }
 
-    public function getEstados()
+    public function getEstados(Request $request)
     {
         try {
-            $estados = EstadoPedido::all();
-            return response()->json($estados);
+            $pedidoId = $request->query('pedido_id');
+            
+            if ($pedidoId) {
+                // Si se proporciona un pedido_id, devolver estados específicos para ese pedido
+                $pedido = Pedido::findOrFail($pedidoId);
+                $estados = $pedido->getEstadosDisponibles();
+            } else {
+                // Devolver todos los estados
+                $estados = EstadoPedido::orderBy('orden')->get();
+            }
+            
+            return response()->json([
+                'status' => 'success',
+                'estados' => $estados
+            ]);
+            
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Error al obtener estados',
-                'error' => $e->getMessage()
+                'status' => 'error',
+                'message' => 'Error al obtener estados: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -312,29 +523,6 @@ class PedidosController extends Controller
         }
     }
 
-    public function misPedidos(Request $request)
-    {
-        try {
-            $userCliente = $request->user();
-            
-            if (!$userCliente instanceof UserCliente) {
-                return response()->json(['message' => 'Acceso no autorizado'], 403);
-            }
-
-            $pedidos = Pedido::with(['detalles.producto', 'estadoPedido'])
-                          ->where('user_cliente_id', $userCliente->id)
-                          ->orderBy('fecha_pedido', 'desc')
-                          ->paginate(10);
-
-            return response()->json($pedidos);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error al obtener pedidos',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
 
     public function destroy($id)
     {

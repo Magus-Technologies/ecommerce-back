@@ -70,6 +70,35 @@ class Categoria extends Model
         return $this->productos()->count() === 0;
     }
 
+    // Relación con configuración de Arma PC
+    public function armaPcConfiguracion()
+    {
+        return $this->hasOne(ArmaPcConfiguracion::class, 'categoria_id');
+    }
+
+    // Relaciones con compatibilidades
+    public function compatibilidadesPrincipales()
+    {
+        return $this->hasMany(CategoriaCompatibilidad::class, 'categoria_principal_id');
+    }
+
+    public function compatibilidadesCompatibles()
+    {
+        return $this->hasMany(CategoriaCompatibilidad::class, 'categoria_compatible_id');
+    }
+
+    // Método para obtener categorías compatibles
+    public function getCategoriasCompatibles()
+    {
+        return CategoriaCompatibilidad::getCategoriasCompatibles($this->id);
+    }
+
+    // Verificar si es compatible con otra categoría
+    public function esCompatibleCon($categoriaId)
+    {
+        return CategoriaCompatibilidad::sonCompatibles($this->id, $categoriaId);
+    }
+
     // Boot method para eventos del modelo
     protected static function boot()
     {

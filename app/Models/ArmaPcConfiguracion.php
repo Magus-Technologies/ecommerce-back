@@ -14,12 +14,16 @@ class ArmaPcConfiguracion extends Model
     protected $fillable = [
         'categoria_id',
         'orden',
-        'activo'
+        'activo',
+        'nombre_paso',
+        'descripcion_paso',
+        'es_requerido'
     ];
 
     protected $casts = [
         'activo' => 'boolean',
         'orden' => 'integer',
+        'es_requerido' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
@@ -65,6 +69,14 @@ class ArmaPcConfiguracion extends Model
             ->map(function($config) {
                 $categoria = $config->categoria;
                 if ($categoria) {
+                    // Agregar información del paso y compatibilidad
+                    $categoria->paso_info = [
+                        'orden' => $config->orden,
+                        'nombre_paso' => $config->nombre_paso ?: "Paso {$config->orden}",
+                        'descripcion_paso' => $config->descripcion_paso,
+                        'es_requerido' => $config->es_requerido
+                    ];
+                    
                     // Agregar la URL completa de la imagen
                     if ($categoria->imagen) {
                         $categoria->img = asset('storage/categorias/' . $categoria->imagen);
@@ -74,6 +86,22 @@ class ArmaPcConfiguracion extends Model
                 return null;
             })
             ->filter(); // Eliminar nulls
+    }
+
+    /**
+     * Relación con compatibilidades donde esta categoría es principal
+     */
+    public function compatibilidadesPrincipales()
+    {
+        return $this->hasMany(CategoriaCompatibilidad::class, 'categoria_principal_id', 'categoria_id');
+    }
+
+    /**
+     * Relación con compatibilidades donde esta categoría es compatible
+     */
+    public function compatibilidadesCompatibles()
+    {
+        return $this->hasMany(CategoriaCompatibilidad::class, 'categoria_compatible_id', 'categoria_id');
     }
 
     /**

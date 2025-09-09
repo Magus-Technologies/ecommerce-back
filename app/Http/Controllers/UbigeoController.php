@@ -46,6 +46,8 @@ class UbigeoController extends Controller
         try {
             $distritos = UbigeoInei::where('departamento', $departamentoId)
                                    ->where('provincia', $provinciaId)
+                                   ->where('distrito', '!=', '00') // Excluir el registro padre de la provincia
+                                   ->select('distrito as id', 'nombre', 'id_ubigeo') // Seleccionar campos específicos
                                    ->orderBy('nombre')
                                    ->get();
 
@@ -73,11 +75,17 @@ class UbigeoController extends Controller
                 ], 404);
             }
 
-            // Obtener departamento
-            $departamento = UbigeoInei::where('id_ubigeo', $ubigeo->departamento . '000000')->first();
+            // Obtener departamento correctamente
+            $departamento = UbigeoInei::where('departamento', $ubigeo->departamento)
+                ->where('provincia', '00')
+                ->where('distrito', '00')
+                ->first();
             
-            // Obtener provincia
-            $provincia = UbigeoInei::where('id_ubigeo', $ubigeo->departamento . $ubigeo->provincia . '000')->first();
+            // Obtener provincia correctamente  
+            $provincia = UbigeoInei::where('departamento', $ubigeo->departamento)
+                ->where('provincia', $ubigeo->provincia)
+                ->where('distrito', '00')
+                ->first();
 
             $chain = [
                 'ubigeo_id' => $ubigeo->id_ubigeo,
