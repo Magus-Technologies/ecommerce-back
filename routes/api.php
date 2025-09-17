@@ -28,10 +28,12 @@ use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\ReclamosController;
+use App\Http\Controllers\CotizacionesController;
+use App\Http\Controllers\ComprasController;
 
 
 
-Route::post('/login', [AdminController::class, 'login']);
+Route::post('/login', [AdminController::class, 'login'])->name('login');
 Route::post('/register', [AdminController::class, 'register']);
 Route::post('/check-email', [AdminController::class, 'checkEmail']);
 Route::post('/check-documento', [AdminController::class, 'checkDocumento']);
@@ -428,5 +430,68 @@ Route::middleware(['auth:sanctum'])->group(function () {
 Route::prefix('cotizacion')->group(function () {
     Route::post('/generar-pdf', [App\Http\Controllers\CotizacionController::class, 'generarPDF']);
     Route::post('/enviar-email', [App\Http\Controllers\CotizacionController::class, 'enviarEmail']);
+});
+
+// =============================================================================
+// NUEVAS RUTAS DEL SISTEMA DE COTIZACIONES Y COMPRAS
+// =============================================================================
+
+Route::middleware('auth:sanctum')->group(function () {
+
+    // ✅ RUTAS DE COTIZACIONES
+    Route::prefix('cotizaciones')->group(function () {
+        // Ruta para crear cotización desde checkout (requiere autenticación)
+        Route::post('/ecommerce', [CotizacionesController::class, 'crearCotizacionEcommerce']); // Crear cotización desde checkout
+
+        // Rutas para clientes
+        Route::get('/mis-cotizaciones', [CotizacionesController::class, 'misCotizaciones']); // Ver mis cotizaciones
+        Route::get('/{id}/pdf', [CotizacionesController::class, 'generarPDF']); // Generar PDF de cotización
+        Route::post('/{id}/convertir-compra', [CotizacionesController::class, 'convertirACompra']); // Convertir a compra
+        Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']); // Ver tracking
+
+        // Rutas para administradores
+        Route::middleware('permission:cotizaciones.ver')->group(function () {
+            Route::get('/', [CotizacionesController::class, 'index']); // Listar todas
+            Route::get('/estadisticas', [CotizacionesController::class, 'estadisticas']); // Estadísticas
+            Route::get('/{id}', [CotizacionesController::class, 'show'])->middleware('permission:cotizaciones.show'); // Ver detalle
+        });
+
+        Route::middleware('permission:cotizaciones.edit')->group(function () {
+            Route::patch('/{id}/estado', [CotizacionesController::class, 'cambiarEstado']); // Cambiar estado
+        });
+
+        // Estados de cotización
+        Route::get('/estados/lista', [CotizacionesController::class, 'getEstados']); // Obtener estados
+    });
+
+    // ✅ RUTAS DE COMPRAS
+    Route::prefix('compras')->group(function () {
+        // Rutas para clientes
+        Route::post('/', [ComprasController::class, 'store']); // Crear compra desde ecommerce
+        Route::get('/mis-compras', [ComprasController::class, 'misCompras']); // Ver mis compras
+        Route::post('/{id}/cancelar', [ComprasController::class, 'cancelar']); // Cancelar compra
+        Route::get('/{id}/tracking', [ComprasController::class, 'getTracking']); // Ver tracking
+
+        // Rutas para administradores
+        Route::middleware('permission:compras.ver')->group(function () {
+            Route::get('/', [ComprasController::class, 'index']); // Listar todas
+            Route::get('/estadisticas', [ComprasController::class, 'estadisticas']); // Estadísticas
+            Route::get('/{id}', [ComprasController::class, 'show'])->middleware('permission:compras.show'); // Ver detalle
+        });
+
+        Route::middleware('permission:compras.aprobar')->group(function () {
+            Route::post('/{id}/aprobar', [ComprasController::class, 'aprobar']); // Aprobar compra
+            Route::post('/{id}/rechazar', [ComprasController::class, 'rechazar']); // Rechazar compra
+        });
+
+        Route::middleware('permission:compras.edit')->group(function () {
+            Route::patch('/{id}/estado', [ComprasController::class, 'cambiarEstado']); // Cambiar estado
+            Route::post('/{id}/procesar-pago', [ComprasController::class, 'procesarPago']); // Procesar pago
+        });
+
+        // Estados de compra
+        Route::get('/estados/lista', [ComprasController::class, 'getEstados']); // Obtener estados
+    });
+
 });
 

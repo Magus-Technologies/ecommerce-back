@@ -94,6 +94,19 @@ class PermissionSeeder extends Seeder
             'reclamos.edit',
             'reclamos.delete',
 
+            // Compras
+            'compras.ver',
+            'compras.show',
+            'compras.edit',
+            'compras.delete',
+            'compras.aprobar',
+
+            // Envío de correos
+            'envio_correos.ver',
+            'envio_correos.create',
+            'envio_correos.edit',
+            'envio_correos.delete',
+
         ];
 
         foreach ($permissions as $permission) {
