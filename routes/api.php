@@ -393,6 +393,26 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/{id}', [ReclamosController::class, 'destroy']);
         });
     });
+
+    // Rutas de motorizados protegidas con permisos
+    Route::middleware('permission:motorizados.ver')->group(function () {
+        Route::get('/motorizados', [App\Http\Controllers\MotorizadosController::class, 'index']);
+        Route::get('/motorizados/categorias-licencia', [App\Http\Controllers\MotorizadosController::class, 'getCategoriasLicencia']);
+        Route::get('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'show'])->middleware('permission:motorizados.show');
+    });
+
+    Route::middleware('permission:motorizados.create')->group(function () {
+        Route::post('/motorizados', [App\Http\Controllers\MotorizadosController::class, 'store']);
+    });
+
+    Route::middleware('permission:motorizados.edit')->group(function () {
+        Route::post('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'update']);
+        Route::patch('/motorizados/{id}/toggle-estado', [App\Http\Controllers\MotorizadosController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:motorizados.delete')->group(function () {
+        Route::delete('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'destroy']);
+    });
 });
 
 
