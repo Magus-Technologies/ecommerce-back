@@ -3,20 +3,59 @@
 namespace App\Http\Controllers;
 
 use App\Models\Motorizado;
+use App\Models\UserMotorizado;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class MotorizadosController extends Controller
 {
     public function index()
     {
         try {
-            $motorizados = Motorizado::with(['tipoDocumento', 'registradoPor', 'ubicacion'])
+            $motorizados = Motorizado::with(['tipoDocumento', 'registradoPor', 'ubicacion', 'userMotorizado'])
                 ->orderBy('created_at', 'desc')
-                ->get();
+                ->get()
+                ->map(function ($motorizado) {
+                    return [
+                        'id' => $motorizado->id,
+                        'numero_unidad' => $motorizado->numero_unidad,
+                        'nombre_completo' => $motorizado->nombre_completo,
+                        'foto_perfil' => $motorizado->foto_perfil,
+                        'tipo_documento' => $motorizado->tipoDocumento,
+                        'numero_documento' => $motorizado->numero_documento,
+                        'licencia_numero' => $motorizado->licencia_numero,
+                        'licencia_categoria' => $motorizado->licencia_categoria,
+                        'telefono' => $motorizado->telefono,
+                        'correo' => $motorizado->correo,
+                        'direccion_detalle' => $motorizado->direccion_detalle,
+                        'ubicacion' => $motorizado->ubicacion,
+                        'vehiculo_marca' => $motorizado->vehiculo_marca,
+                        'vehiculo_modelo' => $motorizado->vehiculo_modelo,
+                        'vehiculo_ano' => $motorizado->vehiculo_ano,
+                        'vehiculo_cilindraje' => $motorizado->vehiculo_cilindraje,
+                        'vehiculo_color_principal' => $motorizado->vehiculo_color_principal,
+                        'vehiculo_color_secundario' => $motorizado->vehiculo_color_secundario,
+                        'vehiculo_placa' => $motorizado->vehiculo_placa,
+                        'vehiculo_motor' => $motorizado->vehiculo_motor,
+                        'vehiculo_chasis' => $motorizado->vehiculo_chasis,
+                        'comentario' => $motorizado->comentario,
+                        'estado' => $motorizado->estado,
+                        'registrado_por' => $motorizado->registradoPor,
+                        'created_at' => $motorizado->created_at,
+                        'updated_at' => $motorizado->updated_at,
+                        // Información de usuario de acceso
+                        'tiene_usuario' => $motorizado->tiene_usuario,
+                        'username' => $motorizado->username,
+                        'estado_usuario' => $motorizado->estado_usuario,
+                        'ultimo_login' => $motorizado->userMotorizado?->last_login_at,
+                    ];
+                });
 
             return response()->json($motorizados);
         } catch (\Exception $e) {
@@ -46,7 +85,10 @@ class MotorizadosController extends Controller
             'vehiculo_placa' => 'required|string|max:20|unique:motorizados',
             'vehiculo_motor' => 'required|string|max:100',
             'vehiculo_chasis' => 'required|string|max:100',
-            'comentario' => 'nullable|string'
+            'comentario' => 'nullable|string',
+            // Campos para crear usuario
+            'crear_usuario' => 'nullable|in:true,false,1,0',
+            'password' => 'nullable|string|min:6'
         ]);
 
         if ($validator->fails()) {
@@ -76,10 +118,65 @@ class MotorizadosController extends Controller
 
             $motorizado->save();
 
-            return response()->json([
+            $response = [
                 'message' => 'Motorizado registrado exitosamente',
                 'motorizado' => $motorizado->load(['tipoDocumento', 'registradoPor', 'ubicacion'])
-            ], 201);
+            ];
+
+            // Si se solicita crear usuario
+            if ($request->input('crear_usuario', false)) {
+                try {
+                    // Generar contraseña automáticamente (8 caracteres alfanuméricos)
+                    $password = Str::upper(Str::random(4)) . rand(1000, 9999);
+
+                    $userMotorizado = UserMotorizado::create([
+                        'motorizado_id' => $motorizado->id,
+                        'username' => $motorizado->correo,
+                        'password' => Hash::make($password),
+                        'is_active' => true
+                    ]);
+
+                    // Asignar rol motorizado
+                    $userMotorizado->assignRole('motorizado-app');
+
+                    // Actualizar referencia en motorizado
+                    $motorizado->update(['user_motorizado_id' => $userMotorizado->id]);
+
+                    // Enviar email con credenciales
+                    try {
+                        Mail::to($motorizado->correo)->send(
+                            new \App\Mail\MotorizadoCredentialsMail($userMotorizado, $motorizado, $password)
+                        );
+                        $emailEnviado = true;
+                    } catch (\Exception $e) {
+                        Log::error('Error enviando email a motorizado: ' . $e->getMessage());
+                        $emailEnviado = false;
+                    }
+
+                    $response['usuario_creado'] = true;
+                    $response['email_enviado'] = $emailEnviado;
+                    $response['credenciales'] = [
+                        'username' => $userMotorizado->username,
+                        'correo' => $motorizado->correo,
+                        'password' => $password // Solo se muestra una vez
+                    ];
+
+                    Log::info('Usuario motorizado creado exitosamente', [
+                        'motorizado_id' => $motorizado->id,
+                        'username' => $userMotorizado->username
+                    ]);
+
+                } catch (\Exception $e) {
+                    Log::error('Error al crear usuario motorizado', [
+                        'motorizado_id' => $motorizado->id,
+                        'error' => $e->getMessage()
+                    ]);
+
+                    $response['warning'] = 'Motorizado creado pero hubo un error al crear el usuario de acceso';
+                }
+            }
+
+            return response()->json($response, 201);
 
         } catch (\Exception $e) {
             return response()->json(['error' => 'Error al registrar motorizado'], 500);
@@ -264,5 +361,136 @@ class MotorizadosController extends Controller
     {
         $motorizado = new Motorizado();
         return response()->json($motorizado->getCategoriasLicencia());
+    }
+
+    /**
+     * Crear usuario para motorizado existente
+     */
+    public function crearUsuario(Request $request, $id)
+    {
+        try {
+            $motorizado = Motorizado::findOrFail($id);
+
+            if ($motorizado->userMotorizado) {
+                return response()->json([
+                    'error' => 'Este motorizado ya tiene un usuario asignado'
+                ], 400);
+            }
+
+            // Generar contraseña automáticamente (8 caracteres alfanuméricos)
+            $password = Str::upper(Str::random(4)) . rand(1000, 9999);
+
+            $userMotorizado = UserMotorizado::create([
+                'motorizado_id' => $motorizado->id,
+                'username' => $motorizado->correo,
+                'password' => Hash::make($password),
+                'is_active' => true
+            ]);
+
+            // Asignar rol motorizado
+            $userMotorizado->assignRole('motorizado-app');
+
+            // Actualizar referencia en motorizado
+            $motorizado->update(['user_motorizado_id' => $userMotorizado->id]);
+
+            // Enviar email con credenciales
+            $emailEnviado = false;
+            try {
+                Mail::to($motorizado->correo)->send(
+                    new \App\Mail\MotorizadoCredentialsMail($userMotorizado, $motorizado, $password)
+                );
+                $emailEnviado = true;
+            } catch (\Exception $e) {
+                Log::error('Error enviando email a motorizado: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'message' => $emailEnviado ?
+                    'Usuario creado exitosamente. Se han enviado las credenciales al correo del motorizado.' :
+                    'Usuario creado exitosamente. No se pudo enviar el email, pero las credenciales se muestran a continuación.',
+                'email_enviado' => $emailEnviado,
+                'credenciales' => [
+                    'username' => $userMotorizado->username,
+                    'password' => $password,
+                    'correo' => $motorizado->correo
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al crear usuario motorizado', [
+                'motorizado_id' => $id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['error' => 'Error al crear usuario'], 500);
+        }
+    }
+
+    /**
+     * Activar/Desactivar usuario de motorizado
+     */
+    public function toggleUsuario($id)
+    {
+        try {
+            $motorizado = Motorizado::findOrFail($id);
+
+            if (!$motorizado->userMotorizado) {
+                return response()->json([
+                    'error' => 'Este motorizado no tiene usuario asignado'
+                ], 400);
+            }
+
+            $nuevoEstado = !$motorizado->userMotorizado->is_active;
+            $motorizado->userMotorizado->update(['is_active' => $nuevoEstado]);
+
+            return response()->json([
+                'message' => 'Estado de usuario actualizado exitosamente',
+                'estado_usuario' => $nuevoEstado
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al actualizar estado de usuario'], 500);
+        }
+    }
+
+    /**
+     * Resetear contraseña de usuario motorizado
+     */
+    public function resetearPassword(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'password' => 'nullable|string|min:6'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'error' => 'Error de validación',
+                'details' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $motorizado = Motorizado::findOrFail($id);
+
+            if (!$motorizado->userMotorizado) {
+                return response()->json([
+                    'error' => 'Este motorizado no tiene usuario asignado'
+                ], 400);
+            }
+
+            $password = $request->input('password') ?: Str::random(8);
+
+            $motorizado->userMotorizado->update([
+                'password' => Hash::make($password)
+            ]);
+
+            return response()->json([
+                'message' => 'Contraseña actualizada exitosamente',
+                'nueva_password' => $password
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al resetear contraseña'], 500);
+        }
     }
 }
