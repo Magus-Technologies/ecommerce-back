@@ -113,7 +113,7 @@ class MotorizadosController extends Controller
                 $foto = $request->file('foto_perfil');
                 $nombreFoto = time() . '_' . $foto->getClientOriginalName();
                 $rutaFoto = $foto->storeAs('motorizados/fotos', $nombreFoto, 'public');
-                $motorizado->foto_perfil = '/storage/' . $rutaFoto;
+                $motorizado->foto_perfil = config('app.url') . '/storage/' . $rutaFoto;
             }
 
             $motorizado->save();
@@ -305,7 +305,7 @@ class MotorizadosController extends Controller
                 $foto = $request->file('foto_perfil');
                 $nombreFoto = time() . '_' . $foto->getClientOriginalName();
                 $rutaFoto = $foto->storeAs('motorizados/fotos', $nombreFoto, 'public');
-                $motorizado->foto_perfil = '/storage/' . $rutaFoto;
+                $motorizado->foto_perfil = config('app.url') . '/storage/' . $rutaFoto;
             }
 
             // Actualizar datos (excluir foto_perfil y eliminar_foto de mass assignment)
