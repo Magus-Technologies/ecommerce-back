@@ -107,6 +107,52 @@ class PermissionSeeder extends Seeder
             'envio_correos.edit',
             'envio_correos.delete',
 
+            // Motorizados
+            'motorizados.ver',
+            'motorizados.show',
+            'motorizados.create',
+            'motorizados.edit',
+            'motorizados.delete',
+
+            // Permisos específicos para motorizados
+            'pedidos.motorizado.ver',
+            'pedidos.motorizado.actualizar_estado',
+            'pedidos.motorizado.confirmar_entrega',
+            'motorizado.perfil.ver',
+            'motorizado.perfil.editar',
+            'motorizado.rutas.ver',
+            'motorizado.ubicacion.actualizar',
+            'motorizado.estadisticas.ver',
+            'motorizado.chat.ver',
+            'motorizado.notificaciones.ver',
+
+            // Cotizaciones
+            'cotizaciones.ver',
+            'cotizaciones.show',
+            'cotizaciones.create',
+            'cotizaciones.edit',
+            'cotizaciones.delete',
+
+            // Plantillas de Email
+            'email_templates.ver',
+            'email_templates.show',
+            'email_templates.create',
+            'email_templates.edit',
+            'email_templates.delete',
+
+            // Ventas
+            'ventas.ver',
+            'ventas.show',
+            'ventas.create',
+            'ventas.edit',
+            'ventas.delete',
+
+            // Roles
+            'roles.ver',
+            'roles.create',
+            'roles.edit',
+            'roles.delete',
+
         ];
 
         foreach ($permissions as $permission) {
@@ -114,15 +160,51 @@ class PermissionSeeder extends Seeder
                 'name' => $permission,
                 'guard_name' => 'web'
             ]);
+
+            // También crear permisos para sanctum si son de motorizado
+            if (str_contains($permission, 'motorizado.')) {
+                Permission::firstOrCreate([
+                    'name' => $permission,
+                    'guard_name' => 'sanctum'
+                ]);
+            }
         }
 
-        // Crear rol superadmin si no existe
+        // Crear roles si no existen
         $superadmin = Role::firstOrCreate([
             'name' => 'superadmin',
             'guard_name' => 'web'
         ]);
 
-        // Asignar todos los permisos al superadmin
-        $superadmin->givePermissionTo($permissions);
+        $motorizado = Role::firstOrCreate([
+            'name' => 'motorizado',
+            'guard_name' => 'web'
+        ]);
+
+        $motorizadoSanctum = Role::firstOrCreate([
+            'name' => 'motorizado-app',
+            'guard_name' => 'sanctum'
+        ]);
+
+        // Separar permisos principales de los de motorizado
+        $mainPermissions = array_filter($permissions, function($permission) {
+            return !str_contains($permission, 'motorizado.');
+        });
+
+        $motorizadoOnlyPermissions = array_filter($permissions, function($permission) {
+            return str_contains($permission, 'motorizado.');
+        });
+
+        // Asignar permisos principales al superadmin
+        $superadmin->givePermissionTo($mainPermissions);
+
+        // Asignar permisos de motorizado al rol motorizado (web)
+        $motorizado->givePermissionTo($motorizadoOnlyPermissions);
+
+        // Asignar permisos de motorizado al rol motorizado (sanctum)
+        $motorizadoSanctum->givePermissionTo($motorizadoOnlyPermissions);
+
+        // También darle al superadmin los permisos de motorizado
+        $superadmin->givePermissionTo($motorizadoOnlyPermissions);
     }
 }

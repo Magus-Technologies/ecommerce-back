@@ -415,11 +415,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:motorizados.edit')->group(function () {
         Route::post('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'update']);
         Route::patch('/motorizados/{id}/toggle-estado', [App\Http\Controllers\MotorizadosController::class, 'toggleEstado']);
+
+        // Nuevas rutas para gestión de usuarios de motorizados
+        Route::post('/motorizados/{id}/crear-usuario', [App\Http\Controllers\MotorizadosController::class, 'crearUsuario']);
+        Route::patch('/motorizados/{id}/toggle-usuario', [App\Http\Controllers\MotorizadosController::class, 'toggleUsuario']);
+        Route::post('/motorizados/{id}/resetear-password', [App\Http\Controllers\MotorizadosController::class, 'resetearPassword']);
     });
 
     Route::middleware('permission:motorizados.delete')->group(function () {
         Route::delete('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'destroy']);
     });
+
 });
 
 
