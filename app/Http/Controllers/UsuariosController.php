@@ -310,4 +310,25 @@ class UsuariosController extends Controller
             return response()->json(['error' => 'Error al eliminar usuario'], 500);
         }
     }
+
+    public function cambiarEstado(Request $request, $id)
+    {
+        try {
+            $usuario = User::findOrFail($id);
+
+            $request->validate([
+                'is_enabled' => 'required|boolean'
+            ]);
+
+            $usuario->is_enabled = $request->is_enabled;
+            $usuario->save();
+
+            return response()->json([
+                'message' => 'Estado del usuario actualizado correctamente',
+                'usuario' => $usuario
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error al cambiar estado del usuario'], 500);
+        }
+    }
 }
