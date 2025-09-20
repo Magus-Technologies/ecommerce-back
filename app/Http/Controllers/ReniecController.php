@@ -11,7 +11,7 @@ class ReniecController extends Controller
 {
     public function buscar($doc)
     {
-        $token = env('RENIEC_API_TOKEN');
+        $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6InN5c3RlbWNyYWZ0LnBlQGdtYWlsLmNvbSJ9.yuNS5hRaC0hCwymX_PjXRoSZJWLNNBeOdlLRSUGlHGA';
 
         if (strlen($doc) == 8) {
             $url = 'https://dniruc.apisperu.com/api/v1/dni/' . $doc . '?token=' . $token;
