@@ -20,7 +20,8 @@
         "laravel/socialite": "^5.21",
         "laravel/tinker": "^2.10.1",
         "luecano/numero-a-letras": "^4.0",
-        "spatie/laravel-permission": "6.18.0"
+        "spatie/laravel-permission": "6.18.0",
+        "tymon/jwt-auth": "^2.2"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

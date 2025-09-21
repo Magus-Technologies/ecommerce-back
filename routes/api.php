@@ -28,6 +28,15 @@ use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\ReclamosController;
+use App\Http\Controllers\Recompensas\RecompensaController;
+use App\Http\Controllers\Recompensas\RecompensaAnalyticsController;
+use App\Http\Controllers\Recompensas\RecompensaSegmentoController;
+use App\Http\Controllers\Recompensas\RecompensaProductoController;
+use App\Http\Controllers\Recompensas\RecompensaPuntosController;
+use App\Http\Controllers\Recompensas\RecompensaDescuentosController;
+use App\Http\Controllers\Recompensas\RecompensaEnviosController;
+use App\Http\Controllers\Recompensas\RecompensaRegalosController;
+use App\Http\Controllers\Recompensas\RecompensaClienteController;
 
 
 
@@ -397,6 +406,141 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:reclamos.delete')->group(function () {
             Route::delete('/{id}', [ReclamosController::class, 'destroy']);
         });
+    });
+
+    // ========================================
+    // MÓDULO DE RECOMPENSAS
+    // ========================================
+
+    // GRUPO SUPERADMIN - Gestión de Recompensas
+    Route::prefix('admin/recompensas')->middleware('permission:recompensas.ver')->group(function () {
+        
+        // Gestión principal de recompensas
+        Route::get('/', [RecompensaController::class, 'index']); // Listar recompensas
+        Route::get('/estadisticas', [RecompensaController::class, 'estadisticas']); // Estadísticas del sistema
+        Route::get('/tipos', [RecompensaController::class, 'tipos']); // Tipos disponibles
+        Route::get('/{id}', [RecompensaController::class, 'show']); // Ver detalle
+
+        // Analytics Avanzados
+        Route::prefix('analytics')->group(function () {
+            Route::get('/dashboard', [RecompensaAnalyticsController::class, 'dashboard']); // Dashboard principal
+            Route::get('/tendencias', [RecompensaAnalyticsController::class, 'tendencias']); // Tendencias por período
+            Route::get('/rendimiento', [RecompensaAnalyticsController::class, 'rendimiento']); // Métricas de rendimiento
+            Route::get('/comparativa', [RecompensaAnalyticsController::class, 'comparativa']); // Comparar períodos
+            Route::get('/comportamiento-clientes', [RecompensaAnalyticsController::class, 'comportamientoClientes']); // Análisis de clientes
+        });
+        
+        // Creación y edición (requiere permisos específicos)
+        Route::middleware('permission:recompensas.create')->group(function () {
+            Route::post('/', [RecompensaController::class, 'store']); // Crear recompensa
+        });
+        
+        Route::middleware('permission:recompensas.edit')->group(function () {
+            Route::put('/{id}', [RecompensaController::class, 'update']); // Editar recompensa
+            Route::patch('/{id}/activate', [RecompensaController::class, 'activate']); // Activar recompensa
+        });
+        
+        Route::middleware('permission:recompensas.delete')->group(function () {
+            Route::delete('/{id}', [RecompensaController::class, 'destroy']); // Desactivar recompensa
+        });
+        
+        // Gestión de segmentos y clientes
+        Route::prefix('{recompensaId}/segmentos')->group(function () {
+            Route::get('/', [RecompensaSegmentoController::class, 'index']); // Listar segmentos asignados
+            Route::post('/', [RecompensaSegmentoController::class, 'store'])->middleware('permission:recompensas.edit'); // Asignar segmento/cliente
+            Route::delete('/{segmentoId}', [RecompensaSegmentoController::class, 'destroy'])->middleware('permission:recompensas.edit'); // Eliminar asignación
+            Route::get('/disponibles', [RecompensaSegmentoController::class, 'segmentosDisponibles']); // Segmentos disponibles
+            Route::get('/estadisticas', [RecompensaSegmentoController::class, 'estadisticasSegmentacion']); // Estadísticas de segmentación
+            Route::post('/validar-cliente', [RecompensaSegmentoController::class, 'validarCliente']); // Validar cliente específico
+        });
+        
+        // Búsqueda de clientes para asignación
+        Route::get('/clientes/buscar', [RecompensaSegmentoController::class, 'buscarClientes']);
+        
+        // Gestión de productos y categorías
+        Route::prefix('{recompensaId}/productos')->group(function () {
+            Route::get('/', [RecompensaProductoController::class, 'index']); // Listar productos/categorías asignados
+            Route::post('/', [RecompensaProductoController::class, 'store'])->middleware('permission:recompensas.edit'); // Asignar producto/categoría
+            Route::delete('/{asignacionId}', [RecompensaProductoController::class, 'destroy'])->middleware('permission:recompensas.edit'); // Eliminar asignación
+            Route::get('/aplicables', [RecompensaProductoController::class, 'productosAplicables']); // Productos que aplican
+            Route::get('/estadisticas', [RecompensaProductoController::class, 'estadisticas']); // Estadísticas de productos
+            Route::post('/validar-producto', [RecompensaProductoController::class, 'validarProducto']); // Validar producto específico
+        });
+        
+        // Búsqueda de productos y categorías
+        Route::get('/productos/buscar', [RecompensaProductoController::class, 'buscarProductos']);
+        Route::get('/categorias/buscar', [RecompensaProductoController::class, 'buscarCategorias']);
+        
+        // Configuración de submódulos
+        
+        // Submódulo de Puntos
+        Route::prefix('{recompensaId}/puntos')->group(function () {
+            Route::get('/', [RecompensaPuntosController::class, 'index']); // Ver configuración
+            Route::post('/', [RecompensaPuntosController::class, 'store'])->middleware('permission:recompensas.edit'); // Crear/actualizar configuración
+            Route::put('/{configId}', [RecompensaPuntosController::class, 'update'])->middleware('permission:recompensas.edit'); // Actualizar configuración
+            Route::delete('/{configId}', [RecompensaPuntosController::class, 'destroy'])->middleware('permission:recompensas.edit'); // Eliminar configuración
+            Route::post('/simular', [RecompensaPuntosController::class, 'simular']); // Simular cálculo de puntos
+        });
+        
+        // Utilidades para puntos
+        Route::get('/puntos/ejemplos', [RecompensaPuntosController::class, 'ejemplos']);
+        Route::post('/puntos/validar', [RecompensaPuntosController::class, 'validar']);
+        
+        // Submódulo de Descuentos
+        Route::prefix('{recompensaId}/descuentos')->group(function () {
+            Route::get('/', [RecompensaDescuentosController::class, 'index']); // Ver configuración
+            Route::post('/', [RecompensaDescuentosController::class, 'store'])->middleware('permission:recompensas.edit'); // Crear configuración
+            Route::put('/{configId}', [RecompensaDescuentosController::class, 'update'])->middleware('permission:recompensas.edit'); // Actualizar configuración
+            Route::delete('/{configId}', [RecompensaDescuentosController::class, 'destroy'])->middleware('permission:recompensas.edit'); // Eliminar configuración
+            Route::post('/simular', [RecompensaDescuentosController::class, 'simular']); // Simular descuentos
+            Route::post('/calcular', [RecompensaDescuentosController::class, 'calcular']); // Calcular descuento específico
+        });
+        
+        // Utilidades para descuentos
+        Route::get('/descuentos/tipos', [RecompensaDescuentosController::class, 'tiposDisponibles']);
+        Route::post('/descuentos/validar', [RecompensaDescuentosController::class, 'validar']);
+        
+        // Submódulo de Envíos
+        Route::prefix('{recompensaId}/envios')->group(function () {
+            Route::get('/', [RecompensaEnviosController::class, 'index']); // Ver configuración
+            Route::post('/', [RecompensaEnviosController::class, 'store'])->middleware('permission:recompensas.edit'); // Crear configuración
+            Route::put('/{configId}', [RecompensaEnviosController::class, 'update'])->middleware('permission:recompensas.edit'); // Actualizar configuración
+            Route::delete('/{configId}', [RecompensaEnviosController::class, 'destroy'])->middleware('permission:recompensas.edit'); // Eliminar configuración
+            Route::post('/validar', [RecompensaEnviosController::class, 'validar']); // Validar envío gratuito
+            Route::get('/estadisticas-cobertura', [RecompensaEnviosController::class, 'estadisticasCobertura']); // Estadísticas de cobertura
+        });
+        
+        // Utilidades para envíos
+        Route::get('/envios/zonas/buscar', [RecompensaEnviosController::class, 'buscarZonas']);
+        Route::get('/envios/departamentos', [RecompensaEnviosController::class, 'departamentos']);
+        
+        // Submódulo de Regalos
+        Route::prefix('{recompensaId}/regalos')->group(function () {
+            Route::get('/', [RecompensaRegalosController::class, 'index']); // Ver configuración
+            Route::post('/', [RecompensaRegalosController::class, 'store'])->middleware('permission:recompensas.edit'); // Crear configuración
+            Route::put('/{configId}', [RecompensaRegalosController::class, 'update'])->middleware('permission:recompensas.edit'); // Actualizar configuración
+            Route::delete('/{configId}', [RecompensaRegalosController::class, 'destroy'])->middleware('permission:recompensas.edit'); // Eliminar configuración
+            Route::post('/{configId}/verificar-disponibilidad', [RecompensaRegalosController::class, 'verificarDisponibilidad']); // Verificar stock
+            Route::post('/simular', [RecompensaRegalosController::class, 'simular']); // Simular regalos
+            Route::get('/estadisticas', [RecompensaRegalosController::class, 'estadisticas']); // Estadísticas de regalos
+        });
+        
+        // Búsqueda de productos para regalos
+        Route::get('/regalos/productos/buscar', [RecompensaRegalosController::class, 'buscarProductos']);
+    });
+    
+    // 🔹 GRUPO CLIENTE - Consulta de Recompensas (JWT)
+    Route::prefix('cliente/recompensas')->group(function () {
+        
+        // Recompensas disponibles para el cliente
+        Route::get('/activas', [RecompensaClienteController::class, 'recompensasActivas']); // Ver recompensas activas que le aplican
+        Route::get('/{id}/detalle', [RecompensaClienteController::class, 'detalleRecompensa']); // Ver detalle de recompensa específica
+        
+        // Historial del cliente
+        Route::get('/historial', [RecompensaClienteController::class, 'historialRecompensas']); // Consultar historial de recompensas recibidas
+        
+        // Puntos del cliente
+        Route::get('/puntos', [RecompensaClienteController::class, 'puntosAcumulados']); // Consultar puntos acumulados
     });
 });
 
