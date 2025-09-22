@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserCliente;
+use App\Models\UserMotorizado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -106,7 +107,55 @@ class AdminController extends Controller
             ]);
         }
 
-        // PASO 3: Si no encuentra en ninguna tabla
+        // PASO 3: Intentar como MOTORIZADO
+        $userMotorizado = UserMotorizado::where('username', $email)->first();
+
+        if ($userMotorizado && Hash::check($password, $userMotorizado->password)) {
+            // Verificar que el usuario motorizado esté activo
+            if (!$userMotorizado->is_active) {
+                return response()->json([
+                    'message' => 'Usuario motorizado deshabilitado',
+                    'errors' => ['email' => ['Tu usuario está deshabilitado']]
+                ], 401);
+            }
+
+            // Verificar que el motorizado esté activo
+            if (!$userMotorizado->motorizado->estado) {
+                return response()->json([
+                    'message' => 'Motorizado deshabilitado',
+                    'errors' => ['email' => ['Tu cuenta de motorizado está deshabilitada']]
+                ], 401);
+            }
+
+            // Actualizar último login
+            $userMotorizado->actualizarUltimoLogin();
+
+            $token = $userMotorizado->createToken('motorizado_token')->plainTextToken;
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Login exitoso',
+                'tipo_usuario' => 'motorizado',
+                'user' => [
+                    'id' => $userMotorizado->id,
+                    'motorizado_id' => $userMotorizado->motorizado_id,
+                    'username' => $userMotorizado->username,
+                    'numero_unidad' => $userMotorizado->motorizado->numero_unidad,
+                    'nombre_completo' => $userMotorizado->motorizado->nombre_completo,
+                    'correo' => $userMotorizado->motorizado->correo,
+                    'telefono' => $userMotorizado->motorizado->telefono,
+                    'foto_perfil' => $userMotorizado->motorizado->foto_perfil,
+                    'vehiculo_placa' => $userMotorizado->motorizado->vehiculo_placa,
+                    'roles' => $userMotorizado->getRoleNames(),
+                    'permissions' => $userMotorizado->getAllPermissions()->pluck('name'),
+                    'estado_actual' => $userMotorizado->estado_actual,
+                    'estadisticas' => $userMotorizado->estadisticasDelDia(),
+                ],
+                'token' => $token,
+            ]);
+        }
+
+        // PASO 4: Si no encuentra en ninguna tabla
         return response()->json([
             'message' => 'Las credenciales proporcionadas son incorrectas.',
             'errors' => ['email' => ['Las credenciales proporcionadas son incorrectas.']]
@@ -119,8 +168,9 @@ class AdminController extends Controller
             'email' => 'required|email'
         ]);
 
-        $emailExists = UserCliente::where('email', $request->email)->exists() || 
-                      User::where('email', $request->email)->exists();
+        $emailExists = UserCliente::where('email', $request->email)->exists() ||
+                      User::where('email', $request->email)->exists() ||
+                      \App\Models\Motorizado::where('correo', $request->email)->exists();
 
         return response()->json([
             'exists' => $emailExists,
@@ -380,6 +430,7 @@ class AdminController extends Controller
                 'tipo_usuario' => 'cliente',
                 'user' => [
                     'id' => $user->id,
+                    'name' => $user->nombre_completo,
                     'nombre_completo' => $user->nombre_completo,
                     'nombres' => $user->nombres,
                     'apellidos' => $user->apellidos,
@@ -388,8 +439,29 @@ class AdminController extends Controller
                     'numero_documento' => $user->numero_documento,
                     'tipo_documento' => $user->tipoDocumento?->nombre,
                     'puede_facturar' => $user->puedeFacturar(),
-                    'foto_url' => $user->foto_url,
+                    'foto' => $user->foto,
                     'email_verified_at' => $user->email_verified_at
+                ],
+            ]);
+        } elseif ($user instanceof UserMotorizado) {
+            // Motorizado del sistema de delivery
+            return response()->json([
+                'status' => 'success',
+                'tipo_usuario' => 'motorizado',
+                'user' => [
+                    'id' => $user->id,
+                    'motorizado_id' => $user->motorizado_id,
+                    'username' => $user->username,
+                    'numero_unidad' => $user->motorizado->numero_unidad,
+                    'nombre_completo' => $user->motorizado->nombre_completo,
+                    'correo' => $user->motorizado->correo,
+                    'telefono' => $user->motorizado->telefono,
+                    'foto_perfil' => $user->motorizado->foto_perfil,
+                    'vehiculo_placa' => $user->motorizado->vehiculo_placa,
+                    'roles' => $user->getRoleNames(),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                    'estado_actual' => $user->estado_actual,
+                    'estadisticas' => $user->estadisticasDelDia(),
                 ],
             ]);
         }

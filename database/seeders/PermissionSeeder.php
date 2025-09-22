@@ -94,6 +94,65 @@ class PermissionSeeder extends Seeder
             'reclamos.edit',
             'reclamos.delete',
 
+            // Compras
+            'compras.ver',
+            'compras.show',
+            'compras.edit',
+            'compras.delete',
+            'compras.aprobar',
+
+            // Envío de correos
+            'envio_correos.ver',
+            'envio_correos.create',
+            'envio_correos.edit',
+            'envio_correos.delete',
+
+            // Motorizados
+            'motorizados.ver',
+            'motorizados.show',
+            'motorizados.create',
+            'motorizados.edit',
+            'motorizados.delete',
+
+            // Permisos específicos para motorizados
+            'pedidos.motorizado.ver',
+            'pedidos.motorizado.actualizar_estado',
+            'pedidos.motorizado.confirmar_entrega',
+            'motorizado.perfil.ver',
+            'motorizado.perfil.editar',
+            'motorizado.rutas.ver',
+            'motorizado.ubicacion.actualizar',
+            'motorizado.estadisticas.ver',
+            'motorizado.chat.ver',
+            'motorizado.notificaciones.ver',
+
+            // Cotizaciones
+            'cotizaciones.ver',
+            'cotizaciones.show',
+            'cotizaciones.create',
+            'cotizaciones.edit',
+            'cotizaciones.delete',
+
+            // Plantillas de Email
+            'email_templates.ver',
+            'email_templates.show',
+            'email_templates.create',
+            'email_templates.edit',
+            'email_templates.delete',
+
+            // Ventas
+            'ventas.ver',
+            'ventas.show',
+            'ventas.create',
+            'ventas.edit',
+            'ventas.delete',
+
+            // Roles
+            'roles.ver',
+            'roles.create',
+            'roles.edit',
+            'roles.delete',
+
         ];
 
         foreach ($permissions as $permission) {
@@ -103,7 +162,7 @@ class PermissionSeeder extends Seeder
             ]);
         }
 
-        // Crear rol superadmin si no existe
+        // Crear roles si no existen
         $superadmin = Role::firstOrCreate([
             'name' => 'superadmin',
             'guard_name' => 'web'

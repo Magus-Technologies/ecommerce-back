@@ -49,6 +49,5 @@ class UbigeoInei extends Model
     // public static function distritosPorProvincia()
 
     // No necesitas scopes adicionales, las consultas están directamente en el controlador
-
    
 }
