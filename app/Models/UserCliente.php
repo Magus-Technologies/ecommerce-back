@@ -72,6 +72,22 @@ class UserCliente extends Authenticatable
         return $this->hasMany(Venta::class, 'user_cliente_id');
     }
 
+    public function pedidos()
+    {
+        return $this->hasMany(Pedido::class, 'user_cliente_id');
+    }
+
+    // Relaciones del módulo de recompensas
+    public function recompensasHistorial()
+    {
+        return $this->hasMany(RecompensaHistorial::class, 'cliente_id');
+    }
+
+    public function recompensasClientes()
+    {
+        return $this->hasMany(RecompensaCliente::class, 'cliente_id');
+    }
+
     // Scopes
     public function scopeActivos($query)
     {
@@ -117,6 +133,53 @@ class UserCliente extends Authenticatable
     public function puedeFacturar()
     {
         return $this->cliente_facturacion_id !== null;
+    }
+
+    // Métodos del módulo de recompensas
+    public function getTotalPuntosGanados()
+    {
+        return $this->recompensasHistorial()->sum('puntos_otorgados') ?? 0;
+    }
+
+    public function getRecompensasDelMes()
+    {
+        return $this->recompensasHistorial()
+            ->whereMonth('fecha_aplicacion', now()->month)
+            ->whereYear('fecha_aplicacion', now()->year)
+            ->count();
+    }
+
+    public function esClienteNuevo()
+    {
+        return $this->created_at >= now()->subDays(30);
+    }
+
+    public function esClienteRecurrente()
+    {
+        return $this->pedidos()->count() > 1;
+    }
+
+    public function esClienteVip()
+    {
+        $totalCompras = $this->pedidos()->sum('total');
+        return $totalCompras >= 1000; // Configurable
+    }
+
+    public function getSegmentoCliente()
+    {
+        if ($this->esClienteVip()) {
+            return 'vip';
+        }
+        
+        if ($this->esClienteRecurrente()) {
+            return 'recurrentes';
+        }
+        
+        if ($this->esClienteNuevo()) {
+            return 'nuevos';
+        }
+        
+        return 'todos';
     }
     
 }
