@@ -309,6 +309,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/clientes/{id}/toggle-estado', [ClientesController::class, 'toggleEstado']);
     });
 
+    // Rutas específicas para clientes (sin permisos)
+    Route::prefix('cliente')->group(function () {
+        Route::post('/upload-foto', [ClientesController::class, 'uploadFoto']);
+        Route::delete('/delete-foto', [ClientesController::class, 'deleteFoto']);
+    });
+
     Route::middleware('permission:clientes.delete')->group(function () {
         Route::delete('/clientes/{id}', [ClientesController::class, 'destroy']);
     });

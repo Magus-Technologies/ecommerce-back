@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\UserCliente;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
 
 class ClientesController extends Controller
 {
@@ -497,5 +499,103 @@ public function establecerPredeterminada(Request $request, $id)
         'message' => 'Dirección establecida como predeterminada',
         'direccion' => $direccion
     ]);
+}
+
+/**
+ * Subir foto de perfil del cliente
+ */
+public function uploadFoto(Request $request): JsonResponse
+{
+    try {
+        $request->validate([
+            'foto' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        $cliente = Auth::user();
+
+        if (!$cliente || !($cliente instanceof UserCliente)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cliente no encontrado'
+            ], 404);
+        }
+
+        $file = $request->file('foto');
+
+        // Crear directorio si no existe
+        $directory = 'clientes';
+        if (!Storage::disk('public')->exists($directory)) {
+            Storage::disk('public')->makeDirectory($directory);
+        }
+
+        // Eliminar foto anterior si existe
+        if ($cliente->foto) {
+            $oldPath = str_replace('/storage/', '', $cliente->foto);
+            if (Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        // Generar nombre único para el archivo
+        $fileName = time() . '_' . $cliente->id . '.' . $file->getClientOriginalExtension();
+
+        // Guardar archivo
+        $path = $file->storeAs($directory, $fileName, 'public');
+
+        // Actualizar ruta en la base de datos
+        $fotoUrl = '/storage/' . $path;
+        $cliente->update(['foto' => $fotoUrl]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Foto subida exitosamente',
+            'foto_url' => $fotoUrl
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error al subir la foto: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Eliminar foto de perfil del cliente
+ */
+public function deleteFoto(Request $request): JsonResponse
+{
+    try {
+        $cliente = Auth::user();
+
+        if (!$cliente || !($cliente instanceof UserCliente)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cliente no encontrado'
+            ], 404);
+        }
+
+        // Eliminar archivo si existe
+        if ($cliente->foto) {
+            $oldPath = str_replace('/storage/', '', $cliente->foto);
+            if (Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+        }
+
+        // Limpiar la ruta en la base de datos
+        $cliente->update(['foto' => null]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Foto eliminada exitosamente'
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error al eliminar la foto: ' . $e->getMessage()
+        ], 500);
+    }
 }
 }
