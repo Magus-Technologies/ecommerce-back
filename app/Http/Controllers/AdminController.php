@@ -430,6 +430,7 @@ class AdminController extends Controller
                 'tipo_usuario' => 'cliente',
                 'user' => [
                     'id' => $user->id,
+                    'name' => $user->nombre_completo,
                     'nombre_completo' => $user->nombre_completo,
                     'nombres' => $user->nombres,
                     'apellidos' => $user->apellidos,
@@ -438,7 +439,7 @@ class AdminController extends Controller
                     'numero_documento' => $user->numero_documento,
                     'tipo_documento' => $user->tipoDocumento?->nombre,
                     'puede_facturar' => $user->puedeFacturar(),
-                    'foto_url' => $user->foto_url,
+                    'foto' => $user->foto,
                     'email_verified_at' => $user->email_verified_at
                 ],
             ]);

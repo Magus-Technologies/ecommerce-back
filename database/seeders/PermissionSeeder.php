@@ -160,14 +160,6 @@ class PermissionSeeder extends Seeder
                 'name' => $permission,
                 'guard_name' => 'web'
             ]);
-
-            // También crear permisos para sanctum si son de motorizado
-            if (str_contains($permission, 'motorizado.')) {
-                Permission::firstOrCreate([
-                    'name' => $permission,
-                    'guard_name' => 'sanctum'
-                ]);
-            }
         }
 
         // Crear roles si no existen
@@ -176,35 +168,7 @@ class PermissionSeeder extends Seeder
             'guard_name' => 'web'
         ]);
 
-        $motorizado = Role::firstOrCreate([
-            'name' => 'motorizado',
-            'guard_name' => 'web'
-        ]);
-
-        $motorizadoSanctum = Role::firstOrCreate([
-            'name' => 'motorizado-app',
-            'guard_name' => 'sanctum'
-        ]);
-
-        // Separar permisos principales de los de motorizado
-        $mainPermissions = array_filter($permissions, function($permission) {
-            return !str_contains($permission, 'motorizado.');
-        });
-
-        $motorizadoOnlyPermissions = array_filter($permissions, function($permission) {
-            return str_contains($permission, 'motorizado.');
-        });
-
-        // Asignar permisos principales al superadmin
-        $superadmin->givePermissionTo($mainPermissions);
-
-        // Asignar permisos de motorizado al rol motorizado (web)
-        $motorizado->givePermissionTo($motorizadoOnlyPermissions);
-
-        // Asignar permisos de motorizado al rol motorizado (sanctum)
-        $motorizadoSanctum->givePermissionTo($motorizadoOnlyPermissions);
-
-        // También darle al superadmin los permisos de motorizado
-        $superadmin->givePermissionTo($motorizadoOnlyPermissions);
+        // Asignar todos los permisos al superadmin
+        $superadmin->givePermissionTo($permissions);
     }
 }
