@@ -38,6 +38,7 @@ use App\Http\Controllers\Recompensas\RecompensaDescuentosController;
 use App\Http\Controllers\Recompensas\RecompensaEnviosController;
 use App\Http\Controllers\Recompensas\RecompensaRegalosController;
 use App\Http\Controllers\Recompensas\RecompensaClienteController;
+use App\Http\Controllers\Recompensas\RecompensaEstadisticaController;
 
 use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\ComprasController;
@@ -430,8 +431,8 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Gestión principal de recompensas
         Route::get('/', [RecompensaController::class, 'index']); // Listar recompensas
-        Route::get('/estadisticas', [RecompensaController::class, 'estadisticas']); // Estadísticas del sistema
-        Route::get('/tipos', [RecompensaController::class, 'tipos']); // Tipos disponibles
+        Route::get('/estadisticas', [RecompensaEstadisticaController::class, 'estadisticas']); // Estadísticas del sistema
+        Route::get('/tipos', [RecompensaEstadisticaController::class, 'tipos']); // Tipos disponibles
         Route::get('/{id}', [RecompensaController::class, 'show'])->middleware('permission:recompensas.show'); // Ver detalle
 
         // Analytics Avanzados
@@ -445,9 +446,10 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Creación y edición (requiere permisos específicos)
         Route::post('/', [RecompensaController::class, 'store'])->middleware('permission:recompensas.create'); // Crear recompensa
-        Route::put('/{id}', [RecompensaController::class, 'update'])->middleware('permission:recompensas.edit'); // Editar recompensa
+        Route::put('/{id}', [RecompensaController::class, 'update'])->middleware('permission:recompensas.edit'); // Editar recompensa (pausa automáticamente si está activa)
+        Route::patch('/{id}/pause', [RecompensaController::class, 'pause'])->middleware('permission:recompensas.edit'); // Pausar recompensa
         Route::patch('/{id}/activate', [RecompensaController::class, 'activate'])->middleware('permission:recompensas.activate'); // Activar recompensa
-        Route::delete('/{id}', [RecompensaController::class, 'destroy'])->middleware('permission:recompensas.delete'); // Eliminar recompensa
+        Route::delete('/{id}', [RecompensaController::class, 'destroy'])->middleware('permission:recompensas.delete'); // Cancelar recompensa
         
         // Gestión de segmentos y clientes
         Route::prefix('{recompensaId}/segmentos')->middleware('permission:recompensas.segmentos')->group(function () {

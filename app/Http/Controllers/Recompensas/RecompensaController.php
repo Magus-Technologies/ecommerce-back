@@ -36,8 +36,8 @@ class RecompensaController extends Controller
                 $query->porTipo($request->tipo);
             }
 
-            if ($request->has('activo') && $request->activo !== '') {
-                $query->where('activo', (bool) $request->activo);
+            if ($request->has('estado') && !empty($request->estado)) {
+                $query->where('estado', $request->estado);
             }
 
             if ($request->has('vigente') && $request->vigente) {
@@ -72,12 +72,17 @@ class RecompensaController extends Controller
                     'tipo_nombre' => $recompensa->tipo_nombre,
                     'fecha_inicio' => $recompensa->fecha_inicio,
                     'fecha_fin' => $recompensa->fecha_fin,
-                    'activo' => $recompensa->activo,
+                    'estado' => $recompensa->estado,
+                    'estado_nombre' => $recompensa->estado_nombre,
                     'es_vigente' => $recompensa->es_vigente,
                     'total_aplicaciones' => $recompensa->total_aplicaciones,
                     'creador' => $recompensa->creador,
                     'created_at' => $recompensa->created_at,
                     'updated_at' => $recompensa->updated_at,
+                    // Campos requeridos por la documentación
+                    'total_clientes' => $recompensa->clientes_count,
+                    'total_productos' => $recompensa->productos_count,
+                    'valor_total_recompensa' => $this->calcularValorTotalRecompensa($recompensa),
                     // Contadores de configuraciones (optimizado con withCount)
                     'tiene_clientes' => $recompensa->clientes_count > 0,
                     'tiene_productos' => $recompensa->productos_count > 0,
@@ -117,7 +122,7 @@ class RecompensaController extends Controller
                 'tipo' => 'required|in:' . implode(',', Recompensa::getTipos()),
                 'fecha_inicio' => 'required|date|after_or_equal:today',
                 'fecha_fin' => 'required|date|after:fecha_inicio',
-                'activo' => 'boolean'
+                'estado' => 'sometimes|in:' . implode(',', Recompensa::getEstados())
             ], [
                 'nombre.required' => 'El nombre es obligatorio',
                 'tipo.required' => 'El tipo de recompensa es obligatorio',
@@ -125,7 +130,8 @@ class RecompensaController extends Controller
                 'fecha_inicio.required' => 'La fecha de inicio es obligatoria',
                 'fecha_inicio.after_or_equal' => 'La fecha de inicio debe ser hoy o posterior',
                 'fecha_fin.required' => 'La fecha de fin es obligatoria',
-                'fecha_fin.after' => 'La fecha de fin debe ser posterior a la fecha de inicio'
+                'fecha_fin.after' => 'La fecha de fin debe ser posterior a la fecha de inicio',
+                'estado.in' => 'El estado de recompensa no es válido'
             ]);
 
             if ($validator->fails()) {
@@ -144,7 +150,7 @@ class RecompensaController extends Controller
                 'tipo' => $request->tipo,
                 'fecha_inicio' => $request->fecha_inicio,
                 'fecha_fin' => $request->fecha_fin,
-                'activo' => $request->get('activo', true),
+                'estado' => $request->get('estado', Recompensa::ESTADO_PROGRAMADA),
                 'creado_por' => Auth::id()
             ]);
 
@@ -208,7 +214,8 @@ class RecompensaController extends Controller
                     'tipo_nombre' => $recompensa->tipo_nombre,
                     'fecha_inicio' => $recompensa->fecha_inicio,
                     'fecha_fin' => $recompensa->fecha_fin,
-                    'activo' => $recompensa->activo,
+                    'estado' => $recompensa->estado,
+                    'estado_nombre' => $recompensa->estado_nombre,
                     'es_vigente' => $recompensa->es_vigente,
                     'total_aplicaciones' => $recompensa->total_aplicaciones,
                     'creador' => $recompensa->creador,
@@ -276,6 +283,7 @@ class RecompensaController extends Controller
 
     /**
      * Actualizar una recompensa existente
+     * Si no se especifica estado, se pausa automáticamente
      */
     public function update(Request $request, $id): JsonResponse
     {
@@ -295,14 +303,15 @@ class RecompensaController extends Controller
                 'tipo' => 'sometimes|required|in:' . implode(',', Recompensa::getTipos()),
                 'fecha_inicio' => 'sometimes|required|date',
                 'fecha_fin' => 'sometimes|required|date|after:fecha_inicio',
-                'activo' => 'boolean'
+                'estado' => 'sometimes|in:' . implode(',', Recompensa::getEstados())
             ], [
                 'nombre.required' => 'El nombre es obligatorio',
                 'tipo.required' => 'El tipo de recompensa es obligatorio',
                 'tipo.in' => 'El tipo de recompensa no es válido',
                 'fecha_inicio.required' => 'La fecha de inicio es obligatoria',
                 'fecha_fin.required' => 'La fecha de fin es obligatoria',
-                'fecha_fin.after' => 'La fecha de fin debe ser posterior a la fecha de inicio'
+                'fecha_fin.after' => 'La fecha de fin debe ser posterior a la fecha de inicio',
+                'estado.in' => 'El estado de recompensa no es válido'
             ]);
 
             if ($validator->fails()) {
@@ -315,14 +324,26 @@ class RecompensaController extends Controller
 
             DB::beginTransaction();
 
-            $recompensa->update($request->only([
+            // Preparar datos para actualizar
+            $updateData = $request->only([
                 'nombre',
                 'descripcion',
                 'tipo',
                 'fecha_inicio',
-                'fecha_fin',
-                'activo'
-            ]));
+                'fecha_fin'
+            ]);
+
+            // Si no se especifica estado, pausar automáticamente
+            if ($request->has('estado')) {
+                $updateData['estado'] = $request->estado;
+            } else {
+                // Si la recompensa está activa, pausarla al actualizar
+                if ($recompensa->estado === Recompensa::ESTADO_ACTIVA) {
+                    $updateData['estado'] = Recompensa::ESTADO_PAUSADA;
+                }
+            }
+
+            $recompensa->update($updateData);
 
             DB::commit();
 
@@ -346,7 +367,7 @@ class RecompensaController extends Controller
     }
 
     /**
-     * Desactivar una recompensa (soft delete)
+     * Cancelar una recompensa (soft delete)
      */
     public function destroy($id): JsonResponse
     {
@@ -360,23 +381,96 @@ class RecompensaController extends Controller
                 ], 404);
             }
 
+            // Verificar si puede cancelar
+            if (!$recompensa->puedeCancelar()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede cancelar la recompensa desde el estado actual: ' . $recompensa->estado_nombre
+                ], 422);
+            }
+
             DB::beginTransaction();
 
-            // Desactivar en lugar de eliminar
-            $recompensa->update(['activo' => false]);
+            // Usar el método del modelo para cancelar
+            $cancelada = $recompensa->cancelar();
+
+            if (!$cancelada) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo cancelar la recompensa'
+                ], 422);
+            }
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Recompensa desactivada exitosamente'
+                'message' => 'Recompensa cancelada exitosamente'
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => 'Error al desactivar la recompensa',
+                'message' => 'Error al cancelar la recompensa',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Pausar una recompensa
+     */
+    public function pause($id): JsonResponse
+    {
+        try {
+            $recompensa = Recompensa::find($id);
+
+            if (!$recompensa) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Recompensa no encontrada'
+                ], 404);
+            }
+
+            // Verificar si puede pausar
+            if (!$recompensa->puedePausar()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede pausar la recompensa desde el estado actual: ' . $recompensa->estado_nombre
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            // Usar el método del modelo para pausar
+            $pausada = $recompensa->pausar();
+
+            if (!$pausada) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo pausar la recompensa'
+                ], 422);
+            }
+
+            DB::commit();
+
+            // Cargar relaciones para la respuesta
+            $recompensa->load('creador:id,name');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Recompensa pausada exitosamente',
+                'data' => $recompensa
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al pausar la recompensa',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -397,11 +491,31 @@ class RecompensaController extends Controller
                 ], 404);
             }
 
+            // Verificar si puede activar
+            if (!$recompensa->puedeActivar()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede activar la recompensa desde el estado actual: ' . $recompensa->estado_nombre
+                ], 422);
+            }
+
             DB::beginTransaction();
 
-            $recompensa->update(['activo' => true]);
+            // Usar el método del modelo para activar
+            $activada = $recompensa->activar();
+
+            if (!$activada) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo activar la recompensa'
+                ], 422);
+            }
 
             DB::commit();
+
+            // Cargar relaciones para la respuesta
+            $recompensa->load('creador:id,name');
 
             return response()->json([
                 'success' => true,
@@ -436,12 +550,12 @@ class RecompensaController extends Controller
             // Estadísticas básicas con una sola consulta optimizada
             $estadisticasBasicas = Recompensa::selectRaw('
                 COUNT(*) as total_recompensas,
-                SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as recompensas_activas,
-                SUM(CASE WHEN activo = 1 AND fecha_inicio <= CURDATE() AND fecha_fin >= CURDATE() THEN 1 ELSE 0 END) as recompensas_vigentes
+                SUM(CASE WHEN estado = "activa" THEN 1 ELSE 0 END) as recompensas_activas,
+                SUM(CASE WHEN estado = "activa" AND fecha_inicio <= CURDATE() AND fecha_fin >= CURDATE() THEN 1 ELSE 0 END) as recompensas_vigentes
             ')->first();
 
             // Estadísticas por tipo
-            $porTipo = Recompensa::selectRaw('tipo, COUNT(*) as total, SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as activas')
+            $porTipo = Recompensa::selectRaw('tipo, COUNT(*) as total, SUM(CASE WHEN estado = "activa" THEN 1 ELSE 0 END) as activas')
                 ->groupBy('tipo')
                 ->get()
                 ->keyBy('tipo')
@@ -560,6 +674,48 @@ class RecompensaController extends Controller
                 'trace' => config('app.debug') ? $e->getTraceAsString() : null
             ], 500);
         }
+    }
+
+    /**
+     * Calcular valor total de la recompensa
+     */
+    private function calcularValorTotalRecompensa($recompensa): float
+    {
+        $valorTotal = 0.0;
+        
+        // Sumar valor de puntos
+        if ($recompensa->puntos_count > 0) {
+            $puntos = $recompensa->puntos()->get();
+            foreach ($puntos as $punto) {
+                $valorTotal += $punto->puntos_por_compra * $punto->valor_por_punto;
+            }
+        }
+        
+        // Sumar valor de descuentos
+        if ($recompensa->descuentos_count > 0) {
+            $descuentos = $recompensa->descuentos()->get();
+            foreach ($descuentos as $descuento) {
+                $valorTotal += $descuento->porcentaje_descuento * 10; // Aproximación
+            }
+        }
+        
+        // Sumar valor de envíos
+        if ($recompensa->envios_count > 0) {
+            $envios = $recompensa->envios()->get();
+            foreach ($envios as $envio) {
+                $valorTotal += $envio->costo_envio ?? 0;
+            }
+        }
+        
+        // Sumar valor de regalos
+        if ($recompensa->regalos_count > 0) {
+            $regalos = $recompensa->regalos()->get();
+            foreach ($regalos as $regalo) {
+                $valorTotal += $regalo->producto->precio_venta ?? 0;
+            }
+        }
+        
+        return round($valorTotal, 2);
     }
 
     /**
