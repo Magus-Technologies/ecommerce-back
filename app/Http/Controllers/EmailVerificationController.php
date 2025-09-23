@@ -164,7 +164,7 @@ class EmailVerificationController extends Controller
         ]);
     }
 
-    public function verifyByLink(Request $request)
+  public function verifyByLink(Request $request)
     {
         $token = $request->query('token');
         $email = $request->query('email');
@@ -174,52 +174,56 @@ class EmailVerificationController extends Controller
             'email' => $email
         ]);
 
-        $frontendUrl = env('FRONTEND_URL');
-        Log::info('Debug redirect error case', [
-            'FRONTEND_URL_raw' => $frontendUrl,
-            'redirect_url' => $frontendUrl . '/verify-email?error=invalid_link'
-        ]);
         if (!$token || !$email) {
-            return redirect(env('FRONTEND_URL') . '/verify-email?error=invalid_link');
+            return redirect(env('FRONTEND_URL') . 'verify-email?error=invalid_link');
         }
 
-        $user = UserCliente::where('email', $email)
-                        ->where('verification_token', $token)
-                        ->first();
+        // Buscar usuario por email primero
+        $user = UserCliente::where('email', $email)->first();
 
         if (!$user) {
-            Log::error('Usuario no encontrado para verificación por enlace');
-            return redirect(env('FRONTEND_URL') . '/verify-email?error=invalid_token');
+            Log::error('Usuario no existe en la base de datos', ['email' => $email]);
+            return redirect(env('FRONTEND_URL') . 'verify-email?error=invalid_token');
         }
 
-        // Verificar si ya está verificado
+        // Log del estado actual del usuario
+        Log::info('Estado del usuario encontrado', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'verification_token' => $user->verification_token,
+            'email_verified_at' => $user->email_verified_at,
+            'token_matches' => $user->verification_token === $token
+        ]);
+
+        // Si ya está verificado, redirigir apropiadamente
         if ($user->email_verified_at) {
-            return redirect(env('FRONTEND_URL') . '/account?already_verified=true');
+            $redirectUrl = rtrim(env('FRONTEND_URL'), '/') . '/account?already_verified=true&email=' . urlencode($user->email);
+            return redirect($redirectUrl);
         }
 
-        // Verificar la cuenta
+        // Verificar si el token coincide
+        if (!$user->verification_token || $user->verification_token !== $token) {
+            Log::error('Token no coincide', [
+                'token_enviado' => $token,
+                'token_bd' => $user->verification_token
+            ]);
+            $redirectUrl = rtrim(env('FRONTEND_URL'), '/') . '/verify-email?error=invalid_token';
+            return redirect($redirectUrl);
+        }
+
+        // Verificar la cuenta (sin dispatch ni sleep)
         $user->update([
             'email_verified_at' => now(),
-            'verification_token' => null,
+            'verification_token' => null,  // Borrar inmediatamente
             'verification_code' => null,
             'estado' => true
         ]);
 
         Log::info('Cuenta verificada por enlace exitosamente', ['user_id' => $user->id]);
 
-        // Agrega este debug:
-        $frontendUrl = env('FRONTEND_URL');
-        Log::info('Debug redirect values', [
-            'FRONTEND_URL_raw' => $frontendUrl,
-            'FRONTEND_URL_length' => strlen($frontendUrl ?? ''),
-            'FRONTEND_URL_empty' => empty($frontendUrl),
-            'redirect_url_constructed' => $frontendUrl . '/account?verified=true'
-        ]);
-
         // Enviar correo de bienvenida
         try {
             Log::info('Enviando correo de bienvenida', ['email' => $user->email]);
-            // Obtener plantilla de bienvenida
             $template = EmailTemplate::where('name', 'welcome')->where('is_active', true)->first();
             if (!$template) {
                 $template = EmailTemplate::create([
@@ -235,8 +239,10 @@ class EmailVerificationController extends Controller
             Log::error('Error enviando correo de bienvenida: ' . $e->getMessage());
         }
 
-        // Redirigir al login con mensaje de éxito
-        return redirect(env('FRONTEND_URL') . '/account?verified=true');
+        // Redirigir usando la variable de entorno
+        $redirectUrl = rtrim(env('FRONTEND_URL'), '/') . '/account?verified=true&email=' . urlencode($user->email);
+        Log::info('Redirigiendo a', ['url' => $redirectUrl]);
+        return redirect($redirectUrl);
     }
 
 
