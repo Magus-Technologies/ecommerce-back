@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Producto extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'nombre',
@@ -34,8 +35,11 @@ class Producto extends Model
         'destacado' => 'boolean',
         'mostrar_igv' => 'boolean',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime'
     ];
+
+    protected $dates = ['deleted_at'];
 
     protected $appends = ['imagen_url'];
 
@@ -51,8 +55,14 @@ class Producto extends Model
         return $this->belongsTo(MarcaProducto::class, 'marca_id');
     }
 
-    // Scope para productos activos
+    // Scope para productos activos (y no eliminados)
     public function scopeActivos($query)
+    {
+        return $query->where('activo', true);
+    }
+
+    // Scope para productos disponibles (activos y no eliminados)
+    public function scopeDisponibles($query)
     {
         return $query->where('activo', true);
     }
