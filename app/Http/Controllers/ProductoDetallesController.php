@@ -77,13 +77,26 @@ class ProductoDetallesController extends Controller
             $dimensiones = $this->processJsonField($request->input('dimensiones'));
             $videos = $this->processJsonField($request->input('videos'));
 
-            // Procesar imágenes
-            $imagenesGuardadas = [];
+            // Obtener detalles existentes para manejar imágenes
+            $detallesExistentes = ProductoDetalle::where('producto_id', $id)->first();
+
+            // Procesar imágenes - AGREGAR a las existentes, no reemplazar
+            $imagenesFinales = [];
+
+            // Obtener imágenes existentes
+            if ($detallesExistentes && $detallesExistentes->imagenes) {
+                $imagenesExistentes = is_string($detallesExistentes->imagenes)
+                    ? json_decode($detallesExistentes->imagenes, true)
+                    : $detallesExistentes->imagenes;
+                $imagenesFinales = is_array($imagenesExistentes) ? $imagenesExistentes : [];
+            }
+
+            // Agregar nuevas imágenes a las existentes
             if ($request->hasFile('imagenes')) {
                 foreach ($request->file('imagenes') as $imagen) {
                     $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
                     $rutaImagen = $imagen->storeAs('productos/detalles', $nombreImagen, 'public');
-                    $imagenesGuardadas[] = $nombreImagen;
+                    $imagenesFinales[] = $nombreImagen;
                 }
             }
 
@@ -99,7 +112,7 @@ class ProductoDetallesController extends Controller
                     'caracteristicas_tecnicas' => $caracteristicasTecnicas,
                     'dimensiones' => $dimensiones,
                     'videos' => $videos,
-                    'imagenes' => !empty($imagenesGuardadas) ? json_encode($imagenesGuardadas) : $detalles->imagenes ?? null
+                    'imagenes' => !empty($imagenesFinales) ? json_encode($imagenesFinales) : null
                 ]
             );
 
