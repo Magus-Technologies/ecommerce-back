@@ -42,7 +42,7 @@ class BannersController extends Controller
                     'subtitulo' => $banner->subtitulo,
                     'descripcion' => $banner->descripcion,
                     'texto_boton' => $banner->texto_boton,
-                    'enlace_url' => $banner->enlace_boton, // ✅ MAPEAR CORRECTAMENTE
+                    'enlace_url' => $banner->enlace_url, // ✅ USAR CAMPO CORRECTO
                     'precio_desde' => $banner->precio_desde,
                     'imagen_url' => $banner->imagen_completa,
                     'orden' => $banner->orden
@@ -88,12 +88,9 @@ class BannersController extends Controller
 
         try {
             $data = $request->all();
-            
-            // ✅ MAPEAR EL CAMPO CORRECTAMENTE
-            if (isset($data['enlace_url'])) {
-                $data['enlace_boton'] = $data['enlace_url'];
-                unset($data['enlace_url']);
-            }
+
+            // ✅ EL CAMPO YA VIENE CON EL NOMBRE CORRECTO
+            // No necesitamos mapear enlace_url
             
             // Manejar la subida de imagen
             if ($request->hasFile('imagen')) {
@@ -172,12 +169,9 @@ class BannersController extends Controller
         try {
             $banner = Banner::findOrFail($id);
             $data = $request->all();
-            
-            // ✅ MAPEAR EL CAMPO CORRECTAMENTE
-            if (isset($data['enlace_url'])) {
-                $data['enlace_boton'] = $data['enlace_url'];
-                unset($data['enlace_url']);
-            }
+
+            // ✅ EL CAMPO YA VIENE CON EL NOMBRE CORRECTO
+            // No necesitamos mapear enlace_url
             
             // Manejar la subida de nueva imagen
             if ($request->hasFile('imagen')) {
