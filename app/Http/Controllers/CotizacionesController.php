@@ -406,7 +406,7 @@ class CotizacionesController extends Controller
                 $cotizacion->id,
                 5, // Enviada para Compra
                 'Cliente solicitó convertir cotización a compra',
-                $user->id
+                null // null porque el usuario es un cliente, no un admin de la tabla users
             );
 
             DB::commit();
@@ -524,6 +524,156 @@ class CotizacionesController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error al obtener estadísticas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Eliminar una cotización
+     */
+    public function destroy($id)
+    {
+        try {
+            $cotizacion = Cotizacion::findOrFail($id);
+
+            // Verificar que la cotización pertenece al usuario autenticado
+            $user = request()->user();
+
+            // Para clientes: solo pueden eliminar sus propias cotizaciones
+            if ($user instanceof UserCliente) {
+                if ($cotizacion->user_cliente_id !== $user->id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'No tienes permisos para eliminar esta cotización'
+                    ], 403);
+                }
+            }
+            // Para admins: verificar que tienen rol de admin
+            elseif (!$user->hasRole('admin')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No tienes permisos para eliminar cotizaciones'
+                ], 403);
+            }
+
+            // Verificar que la cotización se puede eliminar (solo pendientes o rechazadas)
+            $estadosEliminables = [1, 4]; // 1=Pendiente, 4=Rechazada
+            if (!in_array($cotizacion->estado_cotizacion_id, $estadosEliminables)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se puede eliminar una cotización que ya fue procesada'
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            // Eliminar detalles de la cotización
+            $cotizacion->detalles()->delete();
+
+            // Eliminar tracking de la cotización
+            $cotizacion->tracking()->delete();
+
+            // Eliminar la cotización
+            $cotizacion->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cotización eliminada exitosamente'
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cotización no encontrada'
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar cotización',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Solicitar procesamiento de cotización (cliente pide cotización)
+     */
+    public function pedirCotizacion($id)
+    {
+        try {
+            $cotizacion = Cotizacion::findOrFail($id);
+
+            // Verificar que la cotización pertenece al usuario autenticado
+            $user = request()->user();
+
+            // Para clientes: solo pueden solicitar procesamiento de sus propias cotizaciones
+            if ($user instanceof UserCliente) {
+                if ($cotizacion->user_cliente_id !== $user->id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'No tienes permisos para solicitar esta cotización'
+                    ], 403);
+                }
+            } else {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Acceso no autorizado'
+                ], 403);
+            }
+
+            // Verificar que la cotización está en estado pendiente
+            if ($cotizacion->estado_cotizacion_id !== 1) { // 1 = Pendiente
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Solo se pueden solicitar cotizaciones en estado pendiente'
+                ], 422);
+            }
+
+            // Verificar que la cotización no esté vencida
+            if ($cotizacion->estaVencida()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No se puede solicitar una cotización vencida'
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            // Cambiar el estado de la cotización a "En Revisión" (ID 2)
+            $cotizacion->update([
+                'estado_cotizacion_id' => 2 // En Revisión
+            ]);
+
+            // Crear registro de tracking indicando que el cliente solicitó el procesamiento
+            CotizacionTracking::crearRegistro(
+                $cotizacion->id,
+                2, // En Revisión
+                'Cliente solicitó el procesamiento de la cotización',
+                null // null porque el usuario es un cliente, no un admin de la tabla users
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cotización enviada para revisión exitosamente. Nos contactaremos contigo pronto.',
+                'cotizacion' => $cotizacion->load(['estadoCotizacion'])
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Cotización no encontrada'
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al solicitar cotización',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

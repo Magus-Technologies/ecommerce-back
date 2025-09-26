@@ -579,7 +579,7 @@ class ComprasController extends Controller
                     $compra->cotizacion->id,
                     3,
                     "Compra {$compra->codigo_compra} cancelada por el cliente",
-                    $user->id
+                    null // null porque el usuario es un cliente, no un admin de la tabla users
                 );
             }
 
