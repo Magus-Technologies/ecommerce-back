@@ -29,6 +29,7 @@ class RecompensasPermisosSeeder extends Seeder
     private function crearPermisos(): void
     {
         $permisos = [
+            // Permisos básicos de gestión
             [
                 'name' => 'recompensas.ver',
                 'guard_name' => 'web',
@@ -40,6 +41,11 @@ class RecompensasPermisosSeeder extends Seeder
                 'description' => 'Crear nuevas recompensas'
             ],
             [
+                'name' => 'recompensas.show',
+                'guard_name' => 'web',
+                'description' => 'Ver detalle de recompensa específica'
+            ],
+            [
                 'name' => 'recompensas.edit',
                 'guard_name' => 'web',
                 'description' => 'Editar y configurar recompensas existentes'
@@ -48,13 +54,66 @@ class RecompensasPermisosSeeder extends Seeder
                 'name' => 'recompensas.delete',
                 'guard_name' => 'web',
                 'description' => 'Eliminar o desactivar recompensas'
+            ],
+            [
+                'name' => 'recompensas.activate',
+                'guard_name' => 'web',
+                'description' => 'Activar, pausar o cambiar estado de recompensas'
+            ],
+            
+            // Permisos de analytics y reportes
+            [
+                'name' => 'recompensas.analytics',
+                'guard_name' => 'web',
+                'description' => 'Acceder a analytics, reportes y estadísticas avanzadas'
+            ],
+            
+            // Permisos de segmentación y clientes
+            [
+                'name' => 'recompensas.segmentos',
+                'guard_name' => 'web',
+                'description' => 'Gestionar segmentos de clientes y asignaciones'
+            ],
+            
+            // Permisos de productos y categorías
+            [
+                'name' => 'recompensas.productos',
+                'guard_name' => 'web',
+                'description' => 'Gestionar productos y categorías aplicables'
+            ],
+            
+            // Permisos de configuración de puntos
+            [
+                'name' => 'recompensas.puntos',
+                'guard_name' => 'web',
+                'description' => 'Configurar sistema de puntos y acumulación'
+            ],
+            
+            // Permisos de configuración de descuentos
+            [
+                'name' => 'recompensas.descuentos',
+                'guard_name' => 'web',
+                'description' => 'Configurar descuentos y promociones'
+            ],
+            
+            // Permisos de configuración de envíos
+            [
+                'name' => 'recompensas.envios',
+                'guard_name' => 'web',
+                'description' => 'Configurar envíos gratuitos y cobertura'
+            ],
+            
+            // Permisos de configuración de regalos
+            [
+                'name' => 'recompensas.regalos',
+                'guard_name' => 'web',
+                'description' => 'Configurar regalos y productos promocionales'
             ]
         ];
         
         foreach ($permisos as $permiso) {
             Permission::firstOrCreate(
-                ['name' => $permiso['name'], 'guard_name' => $permiso['guard_name']],
-                ['description' => $permiso['description']]
+                ['name' => $permiso['name'], 'guard_name' => $permiso['guard_name']]
             );
         }
         
@@ -66,21 +125,32 @@ class RecompensasPermisosSeeder extends Seeder
      */
     private function asignarPermisosPorRol(): void
     {
-        // Configuración de permisos por rol - SOLO SUPERADMIN por ahora
+        // Configuración de permisos por rol
         $configuracionRoles = [
             'superadmin' => [
-                'permisos' => ['recompensas.ver', 'recompensas.create', 'recompensas.edit', 'recompensas.delete'],
+                'permisos' => [
+                    'recompensas.ver', 'recompensas.create', 'recompensas.show', 'recompensas.edit', 
+                    'recompensas.delete', 'recompensas.activate', 'recompensas.analytics', 
+                    'recompensas.segmentos', 'recompensas.productos', 'recompensas.puntos', 
+                    'recompensas.descuentos', 'recompensas.envios', 'recompensas.regalos'
+                ],
                 'descripcion' => 'Acceso completo al módulo de recompensas'
+            ],
+            'admin' => [
+                'permisos' => [
+                    'recompensas.ver', 'recompensas.create', 'recompensas.show', 'recompensas.edit', 
+                    'recompensas.activate', 'recompensas.analytics', 'recompensas.segmentos', 
+                    'recompensas.productos', 'recompensas.puntos', 'recompensas.descuentos', 
+                    'recompensas.envios', 'recompensas.regalos'
+                ],
+                'descripcion' => 'Gestión completa excepto eliminación'
+            ],
+            'vendedor' => [
+                'permisos' => [
+                    'recompensas.ver', 'recompensas.show', 'recompensas.analytics'
+                ],
+                'descripcion' => 'Solo consulta, visualización y reportes'
             ]
-            // Temporalmente deshabilitados otros roles
-            // 'admin' => [
-            //     'permisos' => ['recompensas.ver', 'recompensas.create', 'recompensas.edit'],
-            //     'descripcion' => 'Gestión completa excepto eliminación'
-            // ],
-            // 'vendedor' => [
-            //     'permisos' => ['recompensas.ver'],
-            //     'descripcion' => 'Solo consulta y visualización'
-            // ]
         ];
         
         foreach ($configuracionRoles as $rol => $config) {
@@ -153,8 +223,13 @@ class RecompensasPermisosSeeder extends Seeder
      */
     private function revocarPermisosOtrosRoles(): void
     {
-        $rolesSinPermisos = ['admin', 'vendedor'];
-        $permisosRecompensas = ['recompensas.ver', 'recompensas.create', 'recompensas.edit', 'recompensas.delete'];
+        $rolesSinPermisos = []; // Ya no hay roles sin permisos, todos tienen configuración
+        $permisosRecompensas = [
+            'recompensas.ver', 'recompensas.create', 'recompensas.show', 'recompensas.edit', 
+            'recompensas.delete', 'recompensas.activate', 'recompensas.analytics', 
+            'recompensas.segmentos', 'recompensas.productos', 'recompensas.puntos', 
+            'recompensas.descuentos', 'recompensas.envios', 'recompensas.regalos'
+        ];
         
         foreach ($rolesSinPermisos as $rol) {
             $usuarios = collect();
@@ -185,9 +260,9 @@ class RecompensasPermisosSeeder extends Seeder
                 try {
                     // Revocar todos los permisos de recompensas
                     $usuario->revokePermissionTo($permisosRecompensas);
-                    $this->command->info(" 🔒 Permisos de recompensas revocados para {$rol}: {$usuario->email}");
+                    $this->command->info("Permisos de recompensas revocados para {$rol}: {$usuario->email}");
                 } catch (\Exception $e) {
-                    $this->command->error(" ❌ Error revocando permisos a {$usuario->email}: " . $e->getMessage());
+                    $this->command->error("Error revocando permisos a {$usuario->email}: " . $e->getMessage());
                 }
             }
         }
@@ -218,20 +293,20 @@ class RecompensasPermisosSeeder extends Seeder
                         ->pluck('name')
                         ->toArray();
                         
-                    $this->command->info("   👤 {$usuario->email}");
+                    $this->command->info("{$usuario->email}");
                     $this->command->info("      Permisos: " . (empty($permisos) ? 'Ninguno' : implode(', ', $permisos)));
                 }
             } else {
-                $this->command->info("   ⚠️  No hay usuarios con este rol");
+                $this->command->info("No hay usuarios con este rol");
             }
         }
         
         $this->command->info('\n FUNCIONALIDADES POR ROL:');
         $this->command->info('============================');
-        $this->command->info('SuperAdmin: Dashboard completo + CRUD completo + Configuraciones + Estadísticas');
-        $this->command->info('Admin: SIN ACCESO al módulo de recompensas (temporalmente deshabilitado)');
-        $this->command->info('Vendedor: SIN ACCESO al módulo de recompensas (temporalmente deshabilitado)');
+        $this->command->info('SuperAdmin: Acceso completo - CRUD + Analytics + Todos los submódulos + Eliminación');
+        $this->command->info('Admin: Gestión completa - CRUD + Analytics + Todos los submódulos (sin eliminación)');
+        $this->command->info('Vendedor: Solo consulta - Ver recompensas + Analytics y reportes');
         $this->command->info('');
-        $this->command->info('CONFIGURACIÓN ACTUAL: Solo SUPERADMIN tiene acceso al módulo de recompensas');
+        $this->command->info('CONFIGURACIÓN ACTUAL: Todos los roles tienen acceso configurado al módulo de recompensas');
     }
 }
