@@ -54,7 +54,7 @@ class CotizacionTracking extends Model
             'cotizacion_id' => $cotizacionId,
             'estado_cotizacion_id' => $estadoId,
             'comentario' => $comentario,
-            'usuario_id' => $usuarioId ?: auth()->id(),
+            'usuario_id' => $usuarioId, // Acepta null sin usar auth()->id() como fallback
             'fecha_cambio' => now()
         ]);
     }

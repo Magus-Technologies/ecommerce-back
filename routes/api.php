@@ -623,7 +623,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/mis-cotizaciones', [CotizacionesController::class, 'misCotizaciones']); // Ver mis cotizaciones
         Route::get('/{id}/pdf', [CotizacionesController::class, 'generarPDF']); // Generar PDF de cotización
         Route::post('/{id}/convertir-compra', [CotizacionesController::class, 'convertirACompra']); // Convertir a compra
+        Route::post('/{id}/pedir', [CotizacionesController::class, 'pedirCotizacion']); // Solicitar procesamiento
         Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']); // Ver tracking
+        Route::delete('/{id}', [CotizacionesController::class, 'destroy']); // Eliminar cotización
 
         // Rutas para administradores
         Route::middleware('permission:cotizaciones.ver')->group(function () {
