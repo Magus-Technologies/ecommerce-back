@@ -126,8 +126,15 @@ class MotorizadosController extends Controller
             // Si se solicita crear usuario
             if ($request->input('crear_usuario', false)) {
                 try {
-                    // Generar contraseña automáticamente (8 caracteres alfanuméricos)
-                    $password = Str::upper(Str::random(4)) . rand(1000, 9999);
+                    // Usar contraseña proporcionada o generar automáticamente
+                    $passwordPersonalizada = $request->input('password');
+                    if (!empty($passwordPersonalizada) && strlen(trim($passwordPersonalizada)) >= 6) {
+                        $password = trim($passwordPersonalizada);
+                        Log::info('🔑 Usando contraseña personalizada para motorizado', ['motorizado_id' => $motorizado->id]);
+                    } else {
+                        $password = Str::upper(Str::random(4)) . rand(1000, 9999);
+                        Log::info('🔑 Generando contraseña automática para motorizado', ['motorizado_id' => $motorizado->id]);
+                    }
 
                     $userMotorizado = UserMotorizado::create([
                         'motorizado_id' => $motorizado->id,
@@ -478,18 +485,42 @@ class MotorizadosController extends Controller
                 ], 400);
             }
 
-            $password = $request->input('password') ?: Str::random(8);
+            // Generar nueva contraseña automática (8 caracteres alfanuméricos)
+            $password = Str::upper(Str::random(4)) . rand(1000, 9999);
 
+            // Actualizar contraseña en la base de datos
             $motorizado->userMotorizado->update([
                 'password' => Hash::make($password)
             ]);
 
+            // Enviar email con nueva contraseña
+            $emailEnviado = false;
+            try {
+                Mail::to($motorizado->correo)->send(
+                    new \App\Mail\MotorizadoPasswordResetMail($motorizado->userMotorizado, $motorizado, $password)
+                );
+                $emailEnviado = true;
+                Log::info('📧 Email de reseteo enviado exitosamente', [
+                    'motorizado_id' => $motorizado->id,
+                    'correo' => $motorizado->correo
+                ]);
+            } catch (\Exception $e) {
+                Log::error('📧 Error enviando email de reseteo: ' . $e->getMessage(), [
+                    'motorizado_id' => $motorizado->id,
+                    'correo' => $motorizado->correo
+                ]);
+            }
+
             return response()->json([
-                'message' => 'Contraseña actualizada exitosamente',
-                'nueva_password' => $password
+                'message' => $emailEnviado ?
+                    'Contraseña reseteada exitosamente. Se ha enviado la nueva contraseña por correo electrónico.' :
+                    'Contraseña reseteada exitosamente. Error al enviar email, pero se generó nueva contraseña.',
+                'email_enviado' => $emailEnviado,
+                'nueva_password' => $emailEnviado ? null : $password // Solo mostrar si no se envió email
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Error al resetear contraseña: ' . $e->getMessage());
             return response()->json(['error' => 'Error al resetear contraseña'], 500);
         }
     }
