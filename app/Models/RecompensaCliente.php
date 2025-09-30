@@ -25,7 +25,7 @@ class RecompensaCliente extends Model
     const SEGMENTO_NUEVOS = 'nuevos';
     const SEGMENTO_RECURRENTES = 'recurrentes';
     const SEGMENTO_VIP = 'vip';
-    const SEGMENTO_RANGO_FECHAS = 'rango_fechas';
+    const SEGMENTO_NO_REGISTRADOS = 'no_registrados';
 
     public static function getSegmentos()
     {
@@ -34,7 +34,7 @@ class RecompensaCliente extends Model
             self::SEGMENTO_NUEVOS,
             self::SEGMENTO_RECURRENTES,
             self::SEGMENTO_VIP,
-            self::SEGMENTO_RANGO_FECHAS
+            self::SEGMENTO_NO_REGISTRADOS
         ];
     }
 
@@ -86,7 +86,7 @@ class RecompensaCliente extends Model
             self::SEGMENTO_NUEVOS => 'Clientes nuevos',
             self::SEGMENTO_RECURRENTES => 'Clientes recurrentes',
             self::SEGMENTO_VIP => 'Clientes VIP',
-            self::SEGMENTO_RANGO_FECHAS => 'Rango de fechas específico'
+            self::SEGMENTO_NO_REGISTRADOS => 'Clientes no registrados'
         ];
 
         return $segmentos[$this->segmento] ?? 'Desconocido';
@@ -130,9 +130,8 @@ class RecompensaCliente extends Model
                 $totalCompras = $cliente->pedidos()->sum('total');
                 return $totalCompras >= 1000;
 
-            case self::SEGMENTO_RANGO_FECHAS:
-                // Lógica personalizada para rango de fechas
-                // Se puede implementar según necesidades específicas
+            case self::SEGMENTO_NO_REGISTRADOS:
+                // Para clientes no registrados, siempre aplica
                 return true;
 
             default:

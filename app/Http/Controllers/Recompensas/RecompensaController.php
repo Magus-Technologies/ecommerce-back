@@ -120,7 +120,7 @@ class RecompensaController extends Controller
                 'nombre' => 'required|string|max:255',
                 'descripcion' => 'nullable|string',
                 'tipo' => 'required|in:' . implode(',', Recompensa::getTipos()),
-                'fecha_inicio' => 'required|date|after_or_equal:today',
+                'fecha_inicio' => 'required|date',
                 'fecha_fin' => 'required|date|after:fecha_inicio',
                 'estado' => 'sometimes|in:' . implode(',', Recompensa::getEstados())
             ], [
@@ -128,7 +128,6 @@ class RecompensaController extends Controller
                 'tipo.required' => 'El tipo de recompensa es obligatorio',
                 'tipo.in' => 'El tipo de recompensa no es válido',
                 'fecha_inicio.required' => 'La fecha de inicio es obligatoria',
-                'fecha_inicio.after_or_equal' => 'La fecha de inicio debe ser hoy o posterior',
                 'fecha_fin.required' => 'La fecha de fin es obligatoria',
                 'fecha_fin.after' => 'La fecha de fin debe ser posterior a la fecha de inicio',
                 'estado.in' => 'El estado de recompensa no es válido'
@@ -142,6 +141,45 @@ class RecompensaController extends Controller
                 ], 422);
             }
 
+            // Aplicar lógica automática de estados
+            $fechaInicio = Carbon::parse($request->fecha_inicio);
+            $fechaActual = Carbon::today();
+            $estadoAutomatico = '';
+
+            if ($fechaInicio->isSameDay($fechaActual)) {
+                // Fecha de inicio = HOY
+                $estadoAutomatico = $request->get('estado', Recompensa::ESTADO_ACTIVA);
+                // Validar que el estado sea válido para hoy
+                if (!in_array($estadoAutomatico, [Recompensa::ESTADO_ACTIVA, Recompensa::ESTADO_PAUSADA])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Para fechas de hoy, el estado debe ser "activa" o "pausada"',
+                        'errors' => ['estado' => ['Estado no válido para fecha de hoy']]
+                    ], 422);
+                }
+            } elseif ($fechaInicio->isFuture()) {
+                // Fecha de inicio = FUTURO
+                $estadoAutomatico = Recompensa::ESTADO_PROGRAMADA;
+                if ($request->has('estado') && $request->estado !== Recompensa::ESTADO_PROGRAMADA) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Para fechas futuras, el estado debe ser "programada"',
+                        'errors' => ['estado' => ['Estado no válido para fecha futura']]
+                    ], 422);
+                }
+            } else {
+                // Fecha de inicio = PASADO
+                $estadoAutomatico = $request->get('estado', Recompensa::ESTADO_EXPIRADA);
+                // Validar que el estado sea válido para fechas pasadas
+                if (!in_array($estadoAutomatico, [Recompensa::ESTADO_EXPIRADA, Recompensa::ESTADO_CANCELADA])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Para fechas pasadas, el estado debe ser "expirada" o "cancelada"',
+                        'errors' => ['estado' => ['Estado no válido para fecha pasada']]
+                    ], 422);
+                }
+            }
+
             DB::beginTransaction();
 
             $recompensa = Recompensa::create([
@@ -150,7 +188,7 @@ class RecompensaController extends Controller
                 'tipo' => $request->tipo,
                 'fecha_inicio' => $request->fecha_inicio,
                 'fecha_fin' => $request->fecha_fin,
-                'estado' => $request->get('estado', Recompensa::ESTADO_PROGRAMADA),
+                'estado' => $estadoAutomatico,
                 'creado_por' => Auth::id()
             ]);
 
@@ -162,7 +200,18 @@ class RecompensaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Recompensa creada exitosamente',
-                'data' => $recompensa
+                'data' => [
+                    'recompensa' => $recompensa,
+                    'estado_aplicado' => $estadoAutomatico,
+                    'estado_nombre' => $recompensa->estado_nombre,
+                    'logica_aplicada' => [
+                        'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                        'fecha_actual' => $fechaActual->format('Y-m-d'),
+                        'es_fecha_hoy' => $fechaInicio->isSameDay($fechaActual),
+                        'es_fecha_futura' => $fechaInicio->isFuture(),
+                        'es_fecha_pasada' => $fechaInicio->isPast()
+                    ]
+                ]
             ], 201);
 
         } catch (\Exception $e) {
@@ -780,6 +829,205 @@ class RecompensaController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al obtener los tipos de recompensas',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Listar recompensas para popups (solo activas, programadas y pausadas)
+     */
+    public function indexPopups(Request $request): JsonResponse
+    {
+        try {
+            $query = Recompensa::with([
+                'creador:id,name'
+            ])->withCount([
+                'clientes',
+                'productos', 
+                'puntos',
+                'descuentos',
+                'envios',
+                'regalos'
+            ]);
+
+            // Filtro específico para popups: solo activas, programadas y pausadas
+            $query->whereIn('estado', ['activa', 'programada', 'pausada']);
+
+            // Filtros adicionales
+            if ($request->has('tipo') && !empty($request->tipo) && $request->tipo !== 'todos') {
+                $query->porTipo($request->tipo);
+            }
+
+            if ($request->has('vigente') && $request->vigente) {
+                $query->vigentes();
+            }
+
+            if ($request->has('fecha_inicio') && $request->has('fecha_fin')) {
+                $query->whereBetween('fecha_inicio', [$request->fecha_inicio, $request->fecha_fin]);
+            }
+
+            // Búsqueda por nombre
+            if ($request->has('nombre') && !empty($request->nombre)) {
+                $query->where('nombre', 'like', '%' . $request->nombre . '%');
+            }
+
+            // Ordenamiento
+            $orderBy = $request->get('order_by', 'created_at');
+            $orderDirection = $request->get('order_direction', 'desc');
+            $query->orderBy($orderBy, $orderDirection);
+
+            // Paginación
+            $perPage = $request->get('per_page', 12);
+            $recompensas = $query->paginate($perPage);
+
+            // Agregar información adicional a cada recompensa
+            $recompensas->getCollection()->transform(function ($recompensa) {
+                return [
+                    'id' => $recompensa->id,
+                    'nombre' => $recompensa->nombre,
+                    'descripcion' => $recompensa->descripcion,
+                    'tipo' => $recompensa->tipo,
+                    'tipo_nombre' => $recompensa->tipo_nombre,
+                    'fecha_inicio' => $recompensa->fecha_inicio,
+                    'fecha_fin' => $recompensa->fecha_fin,
+                    'estado' => $recompensa->estado,
+                    'estado_nombre' => $recompensa->estado_nombre,
+                    'es_vigente' => $recompensa->es_vigente,
+                    'total_aplicaciones' => $recompensa->total_aplicaciones,
+                    'creador' => $recompensa->creador,
+                    'created_at' => $recompensa->created_at,
+                    'updated_at' => $recompensa->updated_at,
+                    // Campos requeridos por la documentación
+                    'total_clientes' => $recompensa->clientes_count,
+                    'total_productos' => $recompensa->productos_count,
+                    'valor_total_recompensa' => $this->calcularValorTotalRecompensa($recompensa),
+                    // Contadores de configuraciones (optimizado con withCount)
+                    'tiene_clientes' => $recompensa->clientes_count > 0,
+                    'tiene_productos' => $recompensa->productos_count > 0,
+                    'tiene_configuracion' => (
+                        $recompensa->puntos_count > 0 ||
+                        $recompensa->descuentos_count > 0 ||
+                        $recompensa->envios_count > 0 ||
+                        $recompensa->regalos_count > 0
+                    )
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Recompensas para popups obtenidas exitosamente',
+                'data' => $recompensas->items(),
+                'total' => $recompensas->total(),
+                'current_page' => $recompensas->currentPage(),
+                'last_page' => $recompensas->lastPage(),
+                'per_page' => $recompensas->perPage()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener las recompensas para popups',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener estados disponibles según la fecha de inicio
+     */
+    public function estadosDisponibles(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'fecha_inicio' => 'required|date'
+            ], [
+                'fecha_inicio.required' => 'La fecha de inicio es obligatoria',
+                'fecha_inicio.date' => 'La fecha de inicio debe ser una fecha válida'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Errores de validación',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $fechaInicio = Carbon::parse($request->fecha_inicio);
+            $fechaActual = Carbon::today();
+            
+            $estadosDisponibles = [];
+            $estadoPorDefecto = '';
+            $mensaje = '';
+
+            // Lógica de estados según la fecha
+            if ($fechaInicio->isSameDay($fechaActual)) {
+                // Fecha de inicio = HOY
+                $estadosDisponibles = [
+                    [
+                        'value' => Recompensa::ESTADO_ACTIVA,
+                        'label' => 'Activa',
+                        'description' => 'La recompensa estará activa inmediatamente'
+                    ],
+                    [
+                        'value' => Recompensa::ESTADO_PAUSADA,
+                        'label' => 'Pausada',
+                        'description' => 'La recompensa estará pausada y requerirá activación manual'
+                    ]
+                ];
+                $estadoPorDefecto = Recompensa::ESTADO_ACTIVA;
+                $mensaje = 'Para fechas de hoy, la recompensa puede estar activa o pausada';
+                
+            } elseif ($fechaInicio->isFuture()) {
+                // Fecha de inicio = FUTURO
+                $estadosDisponibles = [
+                    [
+                        'value' => Recompensa::ESTADO_PROGRAMADA,
+                        'label' => 'Programada',
+                        'description' => 'La recompensa se activará automáticamente en la fecha de inicio'
+                    ]
+                ];
+                $estadoPorDefecto = Recompensa::ESTADO_PROGRAMADA;
+                $mensaje = 'Para fechas futuras, la recompensa debe estar programada';
+                
+            } else {
+                // Fecha de inicio = PASADO
+                $estadosDisponibles = [
+                    [
+                        'value' => Recompensa::ESTADO_EXPIRADA,
+                        'label' => 'Expirada',
+                        'description' => 'La recompensa ya expiró por fecha de inicio pasada'
+                    ],
+                    [
+                        'value' => Recompensa::ESTADO_CANCELADA,
+                        'label' => 'Cancelada',
+                        'description' => 'La recompensa se marca como cancelada'
+                    ]
+                ];
+                $estadoPorDefecto = Recompensa::ESTADO_EXPIRADA;
+                $mensaje = 'Para fechas pasadas, la recompensa debe estar expirada o cancelada';
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Estados disponibles obtenidos exitosamente',
+                'data' => [
+                    'estados_disponibles' => $estadosDisponibles,
+                    'estado_por_defecto' => $estadoPorDefecto,
+                    'mensaje' => $mensaje,
+                    'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                    'fecha_actual' => $fechaActual->format('Y-m-d'),
+                    'es_fecha_pasada' => $fechaInicio->isPast(),
+                    'es_fecha_hoy' => $fechaInicio->isSameDay($fechaActual),
+                    'es_fecha_futura' => $fechaInicio->isFuture()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener los estados disponibles',
                 'error' => $e->getMessage()
             ], 500);
         }
