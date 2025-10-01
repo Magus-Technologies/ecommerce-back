@@ -42,6 +42,8 @@ use App\Http\Controllers\Recompensas\RecompensaEstadisticaController;
 
 use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\ComprasController;
+use App\Http\Controllers\FormaEnvioController;
+use App\Http\Controllers\TipoPagoController;
 
 
 
@@ -85,6 +87,10 @@ Route::post('/cupones/validar', [OfertasController::class, 'validarCupon']);
 Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); // NUEVA LÍNEA
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
 Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
+
+// Rutas públicas para formas de envío y tipos de pago
+Route::get('/formas-envio/activas', [FormaEnvioController::class, 'activas']);
+Route::get('/tipos-pago/activos', [TipoPagoController::class, 'activos']);
 
 // Rutas públicas de reclamos
 Route::post('/reclamos/crear', [ReclamosController::class, 'crear']);
@@ -575,6 +581,41 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'destroy']);
     });
 
+    // Rutas de Formas de Envío protegidas con permisos
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/formas-envio', [FormaEnvioController::class, 'index']);
+    });
+
+    Route::middleware('permission:configuracion.create')->group(function () {
+        Route::post('/formas-envio', [FormaEnvioController::class, 'store']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/formas-envio/{id}', [FormaEnvioController::class, 'update']);
+        Route::patch('/formas-envio/{id}/toggle-estado', [FormaEnvioController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:configuracion.delete')->group(function () {
+        Route::delete('/formas-envio/{id}', [FormaEnvioController::class, 'destroy']);
+    });
+
+    // Rutas de Tipos de Pago protegidas con permisos
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/tipos-pago', [TipoPagoController::class, 'index']);
+    });
+
+    Route::middleware('permission:configuracion.create')->group(function () {
+        Route::post('/tipos-pago', [TipoPagoController::class, 'store']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/tipos-pago/{id}', [TipoPagoController::class, 'update']);
+        Route::patch('/tipos-pago/{id}/toggle-estado', [TipoPagoController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:configuracion.delete')->group(function () {
+        Route::delete('/tipos-pago/{id}', [TipoPagoController::class, 'destroy']);
+    });
 
 });
 

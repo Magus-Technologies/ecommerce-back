@@ -7,7 +7,6 @@ use App\Models\ArmaPcConfiguracion;
 use App\Models\CategoriaCompatibilidad;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
 class CategoriasController extends Controller
 {
     /**
@@ -270,11 +269,6 @@ class CategoriasController extends Controller
     public function categoriasPublicas(Request $request)
     {
         try {
-            // Log de inicio
-            Log::info('categoriasPublicas: Iniciando método', [
-                'request_params' => $request->all(),
-                'seccion' => $request->seccion ?? 'no_especificada'
-            ]);
 
             // ✅ CORREGIDO: Obtener la sección antes de crear el query
             $seccion = null;
@@ -288,80 +282,29 @@ class CategoriasController extends Controller
             }])
             ->orderBy('nombre');
             
-            Log::debug('categoriasPublicas: Query base creado');
             
             // ✅ NUEVO: Filtrar por sección si se proporciona
             if ($seccion) {
-                Log::info('categoriasPublicas: Filtrando por sección', [
-                    'id_seccion' => $seccion,
-                    'tipo_dato' => gettype($seccion)
-                ]);
-                
                 $query->where('id_seccion', $seccion);
-            } else {
-                Log::info('categoriasPublicas: Sin filtro de sección', [
-                    'has_seccion' => $request->has('seccion'),
-                    'seccion_value' => $request->seccion,
-                    'seccion_empty' => $request->seccion === '',
-                    'seccion_null' => $request->seccion === null
-                ]);
             }
             
             $categorias = $query->get(['id', 'nombre', 'descripcion', 'imagen']);
             
-            Log::info('categoriasPublicas: Categorías obtenidas', [
-                'total_categorias' => $categorias->count(),
-                'categorias_ids' => $categorias->pluck('id')->toArray()
-            ]);
 
-            // Log detallado de cada categoría antes de transformar
-            $categorias->each(function($categoria) {
-                Log::debug('categoriasPublicas: Categoría encontrada', [
-                    'id' => $categoria->id,
-                    'nombre' => $categoria->nombre,
-                    'tiene_imagen' => !empty($categoria->imagen),
-                    'imagen' => $categoria->imagen,
-                    'productos_count' => $categoria->productos_count ?? 'no_disponible'
-                ]);
-            });
             
             // Agregar ruta completa de imagen
             $categorias->transform(function ($categoria) {
                 if ($categoria->imagen) {
                     $imagen_url = asset('storage/categorias/' . $categoria->imagen);
                     $categoria->imagen_url = $imagen_url;
-                    
-                    Log::debug('categoriasPublicas: URL de imagen generada', [
-                        'categoria_id' => $categoria->id,
-                        'imagen_original' => $categoria->imagen,
-                        'imagen_url' => $imagen_url
-                    ]);
-                } else {
-                    Log::debug('categoriasPublicas: Categoría sin imagen', [
-                        'categoria_id' => $categoria->id,
-                        'categoria_nombre' => $categoria->nombre
-                    ]);
                 }
                 return $categoria;
             });
 
-            Log::info('categoriasPublicas: Respuesta exitosa', [
-                'total_final' => $categorias->count(),
-                'con_imagenes' => $categorias->whereNotNull('imagen_url')->count(),
-                'sin_imagenes' => $categorias->whereNull('imagen_url')->count()
-            ]);
 
             return response()->json($categorias);
             
         } catch (\Exception $e) {
-            Log::error('categoriasPublicas: Error en el método', [
-                'error_message' => $e->getMessage(),
-                'error_file' => $e->getFile(),
-                'error_line' => $e->getLine(),
-                'request_params' => $request->all(),
-                'stack_trace' => $e->getTraceAsString()
-            ]);
-
             return response()->json([
                 'message' => 'Error al obtener categorías públicas',
                 'error' => $e->getMessage()
@@ -380,22 +323,11 @@ class CategoriasController extends Controller
     public function categoriasArmaPc()
     {
         try {
-            Log::info('categoriasArmaPc: Obteniendo categorías configuradas para Arma tu PC');
-            
             $categorias = ArmaPcConfiguracion::getCategoriasConfiguradas();
-            
-            Log::info('categoriasArmaPc: Categorías obtenidas', [
-                'total_categorias' => $categorias->count()
-            ]);
 
             return response()->json($categorias);
             
         } catch (\Exception $e) {
-            Log::error('categoriasArmaPc: Error al obtener categorías', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
 
             return response()->json([
                 'message' => 'Error al obtener categorías de Arma tu PC',
@@ -411,7 +343,6 @@ class CategoriasController extends Controller
     public function configuracionArmaPc()
     {
         try {
-            Log::info('configuracionArmaPc: Obteniendo configuración actual');
 
             // Obtener configuraciones actuales con sus categorías
             $configuraciones = ArmaPcConfiguracion::with(['categoria' => function($query) {
@@ -445,11 +376,6 @@ class CategoriasController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('configuracionArmaPc: Error al obtener configuración', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -484,9 +410,6 @@ class CategoriasController extends Controller
         }
 
         try {
-            Log::info('guardarConfiguracionArmaPc: Iniciando guardado', [
-                'categorias_count' => count($request->categorias)
-            ]);
 
             // Usar transacción para asegurar consistencia
             \DB::transaction(function() use ($request) {
@@ -506,7 +429,6 @@ class CategoriasController extends Controller
                 }
             });
 
-            Log::info('guardarConfiguracionArmaPc: Configuración guardada exitosamente');
 
             return response()->json([
                 'success' => true,
@@ -514,11 +436,6 @@ class CategoriasController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('guardarConfiguracionArmaPc: Error al guardar configuración', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -549,14 +466,12 @@ class CategoriasController extends Controller
         }
 
         try {
-            Log::info('actualizarOrdenArmaPc: Iniciando actualización de orden');
 
             foreach ($request->categorias as $categoriaData) {
                 ArmaPcConfiguracion::where('categoria_id', $categoriaData['id'])
                     ->update(['orden' => $categoriaData['orden']]);
             }
 
-            Log::info('actualizarOrdenArmaPc: Orden actualizado exitosamente');
 
             return response()->json([
                 'success' => true,
@@ -564,11 +479,6 @@ class CategoriasController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('actualizarOrdenArmaPc: Error al actualizar orden', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -607,10 +517,6 @@ class CategoriasController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('getCategoriasCompatibles: Error', [
-                'error' => $e->getMessage(),
-                'categoria_id' => $id
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -644,10 +550,6 @@ class CategoriasController extends Controller
             $categoriaPrincipalId = $request->categoria_principal_id;
             $categoriasCompatibles = $request->categorias_compatibles;
 
-            Log::info('gestionarCompatibilidades: Iniciando gestión', [
-                'categoria_principal' => $categoriaPrincipalId,
-                'compatibles_count' => count($categoriasCompatibles)
-            ]);
 
             \DB::transaction(function() use ($categoriaPrincipalId, $categoriasCompatibles) {
                 // Eliminar compatibilidades existentes de esta categoría
@@ -671,11 +573,6 @@ class CategoriasController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('gestionarCompatibilidades: Error', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -722,9 +619,6 @@ class CategoriasController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            Log::error('obtenerCompatibilidades: Error', [
-                'error' => $e->getMessage()
-            ]);
 
             return response()->json([
                 'success' => false,

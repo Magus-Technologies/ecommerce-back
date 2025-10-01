@@ -37,10 +37,10 @@ class CartController extends Controller
         
         $cartItems = $query->get();
         
-        \Log::info('Items encontrados en el carrito:', [
-            'count' => $cartItems->count(),
-            'items' => $cartItems->toArray()
-        ]);
+        // \Log::info('Items encontrados en el carrito:', [
+        //     'count' => $cartItems->count(),
+        //     'items' => $cartItems->toArray()
+        // ]);
 
         $formattedItems = $cartItems->map(function ($item) {
             return [

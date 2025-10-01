@@ -153,6 +153,12 @@ class PermissionSeeder extends Seeder
             'roles.edit',
             'roles.delete',
 
+            // Configuración (Formas de Envío y Tipos de Pago)
+            'configuracion.ver',
+            'configuracion.create',
+            'configuracion.edit',
+            'configuracion.delete',
+
         ];
 
         foreach ($permissions as $permission) {
