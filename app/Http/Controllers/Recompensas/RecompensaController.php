@@ -848,7 +848,8 @@ class RecompensaController extends Controller
                 'puntos',
                 'descuentos',
                 'envios',
-                'regalos'
+                'regalos',
+                'popup'
             ]);
 
             // Filtro específico para popups: solo activas, programadas y pausadas
@@ -910,7 +911,10 @@ class RecompensaController extends Controller
                         $recompensa->descuentos_count > 0 ||
                         $recompensa->envios_count > 0 ||
                         $recompensa->regalos_count > 0
-                    )
+                    ),
+                    // Información específica de popups
+                    'tiene_popup' => $recompensa->popup_count > 0,
+                    'total_popups' => $recompensa->popup_count
                 ];
             });
 
