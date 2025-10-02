@@ -39,6 +39,8 @@ use App\Http\Controllers\Recompensas\RecompensaEnviosController;
 use App\Http\Controllers\Recompensas\RecompensaRegalosController;
 use App\Http\Controllers\Recompensas\RecompensaClienteController;
 use App\Http\Controllers\Recompensas\RecompensaEstadisticaController;
+use App\Http\Controllers\Recompensas\RecompensaPopupController;
+use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 
 use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\ComprasController;
@@ -437,8 +439,10 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Gestión principal de recompensas
         Route::get('/', [RecompensaController::class, 'index']); // Listar recompensas
+        Route::get('/popups', [RecompensaController::class, 'indexPopups']); // Listar recompensas para popups (solo activas, programadas y pausadas)
         Route::get('/estadisticas', [RecompensaEstadisticaController::class, 'estadisticas']); // Estadísticas del sistema
         Route::get('/tipos', [RecompensaEstadisticaController::class, 'tipos']); // Tipos disponibles
+        Route::get('/estados-disponibles', [RecompensaController::class, 'estadosDisponibles']); // Estados disponibles según fecha
         Route::get('/{id}', [RecompensaController::class, 'show'])->middleware('permission:recompensas.show'); // Ver detalle
 
         // Analytics Avanzados
@@ -540,6 +544,23 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Búsqueda de productos para regalos
         Route::get('/regalos/productos/buscar', [RecompensaRegalosController::class, 'buscarProductos'])->middleware('permission:recompensas.regalos');
+        
+        // Submódulo de Popups
+        Route::prefix('{recompensaId}/popups')->middleware('permission:recompensas.popups')->group(function () {
+            Route::get('/', [RecompensaPopupController::class, 'index']); // Listar popups de la recompensa
+            Route::get('/{popupId}', [RecompensaPopupController::class, 'show']); // Ver detalle de popup
+            Route::post('/', [RecompensaPopupController::class, 'store']); // Crear popup
+            Route::put('/{popupId}', [RecompensaPopupController::class, 'update']); // Actualizar popup
+            Route::delete('/{popupId}', [RecompensaPopupController::class, 'destroy']); // Eliminar popup
+            Route::patch('/{popupId}/toggle', [RecompensaPopupController::class, 'toggleActivo']); // Activar/desactivar popup
+            Route::get('/estadisticas-popups', [RecompensaPopupController::class, 'estadisticas']); // Estadísticas de popups
+        });
+        
+        // Gestión de Notificaciones (Admin)
+        Route::prefix('{recompensaId}/notificaciones')->middleware('permission:recompensas.notificaciones')->group(function () {
+            Route::post('/enviar', [RecompensaNotificacionController::class, 'enviarNotificacion']); // Enviar notificación a clientes
+            Route::get('/estadisticas', [RecompensaNotificacionController::class, 'estadisticasNotificaciones']); // Estadísticas de notificaciones
+        });
     });
     
     // 🔹 GRUPO CLIENTE - Consulta de Recompensas (JWT)
@@ -554,6 +575,19 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Puntos del cliente
         Route::get('/puntos', [RecompensaClienteController::class, 'puntosAcumulados']); // Consultar puntos acumulados
+        
+        // Popups y Notificaciones para el cliente
+        Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos']); // Ver popups activos para el cliente
+        Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto']); // Marcar popup como visto
+        Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup
+        Route::get('/notificaciones/historial', [RecompensaNotificacionController::class, 'historialNotificaciones']); // Historial de notificaciones
+    });
+
+    // 🔹 GRUPO PÚBLICO - Recompensas para Clientes No Registrados
+    Route::prefix('publico/recompensas')->group(function () {
+        
+        // Recompensas públicas (sin autenticación)
+        Route::get('/publicas', [RecompensaClienteController::class, 'recompensasPublicas']); // Ver recompensas para clientes no registrados
     });
 
     // Rutas de motorizados protegidas con permisos

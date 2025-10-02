@@ -108,6 +108,20 @@ class RecompensasPermisosSeeder extends Seeder
                 'name' => 'recompensas.regalos',
                 'guard_name' => 'web',
                 'description' => 'Configurar regalos y productos promocionales'
+            ],
+            
+            // Permisos de configuración de popups
+            [
+                'name' => 'recompensas.popups',
+                'guard_name' => 'web',
+                'description' => 'Gestionar popups y notificaciones de recompensas'
+            ],
+            
+            // Permisos de notificaciones
+            [
+                'name' => 'recompensas.notificaciones',
+                'guard_name' => 'web',
+                'description' => 'Enviar y gestionar notificaciones de recompensas'
             ]
         ];
         
@@ -132,7 +146,8 @@ class RecompensasPermisosSeeder extends Seeder
                     'recompensas.ver', 'recompensas.create', 'recompensas.show', 'recompensas.edit', 
                     'recompensas.delete', 'recompensas.activate', 'recompensas.analytics', 
                     'recompensas.segmentos', 'recompensas.productos', 'recompensas.puntos', 
-                    'recompensas.descuentos', 'recompensas.envios', 'recompensas.regalos'
+                    'recompensas.descuentos', 'recompensas.envios', 'recompensas.regalos',
+                    'recompensas.popups', 'recompensas.notificaciones'
                 ],
                 'descripcion' => 'Acceso completo al módulo de recompensas'
             ],
@@ -141,7 +156,8 @@ class RecompensasPermisosSeeder extends Seeder
                     'recompensas.ver', 'recompensas.create', 'recompensas.show', 'recompensas.edit', 
                     'recompensas.activate', 'recompensas.analytics', 'recompensas.segmentos', 
                     'recompensas.productos', 'recompensas.puntos', 'recompensas.descuentos', 
-                    'recompensas.envios', 'recompensas.regalos'
+                    'recompensas.envios', 'recompensas.regalos', 'recompensas.popups', 
+                    'recompensas.notificaciones'
                 ],
                 'descripcion' => 'Gestión completa excepto eliminación'
             ],
@@ -228,7 +244,8 @@ class RecompensasPermisosSeeder extends Seeder
             'recompensas.ver', 'recompensas.create', 'recompensas.show', 'recompensas.edit', 
             'recompensas.delete', 'recompensas.activate', 'recompensas.analytics', 
             'recompensas.segmentos', 'recompensas.productos', 'recompensas.puntos', 
-            'recompensas.descuentos', 'recompensas.envios', 'recompensas.regalos'
+            'recompensas.descuentos', 'recompensas.envios', 'recompensas.regalos',
+            'recompensas.popups', 'recompensas.notificaciones'
         ];
         
         foreach ($rolesSinPermisos as $rol) {
