@@ -12,9 +12,55 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RecompensaNotificacionController extends Controller
 {
+    /**
+     * Obtener popups activos para visitantes (no autenticados)
+     */
+    public function popupsActivosPublico(Request $request): JsonResponse
+    {
+        try {
+            // Buscar directamente popups activos cuyas recompensas estén vigentes
+            // y estén segmentadas explícitamente para no_registrados
+            $popupsQuery = \App\Models\RecompensaPopup::query()
+                ->activos()
+                ->deRecompensasActivas()
+                ->whereHas('recompensa.clientes', function($q) {
+                    $q->where('segmento', 'no_registrados');
+                });
+
+            $popups = $popupsQuery->with(['recompensa:id,nombre,tipo,fecha_inicio,fecha_fin,estado'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $popupsActivos = $popups->map(function($popup) {
+                $configuracion = $popup->getConfiguracionFrontend();
+                if ($popup->imagen_popup) {
+                    $configuracion['imagen_popup_url'] = asset('storage/popups/' . $popup->imagen_popup);
+                }
+                // En público no generamos notificación; solo devolvemos configuración
+                return $configuracion;
+            })->values()->all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Popups públicos obtenidos exitosamente',
+                'data' => [
+                    'popups_activos' => array_values($popupsActivos),
+                    'total_popups' => count($popupsActivos)
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener los popups públicos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
     /**
      * Obtener popups activos para el cliente autenticado
      */
@@ -22,6 +68,7 @@ class RecompensaNotificacionController extends Controller
     {
         try {
             $cliente = Auth::guard('cliente')->user();
+            /** @var UserCliente $cliente */
             if (!$cliente) {
                 return response()->json([
                     'success' => false,
@@ -33,16 +80,29 @@ class RecompensaNotificacionController extends Controller
             $recompensasAplicables = $this->obtenerRecompensasAplicables($cliente);
             
             $popupsActivos = [];
+            $notificacionesEnviadas = 0;
             
             foreach ($recompensasAplicables as $recompensa) {
                 $popup = $recompensa->popup;
                 if ($popup && $popup->estaActivo()) {
-                    $configuracion = $popup->getConfiguracionFrontend();
-                    // Agregar URL de imagen si existe
-                    if ($popup->imagen_popup) {
-                        $configuracion['imagen_popup_url'] = asset('storage/popups/' . $popup->imagen_popup);
+                    
+                    // ✅ ENVÍO AUTOMÁTICO: Crear notificación automáticamente
+                    $notificacion = $this->enviarPopupAutomaticamente($cliente, $recompensa, $popup);
+                    
+                    if ($notificacion) {
+                        $notificacionesEnviadas++;
+                        
+                        $configuracion = $popup->getConfiguracionFrontend();
+                        // Agregar URL de imagen si existe
+                        if ($popup->imagen_popup) {
+                            $configuracion['imagen_popup_url'] = asset('storage/popups/' . $popup->imagen_popup);
+                        }
+                        // Agregar información de la notificación
+                        $configuracion['notificacion_id'] = $notificacion->id;
+                        $configuracion['fecha_envio'] = $notificacion->fecha_notificacion;
+                        
+                        $popupsActivos[] = $configuracion;
                     }
-                    $popupsActivos[] = $configuracion;
                 }
             }
 
@@ -56,7 +116,9 @@ class RecompensaNotificacionController extends Controller
                         'segmento_actual' => $cliente->getSegmentoCliente()
                     ],
                     'popups_activos' => $popupsActivos,
-                    'total_popups' => count($popupsActivos)
+                    'total_popups' => count($popupsActivos),
+                    'notificaciones_enviadas' => $notificacionesEnviadas,
+                    'envio_automatico' => true
                 ]
             ]);
 
@@ -402,5 +464,119 @@ class RecompensaNotificacionController extends Controller
             }
         }
         return false;
+    }
+
+    /**
+     * Endpoint de prueba para verificar envío automático
+     */
+    public function probarEnvioAutomatico(Request $request): JsonResponse
+    {
+        try {
+            $cliente = Auth::guard('cliente')->user();
+            /** @var UserCliente $cliente */
+            if (!$cliente) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cliente no autenticado'
+                ], 401);
+            }
+
+            // Obtener estadísticas del envío automático
+            $recompensasAplicables = $this->obtenerRecompensasAplicables($cliente);
+            $popupsEnviados = 0;
+            $detallesEnvio = [];
+
+            foreach ($recompensasAplicables as $recompensa) {
+                $popup = $recompensa->popup;
+                if ($popup && $popup->estaActivo()) {
+                    $notificacion = $this->enviarPopupAutomaticamente($cliente, $recompensa, $popup);
+                    if ($notificacion) {
+                        $popupsEnviados++;
+                    $detallesEnvio[] = [
+                            'recompensa_id' => $recompensa->id,
+                            'recompensa_nombre' => $recompensa->nombre,
+                            'popup_id' => $popup->id,
+                            'popup_titulo' => $popup->titulo,
+                            'notificacion_id' => $notificacion->id,
+                            'fecha_envio' => $notificacion->fecha_notificacion,
+                            'segmento_cliente' => $cliente->getSegmentoCliente()
+                        ];
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Prueba de envío automático completada',
+                'data' => [
+                    'cliente' => [
+                        'id' => $cliente->id,
+                        'nombre' => $cliente->nombres . ' ' . $cliente->apellidos,
+                        'segmento_actual' => $cliente->getSegmentoCliente()
+                    ],
+                    'popups_enviados' => $popupsEnviados,
+                    'total_recompensas_aplicables' => $recompensasAplicables->count(),
+                    'detalles_envio' => $detallesEnvio
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error en la prueba de envío automático',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Enviar popup automáticamente a un cliente
+     */
+    private function enviarPopupAutomaticamente($cliente, $recompensa, $popup)
+    {
+        try {
+            // Verificar si ya existe una notificación activa para evitar duplicados
+            $notificacionExistente = RecompensaNotificacionCliente::where('recompensa_id', $recompensa->id)
+                ->where('cliente_id', $cliente->id)
+                ->where('popup_id', $popup->id)
+                ->where('estado', '!=', RecompensaNotificacionCliente::ESTADO_EXPIRADA)
+                ->first();
+
+            if ($notificacionExistente) {
+                // Si ya existe, actualizar la fecha de notificación
+                $notificacionExistente->fecha_notificacion = now();
+                $notificacionExistente->save();
+                return $notificacionExistente;
+            }
+
+            // Crear nueva notificación automática
+            $notificacion = RecompensaNotificacionCliente::create([
+                'recompensa_id' => $recompensa->id,
+                'cliente_id' => $cliente->id,
+                'popup_id' => $popup->id,
+                'fecha_notificacion' => now(),
+                'estado' => RecompensaNotificacionCliente::ESTADO_ENVIADA
+            ]);
+
+            // Log del envío automático
+            Log::info("Popup enviado automáticamente", [
+                'cliente_id' => $cliente->id,
+                'recompensa_id' => $recompensa->id,
+                'popup_id' => $popup->id,
+                'segmento_cliente' => $cliente->getSegmentoCliente(),
+                'fecha_envio' => now()
+            ]);
+
+            return $notificacion;
+
+        } catch (\Exception $e) {
+            Log::error("Error enviando popup automáticamente", [
+                'cliente_id' => $cliente->id,
+                'recompensa_id' => $recompensa->id,
+                'popup_id' => $popup->id,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 }
