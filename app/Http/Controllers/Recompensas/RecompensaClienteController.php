@@ -651,4 +651,232 @@ class RecompensaClienteController extends Controller
 
         return array_values($meses);
     }
+
+    /**
+     * Obtener recompensas para clientes no registrados (públicas)
+     */
+    public function recompensasPublicas(Request $request): JsonResponse
+    {
+        try {
+            // Obtener recompensas activas y vigentes para clientes no registrados
+            $recompensasQuery = Recompensa::with([
+                'clientes' => function($query) {
+                    $query->where('segmento', 'no_registrados');
+                },
+                'productos.producto:id,nombre,codigo_producto,precio_venta',
+                'productos.categoria:id,nombre',
+                'puntos',
+                'descuentos',
+                'envios',
+                'regalos.producto:id,nombre,codigo_producto,precio_venta'
+            ])
+            ->activas()
+            ->vigentes();
+
+            // Filtrar por tipo si se especifica
+            if ($request->has('tipo') && !empty($request->tipo)) {
+                $recompensasQuery->porTipo($request->tipo);
+            }
+
+            $recompensas = $recompensasQuery->get();
+
+            $recompensasPublicas = [];
+
+            foreach ($recompensas as $recompensa) {
+                // Verificar si tiene segmentación para no registrados
+                $tieneSegmentoNoRegistrados = $recompensa->clientes->contains('segmento', 'no_registrados');
+                $tieneSegmentoTodos = $recompensa->clientes->contains('segmento', 'todos');
+
+                if ($tieneSegmentoNoRegistrados || $tieneSegmentoTodos) {
+                    $recompensasPublicas[] = [
+                        'id' => $recompensa->id,
+                        'nombre' => $recompensa->nombre,
+                        'descripcion' => $recompensa->descripcion,
+                        'tipo' => $recompensa->tipo,
+                        'tipo_nombre' => $recompensa->tipo_nombre,
+                        'fecha_inicio' => $recompensa->fecha_inicio,
+                        'fecha_fin' => $recompensa->fecha_fin,
+                        'dias_restantes' => $recompensa->fecha_fin->diffInDays(now()),
+                        'configuracion' => $this->obtenerConfiguracionPublica($recompensa),
+                        'productos_aplicables' => $this->obtenerProductosAplicables($recompensa),
+                        'como_obtener' => $this->generarInstruccionesPublicas($recompensa),
+                        'requiere_registro' => $this->verificarSiRequiereRegistro($recompensa)
+                    ];
+                }
+            }
+
+            // Ordenar por fecha de fin (más próximas a vencer primero)
+            usort($recompensasPublicas, function($a, $b) {
+                return $a['dias_restantes'] <=> $b['dias_restantes'];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Recompensas públicas obtenidas exitosamente',
+                'data' => [
+                    'total_recompensas' => count($recompensasPublicas),
+                    'recompensas' => $recompensasPublicas,
+                    'mensaje_bienvenida' => '¡Descubre nuestras recompensas especiales! Regístrate para obtener más beneficios.'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener las recompensas públicas',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener configuración pública de la recompensa
+     */
+    private function obtenerConfiguracionPublica($recompensa): array
+    {
+        $configuracion = [];
+
+        switch ($recompensa->tipo) {
+            case 'puntos':
+                if ($recompensa->puntos->count() > 0) {
+                    $puntos = $recompensa->puntos->first();
+                    $configuracion = [
+                        'tipo' => 'puntos',
+                        'puntos_por_compra' => $puntos->puntos_por_compra,
+                        'puntos_por_monto' => $puntos->puntos_por_monto,
+                        'puntos_registro' => $puntos->puntos_registro,
+                        'descripcion' => "Gana {$puntos->puntos_por_compra} puntos por cada compra"
+                    ];
+                }
+                break;
+
+            case 'descuento':
+                if ($recompensa->descuentos->count() > 0) {
+                    $descuento = $recompensa->descuentos->first();
+                    $configuracion = [
+                        'tipo' => 'descuento',
+                        'tipo_descuento' => $descuento->tipo_descuento,
+                        'valor_descuento' => $descuento->valor_descuento,
+                        'compra_minima' => $descuento->compra_minima,
+                        'descripcion' => $descuento->tipo_descuento === 'porcentaje' 
+                            ? "Descuento del {$descuento->valor_descuento}%"
+                            : "Descuento de S/ {$descuento->valor_descuento}"
+                    ];
+                }
+                break;
+
+            case 'envio_gratis':
+                if ($recompensa->envios->count() > 0) {
+                    $envio = $recompensa->envios->first();
+                    $configuracion = [
+                        'tipo' => 'envio_gratis',
+                        'minimo_compra' => $envio->minimo_compra,
+                        'descripcion' => "Envío gratis en compras desde S/ {$envio->minimo_compra}"
+                    ];
+                }
+                break;
+
+            case 'regalo':
+                if ($recompensa->regalos->count() > 0) {
+                    $regalos = $recompensa->regalos->map(function($regalo) {
+                        return [
+                            'producto' => $regalo->producto->nombre,
+                            'cantidad' => $regalo->cantidad
+                        ];
+                    });
+                    $configuracion = [
+                        'tipo' => 'regalo',
+                        'regalos' => $regalos,
+                        'descripcion' => "Recibe productos de regalo con tu compra"
+                    ];
+                }
+                break;
+        }
+
+        return $configuracion;
+    }
+
+    /**
+     * Generar instrucciones públicas para obtener la recompensa
+     */
+    private function generarInstruccionesPublicas($recompensa): array
+    {
+        $instrucciones = [];
+
+        switch ($recompensa->tipo) {
+            case 'puntos':
+                $instrucciones = [
+                    'titulo' => '¿Cómo ganar puntos?',
+                    'pasos' => [
+                        'Regístrate en nuestra plataforma',
+                        'Realiza tu primera compra',
+                        'Los puntos se acreditarán automáticamente',
+                        'Canjea tus puntos por descuentos'
+                    ],
+                    'beneficio_adicional' => '¡Regístrate ahora y obtén puntos de bienvenida!'
+                ];
+                break;
+
+            case 'descuento':
+                $instrucciones = [
+                    'titulo' => '¿Cómo obtener el descuento?',
+                    'pasos' => [
+                        'Regístrate en nuestra plataforma',
+                        'Agrega productos al carrito',
+                        'El descuento se aplicará automáticamente',
+                        'Disfruta de tu compra con descuento'
+                    ],
+                    'beneficio_adicional' => '¡Descuento especial para nuevos usuarios!'
+                ];
+                break;
+
+            case 'envio_gratis':
+                $instrucciones = [
+                    'titulo' => '¿Cómo obtener envío gratis?',
+                    'pasos' => [
+                        'Regístrate en nuestra plataforma',
+                        'Agrega productos por el monto mínimo',
+                        'El envío gratis se aplicará automáticamente',
+                        'Recibe tu pedido sin costo de envío'
+                    ],
+                    'beneficio_adicional' => '¡Envío gratis para nuevos usuarios!'
+                ];
+                break;
+
+            case 'regalo':
+                $instrucciones = [
+                    'titulo' => '¿Cómo obtener productos de regalo?',
+                    'pasos' => [
+                        'Regístrate en nuestra plataforma',
+                        'Realiza una compra',
+                        'Los productos de regalo se incluirán automáticamente',
+                        'Recibe tu pedido con regalos incluidos'
+                    ],
+                    'beneficio_adicional' => '¡Regalos especiales para nuevos usuarios!'
+                ];
+                break;
+
+            default:
+                $instrucciones = [
+                    'titulo' => '¿Cómo obtener esta recompensa?',
+                    'pasos' => [
+                        'Regístrate en nuestra plataforma',
+                        'Cumple con los requisitos especificados',
+                        'La recompensa se aplicará automáticamente'
+                    ],
+                    'beneficio_adicional' => '¡Únete a nosotros y disfruta de beneficios exclusivos!'
+                ];
+        }
+
+        return $instrucciones;
+    }
+
+    /**
+     * Verificar si la recompensa requiere registro
+     */
+    private function verificarSiRequiereRegistro($recompensa): bool
+    {
+        // Todas las recompensas públicas requieren registro para ser utilizadas
+        return true;
+    }
 }

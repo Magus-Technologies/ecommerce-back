@@ -32,11 +32,9 @@ class OfertasController extends Controller
                     'fecha_inicio' => $oferta->fecha_inicio ? Carbon::parse($oferta->fecha_inicio)->toISOString() : null,
                     'fecha_fin' => $oferta->fecha_fin ? Carbon::parse($oferta->fecha_fin)->toISOString() : null,
                     'imagen_url' => $oferta->imagen_url,
-                    'banner_imagen_url' => $oferta->banner_imagen_url,
                     'color_fondo' => $oferta->color_fondo,
                     'texto_boton' => $oferta->texto_boton,
                     'enlace_url' => $oferta->enlace_url,
-                    'mostrar_countdown' => $oferta->mostrar_countdown,
                     'es_oferta_principal' => $oferta->es_oferta_principal,
                     'es_oferta_semana' => $oferta->es_oferta_semana,
                     'timestamp_servidor' => Carbon::now()->toISOString(),
@@ -102,11 +100,9 @@ class OfertasController extends Controller
                 'fecha_inicio' => $ofertaPrincipal->fecha_inicio ? Carbon::parse($ofertaPrincipal->fecha_inicio)->toISOString() : null,
                 'fecha_fin' => $ofertaPrincipal->fecha_fin ? Carbon::parse($ofertaPrincipal->fecha_fin)->toISOString() : null,
                 'imagen_url' => $ofertaPrincipal->imagen_url,
-                'banner_imagen_url' => $ofertaPrincipal->banner_imagen_url,
                 'color_fondo' => $ofertaPrincipal->color_fondo,
                 'texto_boton' => $ofertaPrincipal->texto_boton,
                 'enlace_url' => $ofertaPrincipal->enlace_url,
-                'mostrar_countdown' => $ofertaPrincipal->mostrar_countdown,
                 'timestamp_servidor' => Carbon::now()->toISOString(),
             ],
             'productos' => $productos
@@ -156,40 +152,13 @@ class OfertasController extends Controller
                 'fecha_inicio' => $ofertaSemana->fecha_inicio ? Carbon::parse($ofertaSemana->fecha_inicio)->toISOString() : null,
                 'fecha_fin' => $ofertaSemana->fecha_fin ? Carbon::parse($ofertaSemana->fecha_fin)->toISOString() : null,
                 'imagen_url' => $ofertaSemana->imagen_url,
-                'banner_imagen_url' => $ofertaSemana->banner_imagen_url,
                 'color_fondo' => $ofertaSemana->color_fondo,
                 'texto_boton' => $ofertaSemana->texto_boton,
                 'enlace_url' => $ofertaSemana->enlace_url,
-                'mostrar_countdown' => $ofertaSemana->mostrar_countdown,
                 'timestamp_servidor' => Carbon::now()->toISOString(),
             ],
             'productos' => $productos
         ]);
-    }
-
-    public function flashSales()
-    {
-        $flashSales = Oferta::with(['productos.producto'])
-            ->activas()
-            ->flashSales()
-            ->orderBy('prioridad', 'desc')
-            ->get()
-            ->map(function ($oferta) {
-                return [
-                    'id' => $oferta->id,
-                    'titulo' => $oferta->titulo,
-                    'descripcion' => $oferta->descripcion,
-                    'fecha_fin' => $oferta->fecha_fin ? Carbon::parse($oferta->fecha_fin)->toISOString() : null,
-                    'banner_imagen_url' => $oferta->banner_imagen_url,
-                    'color_fondo' => $oferta->color_fondo,
-                    'texto_boton' => $oferta->texto_boton,
-                    'enlace_url' => $oferta->enlace_url,
-                    'mostrar_countdown' => $oferta->mostrar_countdown,
-                    'timestamp_servidor' => Carbon::now()->toISOString(),
-                ];
-            });
-
-        return response()->json($flashSales);
     }
 
     public function productosEnOferta()
@@ -216,7 +185,6 @@ class OfertasController extends Controller
                     'vendidos_oferta' => $productoOferta->vendidos_oferta,
                     'imagen_url' => $producto->imagen_url,
                     'fecha_fin_oferta' => $oferta->fecha_fin ? Carbon::parse($oferta->fecha_fin)->toISOString() : null,
-                    'es_flash_sale' => $oferta->mostrar_countdown,
                     'categoria' => $producto->categoria->nombre ?? null,
                     'marca' => $producto->marca->nombre ?? null,
                     'timestamp_servidor' => Carbon::now()->toISOString(),
@@ -297,20 +265,15 @@ class OfertasController extends Controller
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'es_oferta_principal' => 'boolean',
             'es_oferta_semana' => 'boolean'
         ]);
 
         $data = $request->all();
 
-        // Manejar subida de imágenes
+        // Manejar subida de imagen
         if ($request->hasFile('imagen')) {
             $data['imagen'] = $request->file('imagen')->store('ofertas', 'public');
-        }
-
-        if ($request->hasFile('banner_imagen')) {
-            $data['banner_imagen'] = $request->file('banner_imagen')->store('ofertas/banners', 'public');
         }
 
         $oferta = Oferta::create($data);
@@ -348,7 +311,6 @@ class OfertasController extends Controller
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'banner_imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'es_oferta_principal' => 'boolean',
             'es_oferta_semana' => 'boolean'
         ]);
@@ -359,21 +321,13 @@ class OfertasController extends Controller
         unset($data['es_oferta_principal']);
         unset($data['es_oferta_semana']);
 
-        // Manejar subida de imágenes
+        // Manejar subida de imagen
         if ($request->hasFile('imagen')) {
             // Eliminar imagen anterior
             if ($oferta->imagen) {
                 Storage::disk('public')->delete($oferta->imagen);
             }
             $data['imagen'] = $request->file('imagen')->store('ofertas', 'public');
-        }
-
-        if ($request->hasFile('banner_imagen')) {
-            // Eliminar imagen anterior
-            if ($oferta->banner_imagen) {
-                Storage::disk('public')->delete($oferta->banner_imagen);
-            }
-            $data['banner_imagen'] = $request->file('banner_imagen')->store('ofertas/banners', 'public');
         }
 
         // ✅ PRIMERO: Manejar estados booleanos especiales ANTES de la actualización masiva
@@ -457,12 +411,9 @@ class OfertasController extends Controller
     {
         $oferta = Oferta::findOrFail($id);
 
-        // Eliminar imágenes
+        // Eliminar imagen
         if ($oferta->imagen) {
             Storage::disk('public')->delete($oferta->imagen);
-        }
-        if ($oferta->banner_imagen) {
-            Storage::disk('public')->delete($oferta->banner_imagen);
         }
 
         $oferta->delete();

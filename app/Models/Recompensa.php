@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Recompensa extends Model
 {
@@ -129,6 +130,22 @@ class Recompensa extends Model
     public function historial(): HasMany
     {
         return $this->hasMany(RecompensaHistorial::class);
+    }
+
+    /**
+     * Popup asociado a esta recompensa
+     */
+    public function popup(): HasOne
+    {
+        return $this->hasOne(RecompensaPopup::class);
+    }
+
+    /**
+     * Notificaciones enviadas de esta recompensa
+     */
+    public function notificaciones(): HasMany
+    {
+        return $this->hasMany(RecompensaNotificacionCliente::class);
     }
 
     // Scopes

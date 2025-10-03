@@ -13,43 +13,31 @@ class Oferta extends Model
         'titulo',
         'subtitulo',
         'descripcion',
-        'tipo_oferta_id',
         'tipo_descuento',
         'valor_descuento',
-        'precio_minimo',
         'fecha_inicio',
         'fecha_fin',
         'imagen',
-        'banner_imagen',
         'color_fondo',
         'texto_boton',
         'enlace_url',
-        'limite_uso',
-        'usos_actuales',
-        'activo',
-        'mostrar_countdown',
-        'mostrar_en_slider',
-        'mostrar_en_banner',
         'prioridad',
+        'activo',
         'es_oferta_principal',
-        'es_oferta_semana' 
+        'es_oferta_semana'
     ];
 
     protected $casts = [
         'fecha_inicio' => 'datetime',
         'fecha_fin' => 'datetime',
         'activo' => 'boolean',
-        'mostrar_countdown' => 'boolean',
-        'mostrar_en_slider' => 'boolean',
-        'mostrar_en_banner' => 'boolean',
         'es_oferta_principal' => 'boolean',
         'es_oferta_semana' => 'boolean',
-        'valor_descuento' => 'decimal:2',
-        'precio_minimo' => 'decimal:2'
+        'valor_descuento' => 'decimal:2'
     ];
 
     // ✅ ACCESSORS CORREGIDOS PARA QUE APAREZCAN EN EL JSON
-    protected $appends = ['imagen_url', 'banner_imagen_url'];
+    protected $appends = ['imagen_url'];
 
     // Relaciones
     public function tipoOferta()
@@ -77,20 +65,6 @@ class Oferta extends Model
         return asset('storage/' . $this->imagen);
     }
 
-    public function getBannerImagenUrlAttribute()
-    {
-        if (!$this->banner_imagen) {
-            return null;
-        }
-
-        // Si ya contiene la URL completa, devolverla tal como está
-        if (str_starts_with($this->banner_imagen, 'http')) {
-            return $this->banner_imagen;
-        }
-
-        return asset('storage/' . $this->banner_imagen);
-    }
-
     // Scopes
     public function scopeActivas($query)
     {
@@ -99,22 +73,7 @@ class Oferta extends Model
             ->where('fecha_fin', '>=', now());
     }
 
-    public function scopeFlashSales($query)
-    {
-        return $query->where('mostrar_countdown', true);
-    }
-
-    public function scopeParaSlider($query)
-    {
-        return $query->where('mostrar_en_slider', true);
-    }
-
-    public function scopeParaBanner($query)
-    {
-        return $query->where('mostrar_en_banner', true);
-    }
-
-    // ✅ NUEVO SCOPE: Oferta principal del día
+    // ✅ SCOPE: Oferta principal del día
     public function scopeOfertaPrincipal($query)
     {
         return $query->where('es_oferta_principal', true);

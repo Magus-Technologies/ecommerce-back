@@ -4,22 +4,27 @@ use ecommerce_bak_magus;
 CREATE TABLE recompensas (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(255) NOT NULL,
-  descripcion TEXT DEFAULT NULL,
-  tipo ENUM('puntos','descuento','envio_gratis','regalo') NOT NULL
+  descripcion TEXT,
+  tipo ENUM('puntos','descuento','envio_gratis','regalo') NOT NULL,
   fecha_inicio DATETIME NOT NULL,
   fecha_fin DATETIME NOT NULL,
-  estado ENUM('programada', 'activa', 'pausada', 'expirada', 'cancelada') NOT NULL DEFAULT 'programada',
+  estado ENUM('programada','activa','pausada','expirada','cancelada') NOT NULL DEFAULT 'programada',
   creado_por BIGINT UNSIGNED DEFAULT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_activo_vigencia (fecha_inicio, fecha_fin),
+  INDEX idx_tipo_activo (tipo)
+);
+
 
 -- 2. Reglas de segmentación (a qué clientes va dirigido)
 CREATE TABLE recompensas_clientes (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   recompensa_id BIGINT UNSIGNED NOT NULL,
-  segmento ENUM('todos','nuevos','recurrentes','vip','rango_fechas') NOT NULL,
-  cliente_id BIGINT UNSIGNED DEFAULT NULL, -- si se quiere 1 cliente específico
+  segmento ENUM('todos','nuevos','recurrentes','vip','no_registrados') NOT NULL,
+  cliente_id BIGINT UNSIGNED DEFAULT NULL,
+  INDEX idx_recompensa_segmento (recompensa_id, segmento),
+  INDEX idx_cliente_especifico (cliente_id),
   FOREIGN KEY (recompensa_id) REFERENCES recompensas(id) ON DELETE CASCADE,
   FOREIGN KEY (cliente_id) REFERENCES user_clientes(id) ON DELETE CASCADE
 );
@@ -86,4 +91,40 @@ CREATE TABLE recompensas_historial (
   FOREIGN KEY (recompensa_id) REFERENCES recompensas(id) ON DELETE CASCADE,
   FOREIGN KEY (cliente_id) REFERENCES user_clientes(id) ON DELETE CASCADE,
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE SET NULL
+);
+CREATE TABLE recompensas_popups (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  recompensa_id BIGINT UNSIGNED NOT NULL,
+  titulo VARCHAR(255) NOT NULL,
+  descripcion TEXT,
+  imagen_popup VARCHAR(255) DEFAULT NULL,
+  texto_boton VARCHAR(100) DEFAULT 'Ver más',
+  url_destino VARCHAR(500) DEFAULT NULL,
+  mostrar_cerrar TINYINT(1) DEFAULT 1,
+  auto_cerrar_segundos INT DEFAULT NULL,
+  popup_activo TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_recompensa_id (recompensa_id),
+  INDEX idx_popup_activo (popup_activo),
+  FOREIGN KEY (recompensa_id) REFERENCES recompensas(id) ON DELETE CASCADE
+);
+
+CREATE TABLE recompensas_notificaciones_clientes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  recompensa_id BIGINT UNSIGNED NOT NULL,
+  cliente_id BIGINT UNSIGNED NOT NULL,
+  popup_id BIGINT UNSIGNED NOT NULL,
+  fecha_notificacion TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_visualizacion TIMESTAMP NULL DEFAULT NULL,
+  fecha_cierre TIMESTAMP NULL DEFAULT NULL,
+  estado ENUM('enviada','vista','cerrada','expirada') DEFAULT 'enviada',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_recompensa_id (recompensa_id),
+  INDEX idx_cliente_id (cliente_id),
+  INDEX idx_popup_id (popup_id),
+  FOREIGN KEY (recompensa_id) REFERENCES recompensas(id) ON DELETE CASCADE,
+  FOREIGN KEY (cliente_id) REFERENCES user_clientes(id) ON DELETE CASCADE,
+  FOREIGN KEY (popup_id) REFERENCES recompensas_popups(id) ON DELETE CASCADE
 );

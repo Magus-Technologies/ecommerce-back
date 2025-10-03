@@ -217,7 +217,7 @@ class RecompensaSegmentoController extends Controller
                     'nuevos' => 'Clientes nuevos (últimos 30 días)',
                     'recurrentes' => 'Clientes recurrentes (más de 1 compra)',
                     'vip' => 'Clientes VIP (compras > S/ 1000)',
-                    'rango_fechas' => 'Rango de fechas específico'
+                    'no_registrados' => 'Clientes no registrados (captación)'
                 ];
 
                 return [

@@ -4,6 +4,8 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\BannersPromocionalesController;
+use App\Http\Controllers\BannerFlashSalesController;
+use App\Http\Controllers\BannerOfertaController;
 use App\Http\Controllers\CuponesController;
 use App\Http\Controllers\EmpresaInfoController;
 use App\Http\Controllers\MarcaProductoController;
@@ -39,6 +41,8 @@ use App\Http\Controllers\Recompensas\RecompensaEnviosController;
 use App\Http\Controllers\Recompensas\RecompensaRegalosController;
 use App\Http\Controllers\Recompensas\RecompensaClienteController;
 use App\Http\Controllers\Recompensas\RecompensaEstadisticaController;
+use App\Http\Controllers\Recompensas\RecompensaPopupController;
+use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 
 use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\ComprasController;
@@ -71,6 +75,8 @@ Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos'])
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
+Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
+Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
 Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
 Route::get('/marcas/por-categoria', [MarcaProductoController::class, 'marcasPorCategoria']);
 
@@ -312,6 +318,47 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/banners-promocionales/{id}', [BannersPromocionalesController::class, 'destroy']);
     });
 
+    // Protección de rutas del módulo banners flash sales con sus respectivos permisos
+    Route::middleware('permission:banners_flash_sales.ver')->group(function () {
+        Route::get('/banners-flash-sales', [BannerFlashSalesController::class, 'index']);
+        Route::get('/banners-flash-sales/{id}', [BannerFlashSalesController::class, 'show']);
+    });
+
+    Route::middleware('permission:banners_flash_sales.create')->group(function () {
+        Route::post('/banners-flash-sales', [BannerFlashSalesController::class, 'store']);
+    });
+
+    Route::middleware('permission:banners_flash_sales.edit')->group(function () {
+        Route::post('/banners-flash-sales/{id}', [BannerFlashSalesController::class, 'update']);
+        Route::patch('/banners-flash-sales/{id}/toggle-activo', [BannerFlashSalesController::class, 'toggleActivo']);
+    });
+
+    Route::middleware('permission:banners_flash_sales.delete')->group(function () {
+        Route::delete('/banners-flash-sales/{id}', [BannerFlashSalesController::class, 'destroy']);
+    });
+
+    // Protección de rutas del módulo banners ofertas con sus respectivos permisos
+    Route::middleware('permission:banners_ofertas.ver')->group(function () {
+        Route::get('/banners-ofertas', [BannerOfertaController::class, 'index']);
+        Route::get('/banners-ofertas/{id}', [BannerOfertaController::class, 'show']);
+        Route::get('/banners-ofertas/{bannerId}/productos', [BannerOfertaController::class, 'show']);
+    });
+
+    Route::middleware('permission:banners_ofertas.create')->group(function () {
+        Route::post('/banners-ofertas', [BannerOfertaController::class, 'store']);
+        Route::post('/banners-ofertas/{id}/productos', [BannerOfertaController::class, 'agregarProductos']);
+    });
+
+    Route::middleware('permission:banners_ofertas.edit')->group(function () {
+        Route::post('/banners-ofertas/{id}', [BannerOfertaController::class, 'update']);
+        Route::patch('/banners-ofertas/{bannerId}/productos/{productoId}', [BannerOfertaController::class, 'actualizarDescuentoProducto']);
+    });
+
+    Route::middleware('permission:banners_ofertas.delete')->group(function () {
+        Route::delete('/banners-ofertas/{id}', [BannerOfertaController::class, 'destroy']);
+        Route::delete('/banners-ofertas/{bannerId}/productos/{productoId}', [BannerOfertaController::class, 'quitarProducto']);
+    });
+
     // Rutas de clientes protegidas con permisos
     Route::middleware('permission:clientes.ver')->group(function () {
         Route::get('/clientes', [ClientesController::class, 'index']);
@@ -437,8 +484,10 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Gestión principal de recompensas
         Route::get('/', [RecompensaController::class, 'index']); // Listar recompensas
+        Route::get('/popups', [RecompensaController::class, 'indexPopups']); // Listar recompensas para popups (solo activas, programadas y pausadas)
         Route::get('/estadisticas', [RecompensaEstadisticaController::class, 'estadisticas']); // Estadísticas del sistema
         Route::get('/tipos', [RecompensaEstadisticaController::class, 'tipos']); // Tipos disponibles
+        Route::get('/estados-disponibles', [RecompensaController::class, 'estadosDisponibles']); // Estados disponibles según fecha
         Route::get('/{id}', [RecompensaController::class, 'show'])->middleware('permission:recompensas.show'); // Ver detalle
 
         // Analytics Avanzados
@@ -540,6 +589,23 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Búsqueda de productos para regalos
         Route::get('/regalos/productos/buscar', [RecompensaRegalosController::class, 'buscarProductos'])->middleware('permission:recompensas.regalos');
+        
+        // Submódulo de Popups
+        Route::prefix('{recompensaId}/popups')->middleware('permission:recompensas.popups')->group(function () {
+            Route::get('/', [RecompensaPopupController::class, 'index']); // Listar popups de la recompensa
+            Route::get('/{popupId}', [RecompensaPopupController::class, 'show']); // Ver detalle de popup
+            Route::post('/', [RecompensaPopupController::class, 'store']); // Crear popup
+            Route::put('/{popupId}', [RecompensaPopupController::class, 'update']); // Actualizar popup
+            Route::delete('/{popupId}', [RecompensaPopupController::class, 'destroy']); // Eliminar popup
+            Route::patch('/{popupId}/toggle', [RecompensaPopupController::class, 'toggleActivo']); // Activar/desactivar popup
+            Route::get('/estadisticas-popups', [RecompensaPopupController::class, 'estadisticas']); // Estadísticas de popups
+        });
+        
+        // Gestión de Notificaciones (Admin)
+        Route::prefix('{recompensaId}/notificaciones')->middleware('permission:recompensas.notificaciones')->group(function () {
+            Route::post('/enviar', [RecompensaNotificacionController::class, 'enviarNotificacion']); // Enviar notificación a clientes
+            Route::get('/estadisticas', [RecompensaNotificacionController::class, 'estadisticasNotificaciones']); // Estadísticas de notificaciones
+        });
     });
     
     // 🔹 GRUPO CLIENTE - Consulta de Recompensas (JWT)
@@ -554,6 +620,19 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Puntos del cliente
         Route::get('/puntos', [RecompensaClienteController::class, 'puntosAcumulados']); // Consultar puntos acumulados
+        
+        // Popups y Notificaciones para el cliente
+        Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos']); // Ver popups activos para el cliente
+        Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto']); // Marcar popup como visto
+        Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup
+        Route::get('/notificaciones/historial', [RecompensaNotificacionController::class, 'historialNotificaciones']); // Historial de notificaciones
+    });
+
+    // 🔹 GRUPO PÚBLICO - Recompensas para Clientes No Registrados
+    Route::prefix('publico/recompensas')->group(function () {
+        
+        // Recompensas públicas (sin autenticación)
+        Route::get('/publicas', [RecompensaClienteController::class, 'recompensasPublicas']); // Ver recompensas para clientes no registrados
     });
 
     // Rutas de motorizados protegidas con permisos

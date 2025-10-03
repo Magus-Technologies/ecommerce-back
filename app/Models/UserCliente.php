@@ -100,6 +100,7 @@ class UserCliente extends Authenticatable
         return $this->nombres . ' ' . $this->apellidos;
     }
 
+
     public function getFotoUrlAttribute()
     {
         if ($this->foto) {
@@ -165,7 +166,7 @@ class UserCliente extends Authenticatable
         return $totalCompras >= 1000; // Configurable
     }
 
-    public function getSegmentoCliente()
+    public function getSegmentoCliente(): string
     {
         if ($this->esClienteVip()) {
             return 'vip';

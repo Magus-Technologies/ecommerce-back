@@ -99,11 +99,16 @@ Authorization: Bearer {token}
   "nombre": "string (required, max:255)",
   "descripcion": "string (optional)",
   "tipo": "puntos|descuento|envio_gratis|regalo (required)",
-  "fecha_inicio": "YYYY-MM-DD (required, >= today)",
+  "fecha_inicio": "YYYY-MM-DD (required)",
   "fecha_fin": "YYYY-MM-DD (required, > fecha_inicio)",
-  "activo": "boolean (optional, default: true)"
+  "estado": "programada|activa|pausada|expirada|cancelada (optional, se aplica lógica automática)"
 }
 ```
+
+**Lógica de Estados Automática:**
+- **Fecha de Hoy:** Estados disponibles: `activa`, `pausada` (por defecto: `activa`)
+- **Fecha Futura:** Estado disponible: `programada` (por defecto: `programada`)
+- **Fecha Pasada:** Estados disponibles: `expirada`, `cancelada` (por defecto: `expirada`)
 
 **Ejemplo de Request:**
 ```bash
@@ -127,19 +132,30 @@ Content-Type: application/json
   "success": true,
   "message": "Recompensa creada exitosamente",
   "data": {
-    "id": 15,
-    "nombre": "Black Friday 2024",
-    "descripcion": "Descuentos especiales para Black Friday",
-    "tipo": "descuento",
-    "fecha_inicio": "2024-11-24T00:00:00.000000Z",
-    "fecha_fin": "2024-11-30T23:59:59.000000Z",
-    "activo": true,
-    "creado_por": 1,
-    "created_at": "2024-01-15T16:45:00.000000Z",
-    "updated_at": "2024-01-15T16:45:00.000000Z",
-    "creador": {
-      "id": 1,
-      "name": "Admin Sistema"
+    "recompensa": {
+      "id": 15,
+      "nombre": "Black Friday 2024",
+      "descripcion": "Descuentos especiales para Black Friday",
+      "tipo": "descuento",
+      "fecha_inicio": "2024-11-24T00:00:00.000000Z",
+      "fecha_fin": "2024-11-30T23:59:59.000000Z",
+      "estado": "programada",
+      "creado_por": 1,
+      "created_at": "2024-01-15T16:45:00.000000Z",
+      "updated_at": "2024-01-15T16:45:00.000000Z",
+      "creador": {
+        "id": 1,
+        "name": "Admin Sistema"
+      }
+    },
+    "estado_aplicado": "programada",
+    "estado_nombre": "Programada",
+    "logica_aplicada": {
+      "fecha_inicio": "2024-11-24",
+      "fecha_actual": "2024-01-15",
+      "es_fecha_hoy": false,
+      "es_fecha_futura": true,
+      "es_fecha_pasada": false
     }
   }
 }
@@ -153,6 +169,28 @@ Content-Type: application/json
   "errors": {
     "nombre": ["El nombre es obligatorio"],
     "fecha_fin": ["La fecha de fin debe ser posterior a la fecha de inicio"]
+  }
+}
+```
+
+**Ejemplo de Response (422 - Estado No Válido para Fecha):**
+```json
+{
+  "success": false,
+  "message": "Para fechas de hoy, el estado debe ser \"activa\" o \"pausada\"",
+  "errors": {
+    "estado": ["Estado no válido para fecha de hoy"]
+  }
+}
+```
+
+**Ejemplo de Response (422 - Estado No Válido para Fecha Futura):**
+```json
+{
+  "success": false,
+  "message": "Para fechas futuras, el estado debe ser \"programada\"",
+  "errors": {
+    "estado": ["Estado no válido para fecha futura"]
   }
 }
 ```
@@ -496,6 +534,109 @@ Authorization: Bearer {token}
       "label": "Productos de Regalo"
     }
   ]
+}
+```
+
+---
+
+### 9. **GET** `/api/admin/recompensas/estados-disponibles` - Estados Disponibles
+
+**Descripción:** Obtiene los estados disponibles para una recompensa según su fecha de inicio, aplicando la lógica de negocio automática.
+
+**Permisos:** `recompensas.ver`
+
+**Parámetros de Query:**
+```json
+{
+  "fecha_inicio": "YYYY-MM-DD" // Fecha de inicio de la recompensa
+}
+```
+
+**Ejemplo de Request:**
+```bash
+GET /api/admin/recompensas/estados-disponibles?fecha_inicio=2024-12-20
+Authorization: Bearer {token}
+```
+
+**Ejemplo de Response (Fecha Futura):**
+```json
+{
+  "success": true,
+  "message": "Estados disponibles obtenidos exitosamente",
+  "data": {
+    "estados_disponibles": [
+      {
+        "value": "programada",
+        "label": "Programada",
+        "description": "La recompensa se activará automáticamente en la fecha de inicio"
+      }
+    ],
+    "estado_por_defecto": "programada",
+    "mensaje": "Para fechas futuras, la recompensa debe estar programada",
+    "fecha_inicio": "2024-12-20",
+    "fecha_actual": "2024-12-19",
+    "es_fecha_pasada": false,
+    "es_fecha_hoy": false,
+    "es_fecha_futura": true
+  }
+}
+```
+
+**Ejemplo de Response (Fecha de Hoy):**
+```json
+{
+  "success": true,
+  "message": "Estados disponibles obtenidos exitosamente",
+  "data": {
+    "estados_disponibles": [
+      {
+        "value": "activa",
+        "label": "Activa",
+        "description": "La recompensa estará activa inmediatamente"
+      },
+      {
+        "value": "pausada",
+        "label": "Pausada",
+        "description": "La recompensa estará pausada y requerirá activación manual"
+      }
+    ],
+    "estado_por_defecto": "activa",
+    "mensaje": "Para fechas de hoy, la recompensa puede estar activa o pausada",
+    "fecha_inicio": "2024-12-19",
+    "fecha_actual": "2024-12-19",
+    "es_fecha_pasada": false,
+    "es_fecha_hoy": true,
+    "es_fecha_futura": false
+  }
+}
+```
+
+**Ejemplo de Response (Fecha Pasada):**
+```json
+{
+  "success": true,
+  "message": "Estados disponibles obtenidos exitosamente",
+  "data": {
+    "estados_disponibles": [
+      {
+        "value": "expirada",
+        "label": "Expirada",
+        "description": "La recompensa ya expiró por fecha de inicio pasada"
+      },
+      {
+        "value": "cancelada",
+        "label": "Cancelada",
+        "description": "La recompensa se marca como cancelada"
+      }
+    ],
+    "estado_por_defecto": "expirada",
+    "mensaje": "Para fechas pasadas, la recompensa debe estar expirada o cancelada",
+    "fecha_inicio": "2024-12-18",
+    "fecha_actual": "2024-12-19",
+    "es_fecha_pasada": true,
+    "es_fecha_hoy": false,
+    "es_fecha_futura": false
+  }
 }
 ```
 

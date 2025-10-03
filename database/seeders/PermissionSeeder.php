@@ -55,6 +55,18 @@ class PermissionSeeder extends Seeder
             'banners_promocionales.edit',
             'banners_promocionales.delete',
 
+            // Banners Flash Sales
+            'banners_flash_sales.ver',
+            'banners_flash_sales.create',
+            'banners_flash_sales.edit',
+            'banners_flash_sales.delete',
+
+            // Banners Ofertas
+            'banners_ofertas.ver',
+            'banners_ofertas.create',
+            'banners_ofertas.edit',
+            'banners_ofertas.delete',
+
             // Clientes
             'clientes.ver',
             'clientes.show',
