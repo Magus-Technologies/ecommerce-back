@@ -19,13 +19,17 @@ class Banner extends Model
         'precio_desde',
         'imagen_url',
         'orden',
-        'activo'
+        'activo',
+        'tipo_banner', // ✅ NUEVO: principal u horizontal
+        'posicion_horizontal' // ✅ NUEVO: posición del banner horizontal
     ];
 
     protected $casts = [
         'precio_desde' => 'decimal:2',
         'activo' => 'boolean',
-        'orden' => 'integer'
+        'orden' => 'integer',
+        'tipo_banner' => 'string',
+        'posicion_horizontal' => 'string'
     ];
 
     // Scope para obtener solo banners activos
@@ -38,6 +42,25 @@ class Banner extends Model
     public function scopeOrdenados($query)
     {
         return $query->orderBy('orden', 'asc');
+    }
+
+    // ✅ NUEVO: Scope para obtener solo banners principales (carrusel)
+    public function scopePrincipales($query)
+    {
+        return $query->where('tipo_banner', 'principal');
+    }
+
+    // ✅ NUEVO: Scope para obtener solo banners horizontales
+    public function scopeHorizontales($query)
+    {
+        return $query->where('tipo_banner', 'horizontal');
+    }
+
+    // ✅ NUEVO: Scope para obtener banners por posición horizontal
+    public function scopePorPosicion($query, $posicion)
+    {
+        return $query->where('tipo_banner', 'horizontal')
+                     ->where('posicion_horizontal', $posicion);
     }
 
     // Accessor para la URL completa de la imagen
