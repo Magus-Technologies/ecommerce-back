@@ -30,12 +30,12 @@ class BannersController extends Controller
     }
 
     /**
-     * Obtener banners activos para el público
+     * Obtener banners activos para el público (solo principales/carrusel)
      */
     public function bannersPublicos()
     {
         try {
-            $banners = Banner::activos()->ordenados()->get()->map(function ($banner) {
+            $banners = Banner::activos()->principales()->ordenados()->get()->map(function ($banner) {
                 return [
                     'id' => $banner->id,
                     'titulo' => $banner->titulo,
@@ -48,7 +48,7 @@ class BannersController extends Controller
                     'orden' => $banner->orden
                 ];
             });
-            
+
             return response()->json([
                 'status' => 'success',
                 'data' => $banners
@@ -62,20 +62,51 @@ class BannersController extends Controller
     }
 
     /**
+     * ✅ NUEVO: Obtener banners horizontales activos para el público
+     */
+    public function bannersHorizontalesPublicos()
+    {
+        try {
+            $banners = Banner::activos()->horizontales()->ordenados()->get()->map(function ($banner) {
+                return [
+                    'id' => $banner->id,
+                    'titulo' => $banner->titulo,
+                    'enlace_url' => $banner->enlace_url,
+                    'imagen_url' => $banner->imagen_completa,
+                    'posicion_horizontal' => $banner->posicion_horizontal,
+                    'orden' => $banner->orden
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $banners
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener banners horizontales públicos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Crear un nuevo banner
      */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'titulo' => 'required|string|max:255',
-            'subtitulo' => 'nullable|string|max:255', // ✅ CAMBIAR A NULLABLE
+            'subtitulo' => 'nullable|string|max:255',
             'descripcion' => 'nullable|string',
             'texto_boton' => 'required|string|max:100',
-            'enlace_url' => 'required|string|max:255', // ✅ CAMBIAR NOMBRE DEL CAMPO
+            'enlace_url' => 'required|string|max:255',
             'precio_desde' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'orden' => 'nullable|integer|min:0',
-            'activo' => 'boolean'
+            'activo' => 'boolean',
+            'tipo_banner' => 'nullable|in:principal,horizontal', // ✅ NUEVO
+            'posicion_horizontal' => 'nullable|in:debajo_ofertas_especiales,debajo_categorias,debajo_ventas_flash' // ✅ NUEVO
         ]);
 
         if ($validator->fails()) {
@@ -147,15 +178,17 @@ class BannersController extends Controller
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'titulo' => 'sometimes|required|string|max:255', // ✅ AGREGAR SOMETIMES
+            'titulo' => 'sometimes|required|string|max:255',
             'subtitulo' => 'nullable|string|max:255',
             'descripcion' => 'nullable|string',
-            'texto_boton' => 'sometimes|required|string|max:100', // ✅ AGREGAR SOMETIMES
-            'enlace_url' => 'sometimes|required|string|max:255', // ✅ CAMBIAR NOMBRE
+            'texto_boton' => 'sometimes|required|string|max:100',
+            'enlace_url' => 'sometimes|required|string|max:255',
             'precio_desde' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'orden' => 'nullable|integer|min:0',
-            'activo' => 'sometimes|boolean' // ✅ AGREGAR SOMETIMES
+            'activo' => 'sometimes|boolean',
+            'tipo_banner' => 'sometimes|in:principal,horizontal', // ✅ NUEVO
+            'posicion_horizontal' => 'nullable|in:debajo_ofertas_especiales,debajo_categorias,debajo_ventas_flash' // ✅ NUEVO
         ]);
 
         if ($validator->fails()) {
