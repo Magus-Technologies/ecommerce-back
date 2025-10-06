@@ -12,7 +12,6 @@ class BannerPromocional extends Model
 
     protected $table = 'banners_promocionales';
 
-    // Reemplázala con:
     protected $fillable = [
         'titulo',
         'precio',
@@ -21,9 +20,10 @@ class BannerPromocional extends Model
         'enlace_url',
         'orden',
         'animacion_delay',
-        'color_fondo',
         'color_boton',
         'color_texto',
+        'color_badge_nombre',
+        'color_badge_precio',
         'activo'
     ];
 
