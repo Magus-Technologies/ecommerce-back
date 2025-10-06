@@ -45,10 +45,10 @@ class BannersPromocionalesController extends Controller
                     'enlace_url' => $banner->enlace_url,
                     'animacion_delay' => $banner->animacion_delay,
                     'orden' => $banner->orden,
-                    // ✅ CAMPOS DE COLORES AGREGADOS:
-                    'color_fondo' => $banner->color_fondo,
                     'color_boton' => $banner->color_boton,
-                    'color_texto' => $banner->color_texto
+                    'color_texto' => $banner->color_texto,
+                    'color_badge_nombre' => $banner->color_badge_nombre,
+                    'color_badge_precio' => $banner->color_badge_precio
                 ];
             });
             
@@ -69,7 +69,6 @@ class BannersPromocionalesController extends Controller
      */
     public function store(Request $request)
     {
-        // Reemplázalas con:
         $validator = Validator::make($request->all(), [
             'titulo' => 'required|string|max:255',
             'precio' => 'nullable|numeric|min:0',
@@ -77,9 +76,10 @@ class BannersPromocionalesController extends Controller
             'enlace_url' => 'required|string|max:255',
             'orden' => 'nullable|integer|min:1',
             'animacion_delay' => 'nullable|integer|min:0|max:3000',
-            'color_fondo' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'color_boton' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'color_texto' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'color_badge_nombre' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'color_badge_precio' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'activo' => 'boolean'
         ]);
 
@@ -153,18 +153,18 @@ class BannersPromocionalesController extends Controller
      */
     public function update(Request $request, $id)
     {
-        // Reemplázalas con:
         $validator = Validator::make($request->all(), [
-            'titulo' => 'sometimes|required|string|max:255',
+            'titulo' => 'required|string|max:255',
             'precio' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'enlace_url' => 'sometimes|required|string|max:255',
+            'enlace_url' => 'required|string|max:255',
             'orden' => 'nullable|integer|min:1',
             'animacion_delay' => 'nullable|integer|min:0|max:3000',
-            'color_fondo' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'color_boton' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'color_texto' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
-            'activo' => 'sometimes|boolean'
+            'color_badge_nombre' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'color_badge_precio' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'activo' => 'boolean'
         ]);
 
         if ($validator->fails()) {
