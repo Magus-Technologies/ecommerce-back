@@ -75,8 +75,8 @@ class HorariosController extends Controller
     public function store(Request $request)
     {
         try {
-            \Log::info('=== DEBUG CREAR HORARIO ===');
-            \Log::info('Datos recibidos:', $request->all());
+            // \Log::info('=== DEBUG CREAR HORARIO ===');
+            // \Log::info('Datos recibidos:', $request->all());
             
             $request->validate([
                 'user_id' => 'required|exists:users,id',
@@ -101,7 +101,7 @@ class HorariosController extends Controller
                 'activo' => $request->activo ?? true
             ]);
 
-            \Log::info('Horario creado exitosamente:', $horario->toArray());
+            // \Log::info('Horario creado exitosamente:', $horario->toArray());
 
             return response()->json([
                 'message' => 'Horario creado correctamente',
@@ -109,11 +109,11 @@ class HorariosController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-            \Log::error('Error al crear horario:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
-            ]);
+            // \Log::error('Error al crear horario:', [
+            //     'error' => $e->getMessage(),
+            //     'trace' => $e->getTraceAsString(),
+            //     'request_data' => $request->all()
+            // ]);
             
             return response()->json([
                 'error' => 'Error al crear horario: ' . $e->getMessage()
@@ -274,9 +274,9 @@ class HorariosController extends Controller
         // Usar zona horaria de Lima
         $ahora = Carbon::now('America/Lima');
         
-        Log::info('=== VERIFICANDO ASESORES DISPONIBLES ===');
-        Log::info('Hora actual Lima: ' . $ahora->format('Y-m-d H:i:s T'));
-        Log::info('Día de la semana: ' . $ahora->dayOfWeek . ' (' . $ahora->format('l') . ')');
+        // Log::info('=== VERIFICANDO ASESORES DISPONIBLES ===');
+        // Log::info('Hora actual Lima: ' . $ahora->format('Y-m-d H:i:s T'));
+        // Log::info('Día de la semana: ' . $ahora->dayOfWeek . ' (' . $ahora->format('l') . ')');
         
         $usuarios = User::whereHas('roles', function($query) {
             $query->where('name', 'vendedor');
@@ -287,7 +287,7 @@ class HorariosController extends Controller
         }])
         ->get();
 
-        Log::info('Usuarios vendedor encontrados: ' . $usuarios->count());
+        // Log::info('Usuarios vendedor encontrados: ' . $usuarios->count());
 
         $asesorDisponibles = [];
         
@@ -295,8 +295,8 @@ class HorariosController extends Controller
             // Pasar la hora de Lima al método
             $disponible = UserHorario::estaDisponible($usuario->id, $ahora);
             
-            Log::info("Usuario {$usuario->id} ({$usuario->name}): " . ($disponible ? 'DISPONIBLE' : 'NO DISPONIBLE'));
-            Log::info("Horarios del usuario: " . $usuario->horarios->toJson());
+            // Log::info("Usuario {$usuario->id} ({$usuario->name}): " . ($disponible ? 'DISPONIBLE' : 'NO DISPONIBLE'));
+            // Log::info("Horarios del usuario: " . $usuario->horarios->toJson());
             
             if ($disponible) {
                 $asesorDisponibles[] = [
@@ -310,7 +310,7 @@ class HorariosController extends Controller
             }
         }
 
-        Log::info('Asesores disponibles finales: ' . count($asesorDisponibles));
+        // Log::info('Asesores disponibles finales: ' . count($asesorDisponibles));
         
         return response()->json([
             'asesores_disponibles' => $asesorDisponibles,
@@ -367,8 +367,8 @@ class HorariosController extends Controller
    public function eliminarHorariosUsuario(Request $request)
     {
         try {
-            \Log::info('=== ELIMINANDO HORARIOS USUARIO ===');
-            \Log::info('Datos recibidos:', $request->all());
+            // \Log::info('=== ELIMINANDO HORARIOS USUARIO ===');
+            // \Log::info('Datos recibidos:', $request->all());
             
             $request->validate([
                 'user_id' => 'required|exists:users,id',
@@ -381,7 +381,7 @@ class HorariosController extends Controller
                 ->whereNull('fecha_especial')
                 ->delete();
 
-            \Log::info("Horarios eliminados: {$deletedCount}");
+            // \Log::info("Horarios eliminados: {$deletedCount}");
 
             return response()->json([
                 'message' => 'Horarios eliminados correctamente',
@@ -389,10 +389,10 @@ class HorariosController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error eliminando horarios:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            // \Log::error('Error eliminando horarios:', [
+            //     'error' => $e->getMessage(),
+            //     'trace' => $e->getTraceAsString()
+            // ]);
             
             return response()->json([
                 'error' => 'Error al eliminar horarios: ' . $e->getMessage()

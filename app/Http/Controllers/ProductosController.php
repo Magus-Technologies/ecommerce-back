@@ -406,6 +406,45 @@ class ProductosController extends Controller
             $query->orderBy('nombre', 'asc');
         }
 
+        // ✅ Si no se especifica página, devolver todos los productos (para el index)
+        // Si se especifica página, paginar normalmente (para la tienda)
+        if (!$request->has('page')) {
+            $productos = $query->get();
+
+            // Agregar campos calculados para el frontend
+            $productosTransformados = $productos->map(function ($producto) {
+                return [
+                    'id' => $producto->id,
+                    'nombre' => $producto->nombre,
+                    'descripcion' => $producto->descripcion,
+                    'precio' => $producto->precio_venta,
+                    'precio_oferta' => null,
+                    'stock' => $producto->stock,
+                    'imagen_principal' => $producto->imagen ? asset('storage/productos/' . $producto->imagen) : '/placeholder-product.jpg',
+                    'categoria' => $producto->categoria?->nombre,
+                    'categoria_id' => $producto->categoria_id,
+                    'rating' => 4.8,
+                    'total_reviews' => rand(15, 25) . 'k',
+                    'reviews_count' => rand(150, 250),
+                    'sold_count' => rand(10, 30),
+                    'total_stock' => $producto->stock + rand(10, 30),
+                    'is_on_sale' => false,
+                    'discount_percentage' => 0,
+                    'mostrar_igv' => $producto->mostrar_igv
+                ];
+            });
+
+            return response()->json([
+                'productos' => $productosTransformados,
+                'pagination' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => $productosTransformados->count(),
+                    'total' => $productosTransformados->count()
+                ]
+            ]);
+        }
+
         $productos = $query->paginate(20);
 
         // Agregar campos calculados para el frontend
