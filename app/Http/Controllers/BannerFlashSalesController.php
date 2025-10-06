@@ -47,8 +47,8 @@ class BannerFlashSalesController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'titulo' => 'required|string|max:255',
-            'subtitulo' => 'nullable|string|max:255',
+            'nombre' => 'required|string|max:255',
+            'color_badge' => 'nullable|string|max:7',
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
@@ -87,8 +87,8 @@ class BannerFlashSalesController extends Controller
         $banner = BannerFlashSale::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
-            'titulo' => 'required|string|max:255',
-            'subtitulo' => 'nullable|string|max:255',
+            'nombre' => 'required|string|max:255',
+            'color_badge' => 'nullable|string|max:7',
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'required|date|after:fecha_inicio',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',

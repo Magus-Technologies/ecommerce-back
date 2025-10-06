@@ -171,6 +171,8 @@ class PermissionSeeder extends Seeder
             'configuracion.edit',
             'configuracion.delete',
 
+        
+
         ];
 
         foreach ($permissions as $permission) {

@@ -12,8 +12,8 @@ class BannerFlashSale extends Model
     protected $table = 'banners_flash_sales';
 
     protected $fillable = [
-        'titulo',
-        'subtitulo',
+        'nombre',
+        'color_badge',
         'fecha_inicio',
         'fecha_fin',
         'imagen',
