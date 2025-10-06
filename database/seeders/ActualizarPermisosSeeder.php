@@ -31,7 +31,7 @@ class ActualizarPermisosSeeder extends Seeder
             }
         }
 
-        // 3. Crear todos los permisos nuevos estandarizados
+        // 3. Crear permisos nuevos estandarizados (excluye módulo Recompensas: centralizado en RecompensasPermisosSeeder)
         $permisosNuevos = [
             // Usuarios
             'usuarios.ver',
@@ -53,6 +53,7 @@ class ActualizarPermisosSeeder extends Seeder
             'categorias.show',
             'categorias.edit',
             'categorias.delete',
+
         ];
 
         foreach ($permisosNuevos as $permiso) {

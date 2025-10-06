@@ -22,14 +22,18 @@ class RecompensaNotificacionController extends Controller
     public function popupsActivosPublico(Request $request): JsonResponse
     {
         try {
-            // Buscar directamente popups activos cuyas recompensas estén vigentes
-            // y estén segmentadas explícitamente para no_registrados
+            // Buscar popups activos cuyas recompensas estén vigentes
             $popupsQuery = \App\Models\RecompensaPopup::query()
                 ->activos()
-                ->deRecompensasActivas()
-                ->whereHas('recompensa.clientes', function($q) {
-                    $q->where('segmento', 'no_registrados');
+                ->deRecompensasActivas();
+
+            // Por defecto, solo popups segmentados para no registrados
+            $segmento = $request->get('segmento', 'no_registrados');
+            if ($segmento !== 'all') {
+                $popupsQuery->whereHas('recompensa.clientes', function($q) use ($segmento) {
+                    $q->where('segmento', $segmento);
                 });
+            }
 
             $popups = $popupsQuery->with(['recompensa:id,nombre,tipo,fecha_inicio,fecha_fin,estado'])
                 ->orderBy('created_at', 'desc')
