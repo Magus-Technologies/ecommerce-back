@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Spatie\Permission\Models\Permission;
+use Illuminate\Support\Facades\DB;
 
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -16,7 +17,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Si la tabla ubigeo_inei está vacía, corre el seeder
-        if (\DB::table('ubigeo_inei')->count() === 0) {
+        if (DB::table('ubigeo_inei')->count() === 0) {
             $this->call(UbigeoIneiSeeder::class);
         }
 
@@ -56,6 +57,9 @@ class DatabaseSeeder extends Seeder
         } else {
             $this->command->warn('🚫 Los permisos estandarizados ya existen. Seeder "ActualizarPermisosSeeder" no se ejecutó.');
         }
+
+        // Permisos del módulo Recompensas centralizados en un único seeder
+        $this->call(RecompensasPermisosSeeder::class);
 
         $this->call(EliminarPermisosAntiguosSeeder::class);
 

@@ -41,11 +41,11 @@ return new class extends Migration
         });
 
         // 3. Actualizar datos existentes con nombres de pasos por defecto
-        DB::table('arma_pc_configuracion')->update([
+        /*DB::table('arma_pc_configuracion')->update([
             'nombre_paso' => DB::raw("CONCAT('Paso ', orden)"),
             'descripcion_paso' => 'Selecciona un componente de esta categoría',
             'es_requerido' => true
-        ]);
+        ]);*/
     }
 
     /**

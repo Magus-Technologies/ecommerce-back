@@ -624,16 +624,21 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Popups y Notificaciones para el cliente
         Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos']); // Ver popups activos para el cliente
+        Route::get('/popups-probar-envio', [RecompensaNotificacionController::class, 'probarEnvioAutomatico']); // Probar envío automático de popups
         Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto']); // Marcar popup como visto
         Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup
         Route::get('/notificaciones/historial', [RecompensaNotificacionController::class, 'historialNotificaciones']); // Historial de notificaciones
     });
 
     // 🔹 GRUPO PÚBLICO - Recompensas para Clientes No Registrados
-    Route::prefix('publico/recompensas')->group(function () {
+    Route::prefix('publico/recompensas')->withoutMiddleware(['auth:sanctum'])->group(function () {
         
         // Recompensas públicas (sin autenticación)
         Route::get('/publicas', [RecompensaClienteController::class, 'recompensasPublicas']); // Ver recompensas para clientes no registrados
+        // Popups públicos (sin autenticación)
+        Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivosPublico'])
+            ->name('publico.recompensas.popups-activos')
+            ->withoutMiddleware(['auth:sanctum']);
     });
 
     // Rutas de motorizados protegidas con permisos
