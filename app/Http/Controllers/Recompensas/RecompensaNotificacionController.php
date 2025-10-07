@@ -22,18 +22,33 @@ class RecompensaNotificacionController extends Controller
     public function popupsActivosPublico(Request $request): JsonResponse
     {
         try {
+            // Este endpoint es SOLO para visitantes no autenticados
+            $user = $request->user();
+            if ($user) {
+                // Verificar si es un cliente de user_clientes
+                $cliente = \App\Models\UserCliente::find($user->id);
+                if ($cliente) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Usuarios autenticados deben usar el endpoint de clientes'
+                    ], 403);
+                }
+                // Si es usuario de tabla 'users' (admin), no mostrar pop-ups
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Solo disponible para visitantes no autenticados'
+                ], 403);
+            }
+
             // Buscar popups activos cuyas recompensas estén vigentes
             $popupsQuery = \App\Models\RecompensaPopup::query()
                 ->activos()
                 ->deRecompensasActivas();
 
-            // Por defecto, solo popups segmentados para no registrados
-            $segmento = $request->get('segmento', 'no_registrados');
-            if ($segmento !== 'all') {
-                $popupsQuery->whereHas('recompensa.clientes', function($q) use ($segmento) {
-                    $q->where('segmento', $segmento);
-                });
-            }
+            // CORREGIDO: Solo pop-ups para 'no_registrados' en endpoint público
+            $popupsQuery->whereHas('recompensa.clientes', function($q) {
+                $q->where('segmento', 'no_registrados');
+            });
 
             $popups = $popupsQuery->with(['recompensa:id,nombre,tipo,fecha_inicio,fecha_fin,estado'])
                 ->orderBy('created_at', 'desc')
@@ -66,63 +81,66 @@ class RecompensaNotificacionController extends Controller
         }
     }
     /**
-     * Obtener popups activos para el cliente autenticado
+     * Obtener popups activos para clientes (con filtro por segmento del cliente)
      */
     public function popupsActivos(Request $request): JsonResponse
     {
         try {
-            $cliente = Auth::guard('cliente')->user();
-            /** @var UserCliente $cliente */
-            if (!$cliente) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cliente no autenticado'
-                ], 401);
-            }
-
-            // Obtener recompensas que califican para el cliente
-            $recompensasAplicables = $this->obtenerRecompensasAplicables($cliente);
-            
-            $popupsActivos = [];
-            $notificacionesEnviadas = 0;
-            
-            foreach ($recompensasAplicables as $recompensa) {
-                $popup = $recompensa->popup;
-                if ($popup && $popup->estaActivo()) {
-                    
-                    // ✅ ENVÍO AUTOMÁTICO: Crear notificación automáticamente
-                    $notificacion = $this->enviarPopupAutomaticamente($cliente, $recompensa, $popup);
-                    
-                    if ($notificacion) {
-                        $notificacionesEnviadas++;
-                        
-                        $configuracion = $popup->getConfiguracionFrontend();
-                        // Agregar URL de imagen si existe
-                        if ($popup->imagen_popup) {
-                            $configuracion['imagen_popup_url'] = asset('storage/popups/' . $popup->imagen_popup);
-                        }
-                        // Agregar información de la notificación
-                        $configuracion['notificacion_id'] = $notificacion->id;
-                        $configuracion['fecha_envio'] = $notificacion->fecha_notificacion;
-                        
-                        $popupsActivos[] = $configuracion;
-                    }
+            // Este endpoint es para clientes potenciales (no autenticados)
+            // No requiere token, pero verifica que no sea un admin autenticado
+            $user = $request->user();
+            if ($user) {
+                // Si hay usuario autenticado, verificar que NO sea de la tabla users (admin)
+                $cliente = \App\Models\UserCliente::find($user->id);
+                if (!$cliente) {
+                    // Es un admin de la tabla users, no mostrar pop-ups
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Este endpoint no está disponible para administradores'
+                    ], 403);
                 }
             }
 
+            // Determinar segmentos del cliente
+            $segmentosCliente = $this->obtenerSegmentosCliente($user);
+            
+            // Buscar popups activos para clientes (no admins)
+            $popupsQuery = \App\Models\RecompensaPopup::query()
+                ->activos()
+                ->deRecompensasActivas();
+
+            // CORREGIDO: Filtrar por segmentos del cliente específico
+            $popupsQuery->whereHas('recompensa.clientes', function($q) use ($segmentosCliente) {
+                $q->where(function($qq) use ($segmentosCliente) {
+                    // Siempre incluir 'todos'
+                    $qq->where('segmento', 'todos');
+                    
+                    // Incluir segmentos específicos del cliente
+                    if (!empty($segmentosCliente)) {
+                        $qq->orWhereIn('segmento', $segmentosCliente);
+                    }
+                });
+            });
+
+            $popups = $popupsQuery->with(['recompensa:id,nombre,tipo,fecha_inicio,fecha_fin,estado'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $popupsActivos = $popups->map(function($popup) {
+                $configuracion = $popup->getConfiguracionFrontend();
+                if ($popup->imagen_popup) {
+                    $configuracion['imagen_popup_url'] = asset('storage/popups/' . $popup->imagen_popup);
+                }
+                return $configuracion;
+            })->values()->all();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Popups activos obtenidos exitosamente',
+                'message' => 'Popups para clientes obtenidos exitosamente',
                 'data' => [
-                    'cliente' => [
-                        'id' => $cliente->id,
-                        'nombre' => $cliente->nombres . ' ' . $cliente->apellidos,
-                        'segmento_actual' => $cliente->getSegmentoCliente()
-                    ],
-                    'popups_activos' => $popupsActivos,
+                    'popups_activos' => array_values($popupsActivos),
                     'total_popups' => count($popupsActivos),
-                    'notificaciones_enviadas' => $notificacionesEnviadas,
-                    'envio_automatico' => true
+                    'segmentos_cliente' => $segmentosCliente
                 ]
             ]);
 
@@ -141,7 +159,15 @@ class RecompensaNotificacionController extends Controller
     public function marcarVisto(Request $request, $popupId): JsonResponse
     {
         try {
-            $cliente = Auth::guard('cliente')->user();
+            $user = $request->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuario no autenticado'
+                ], 401);
+            }
+            
+            $cliente = \App\Models\UserCliente::find($user->id);
             if (!$cliente) {
                 return response()->json([
                     'success' => false,
@@ -195,7 +221,15 @@ class RecompensaNotificacionController extends Controller
     public function cerrarPopup(Request $request, $popupId): JsonResponse
     {
         try {
-            $cliente = Auth::guard('cliente')->user();
+            $user = $request->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuario no autenticado'
+                ], 401);
+            }
+            
+            $cliente = \App\Models\UserCliente::find($user->id);
             if (!$cliente) {
                 return response()->json([
                     'success' => false,
@@ -237,7 +271,15 @@ class RecompensaNotificacionController extends Controller
     public function historialNotificaciones(Request $request): JsonResponse
     {
         try {
-            $cliente = Auth::guard('cliente')->user();
+            $user = $request->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuario no autenticado'
+                ], 401);
+            }
+            
+            $cliente = \App\Models\UserCliente::find($user->id);
             if (!$cliente) {
                 return response()->json([
                     'success' => false,
@@ -448,13 +490,22 @@ class RecompensaNotificacionController extends Controller
      */
     private function obtenerRecompensasAplicables($cliente)
     {
-        return Recompensa::with(['popup', 'clientes'])
+        $segmentoCliente = method_exists($cliente, 'getSegmentoCliente')
+            ? $cliente->getSegmentoCliente()
+            : 'todos';
+
+        // Filtrar por segmentos directamente en base de datos
+        return Recompensa::with(['popup'])
             ->activas()
             ->vigentes()
-            ->get()
-            ->filter(function($recompensa) use ($cliente) {
-                return $this->recompensaAplicaAlCliente($recompensa, $cliente);
-            });
+            ->whereHas('clientes', function ($q) use ($segmentoCliente) {
+                // Solo segmentos para clientes autenticados (excluir 'no_registrados')
+                $q->where(function($qq) use ($segmentoCliente) {
+                    $qq->where('segmento', $segmentoCliente)
+                       ->orWhere('segmento', 'todos');
+                })->where('segmento', '!=', 'no_registrados');
+            })
+            ->get();
     }
 
     /**
@@ -476,8 +527,15 @@ class RecompensaNotificacionController extends Controller
     public function probarEnvioAutomatico(Request $request): JsonResponse
     {
         try {
-            $cliente = Auth::guard('cliente')->user();
-            /** @var UserCliente $cliente */
+            $user = $request->user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Usuario no autenticado'
+                ], 401);
+            }
+            
+            $cliente = \App\Models\UserCliente::find($user->id);
             if (!$cliente) {
                 return response()->json([
                     'success' => false,
@@ -581,6 +639,124 @@ class RecompensaNotificacionController extends Controller
                 'error' => $e->getMessage()
             ]);
             return null;
+        }
+    }
+
+    /**
+     * Determinar segmentos del cliente basado en su comportamiento
+     */
+    private function obtenerSegmentosCliente($user): array
+    {
+        $segmentos = [];
+        
+        // Si no hay usuario autenticado, solo segmentos básicos
+        if (!$user) {
+            return ['todos']; // Clientes no autenticados ven pop-ups de 'todos'
+        }
+        
+        // Obtener cliente de user_clientes
+        $cliente = \App\Models\UserCliente::find($user->id);
+        if (!$cliente) {
+            return ['todos']; // Si no es cliente, solo 'todos'
+        }
+        
+        // Lógica de segmentación basada en comportamiento del cliente
+        $fechaRegistro = $cliente->created_at;
+        $diasDesdeRegistro = $fechaRegistro->diffInDays(now());
+        
+        // 1. Cliente nuevo (menos de 30 días registrado)
+        if ($diasDesdeRegistro <= 30) {
+            $segmentos[] = 'nuevos';
+        }
+        
+        // 2. Verificar si es cliente recurrente (tiene pedidos)
+        $totalPedidos = \App\Models\Pedido::where('user_cliente_id', $cliente->id)
+            ->where('estado_pedido', '!=', 'cancelado')
+            ->count();
+            
+        if ($totalPedidos >= 3) {
+            $segmentos[] = 'recurrentes';
+        }
+        
+        // 3. Verificar si es VIP (gasto acumulado alto)
+        $gastoAcumulado = \App\Models\Pedido::where('user_cliente_id', $cliente->id)
+            ->where('estado_pedido', '!=', 'cancelado')
+            ->sum('total');
+            
+        if ($gastoAcumulado >= 1000) { // 1000 soles o más
+            $segmentos[] = 'vip';
+        }
+        
+        // Siempre incluir 'todos' como fallback
+        $segmentos[] = 'todos';
+        
+        return array_unique($segmentos);
+    }
+
+    /**
+     * Endpoint de diagnóstico para verificar pop-ups
+     */
+    public function diagnosticarPopups(Request $request): JsonResponse
+    {
+        try {
+            $diagnostico = [
+                'timestamp' => now()->toISOString(),
+                'popups_totales' => RecompensaPopup::count(),
+                'popups_activos' => RecompensaPopup::where('popup_activo', true)->count(),
+                'recompensas_totales' => Recompensa::count(),
+                'recompensas_activas' => Recompensa::where('estado', 'activa')->count(),
+                'recompensas_vigentes' => Recompensa::where('estado', 'activa')
+                    ->where('fecha_inicio', '<=', now())
+                    ->where('fecha_fin', '>=', now())
+                    ->count(),
+                'popups_por_segmento' => [],
+                'popups_publicos' => [],
+                'popups_autenticados' => []
+            ];
+
+            // Verificar pop-ups por segmento
+            $segmentos = ['todos', 'no_registrados', 'nuevos', 'recurrentes', 'vip'];
+            foreach ($segmentos as $segmento) {
+                $count = RecompensaPopup::whereHas('recompensa.clientes', function($q) use ($segmento) {
+                    $q->where('segmento', $segmento);
+                })->where('popup_activo', true)->count();
+                
+                $diagnostico['popups_por_segmento'][$segmento] = $count;
+            }
+
+            // Simular consulta pública
+            $popupsPublicos = RecompensaPopup::query()
+                ->activos()
+                ->deRecompensasActivas()
+                ->whereHas('recompensa.clientes', function($q) {
+                    $q->whereIn('segmento', ['todos', 'no_registrados']);
+                })
+                ->with(['recompensa:id,nombre,tipo,estado'])
+                ->get();
+
+            $diagnostico['popups_publicos'] = $popupsPublicos->map(function($popup) {
+                return [
+                    'id' => $popup->id,
+                    'titulo' => $popup->titulo,
+                    'recompensa_nombre' => $popup->recompensa->nombre,
+                    'recompensa_estado' => $popup->recompensa->estado,
+                    'popup_activo' => $popup->popup_activo,
+                    'segmentos' => $popup->recompensa->clientes->pluck('segmento')->toArray()
+                ];
+            })->toArray();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Diagnóstico de pop-ups completado',
+                'data' => $diagnostico
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error en el diagnóstico',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

@@ -571,7 +571,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/puntos', [RecompensaClienteController::class, 'puntosAcumulados']); // Consultar puntos acumulados
         
         // Popups y Notificaciones para el cliente
-        Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos']); // Ver popups activos para el cliente
+        Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos'])->withoutMiddleware(['auth:sanctum']); // Ver popups activos para el cliente (sin autenticación)
         Route::get('/popups-probar-envio', [RecompensaNotificacionController::class, 'probarEnvioAutomatico']); // Probar envío automático de popups
         Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto']); // Marcar popup como visto
         Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup
@@ -588,6 +588,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('publico.recompensas.popups-activos')
             ->withoutMiddleware(['auth:sanctum']);
     });
+
+    // 🔹 ENDPOINT DE DIAGNÓSTICO - Para verificar pop-ups
+    Route::get('/popups/diagnostico', [RecompensaNotificacionController::class, 'diagnosticarPopups'])
+        ->name('popups.diagnostico');
 
     // Rutas de motorizados protegidas con permisos
     Route::middleware('permission:motorizados.ver')->group(function () {
