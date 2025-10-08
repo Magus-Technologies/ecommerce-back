@@ -134,7 +134,7 @@
         </div>
         
         <div class="content">
-            <div class="greeting">¡Hola {{ $user->nombres ?? $user->name }}! 👋</div>
+            <div class="greeting">¡Hola {{ Auth::user()->nombres ?? Auth::user()->name ?? 'Usuario' }}! 👋</div>
             
             <div class="welcome-text">
                 ¡Bienvenido a <strong>MarketPro</strong>! Nos emociona tenerte como parte de nuestra comunidad de gamers y tech lovers.

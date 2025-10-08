@@ -576,6 +576,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto']); // Marcar popup como visto
         Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup
         Route::get('/notificaciones/historial', [RecompensaNotificacionController::class, 'historialNotificaciones']); // Historial de notificaciones
+        Route::get('/popups-diagnostico', [RecompensaNotificacionController::class, 'diagnosticarPopups'])->withoutMiddleware(['auth:sanctum']); // Diagnóstico de popups
     });
 
     // 🔹 GRUPO PÚBLICO - Recompensas para Clientes No Registrados
@@ -587,6 +588,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivosPublico'])
             ->name('publico.recompensas.popups-activos')
             ->withoutMiddleware(['auth:sanctum']);
+        Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup público
     });
 
     // 🔹 ENDPOINT DE DIAGNÓSTICO - Para verificar pop-ups
