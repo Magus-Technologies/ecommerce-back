@@ -141,9 +141,10 @@ class RecompensaController extends Controller
                 ], 422);
             }
 
-            // Aplicar lógica automática de estados
-            $fechaInicio = Carbon::parse($request->fecha_inicio);
-            $fechaActual = Carbon::today();
+            // Aplicar lógica automática de estados (normalizando a inicio de día y respetando timezone de la app)
+            $timezone = config('app.timezone');
+            $fechaInicio = Carbon::parse($request->fecha_inicio, $timezone)->startOfDay();
+            $fechaActual = now($timezone)->startOfDay();
             $estadoAutomatico = '';
 
             if ($fechaInicio->isSameDay($fechaActual)) {
@@ -958,8 +959,9 @@ class RecompensaController extends Controller
                 ], 422);
             }
 
-            $fechaInicio = Carbon::parse($request->fecha_inicio);
-            $fechaActual = Carbon::today();
+            $timezone = config('app.timezone');
+            $fechaInicio = Carbon::parse($request->fecha_inicio, $timezone)->startOfDay();
+            $fechaActual = now($timezone)->startOfDay();
             
             $estadosDisponibles = [];
             $estadoPorDefecto = '';
