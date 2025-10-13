@@ -56,11 +56,16 @@ class Banner extends Model
         return $query->where('tipo_banner', 'horizontal');
     }
 
+    // ✅ NUEVO: Scope para obtener solo banners sidebar
+    public function scopeSidebar($query)
+    {
+        return $query->where('tipo_banner', 'sidebar');
+    }
+
     // ✅ NUEVO: Scope para obtener banners por posición horizontal
     public function scopePorPosicion($query, $posicion)
     {
-        return $query->where('tipo_banner', 'horizontal')
-                     ->where('posicion_horizontal', $posicion);
+        return $query->where('posicion_horizontal', $posicion);
     }
 
     // Accessor para la URL completa de la imagen

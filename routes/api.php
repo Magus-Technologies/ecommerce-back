@@ -75,6 +75,7 @@ Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos'])
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
 Route::get('/banners-horizontales/publicos', [BannersController::class, 'bannersHorizontalesPublicos']); // ✅ NUEVO
+Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSidebarShopPublico']); // ✅ NUEVO
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
 Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
