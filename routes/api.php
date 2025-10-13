@@ -48,6 +48,7 @@ use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\ComprasController;
 use App\Http\Controllers\FormaEnvioController;
 use App\Http\Controllers\TipoPagoController;
+use App\Http\Controllers\CookieConsentController;
 
 
 
@@ -107,6 +108,29 @@ Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'busc
 // ✅ NUEVAS RUTAS PÚBLICAS - Arma tu PC
 Route::get('/arma-pc/categorias', [CategoriasController::class, 'categoriasArmaPc']);
 Route::get('/categorias/{id}/compatibles', [CategoriasController::class, 'getCategoriasCompatibles']);
+
+// =====================================================
+// ✅ SISTEMA DE GESTIÓN DE COOKIES - RUTAS PÚBLICAS
+// =====================================================
+Route::prefix('cookies')->group(function () {
+    // Obtener configuración pública del banner (sin autenticación)
+    Route::get('/configuracion/publica', [CookieConsentController::class, 'obtenerConfiguracionPublica']);
+
+    // Obtener preferencias del usuario actual (con o sin autenticación)
+    Route::get('/preferencias', [CookieConsentController::class, 'obtenerPreferencias']);
+
+    // Guardar preferencias personalizadas
+    Route::post('/preferencias', [CookieConsentController::class, 'guardarPreferencias']);
+
+    // Aceptar todas las cookies
+    Route::post('/aceptar-todo', [CookieConsentController::class, 'aceptarTodo']);
+
+    // Rechazar todas las cookies opcionales
+    Route::post('/rechazar-todo', [CookieConsentController::class, 'rechazarTodo']);
+
+    // Revocar consentimiento
+    Route::delete('/revocar', [CookieConsentController::class, 'revocarConsentimiento']);
+});
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -701,6 +725,24 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('permission:configuracion.delete')->group(function () {
         Route::delete('/tipos-pago/{id}', [TipoPagoController::class, 'destroy']);
+    });
+
+    // =====================================================
+    // ✅ SISTEMA DE GESTIÓN DE COOKIES - RUTAS ADMIN
+    // =====================================================
+    Route::prefix('cookies/admin')->middleware('permission:empresa_info.ver')->group(function () {
+        // Obtener configuración completa del sistema (solo admin)
+        Route::get('/configuracion/completa', [CookieConsentController::class, 'obtenerConfiguracionCompleta']);
+
+        // Actualizar configuración del sistema (solo admin)
+        Route::put('/configuracion', [CookieConsentController::class, 'actualizarConfiguracion'])
+            ->middleware('permission:empresa_info.edit');
+
+        // Obtener estadísticas de consentimiento
+        Route::get('/estadisticas', [CookieConsentController::class, 'obtenerEstadisticas']);
+
+        // Obtener log de auditoría
+        Route::get('/auditoria', [CookieConsentController::class, 'obtenerLogAuditoria']);
     });
 
 });
