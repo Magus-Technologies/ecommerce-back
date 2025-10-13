@@ -34,11 +34,18 @@ class Comprobante extends Model
         'tipo_nota',
         'motivo_nota',
         'estado',
+        'origen',
+        'compra_id',
+        'metodo_pago',
+        'referencia_pago',
         'codigo_hash',
         'xml_firmado',
         'xml_respuesta_sunat',
         'pdf_base64',
         'mensaje_sunat',
+        'errores_sunat',
+        'codigos_error_sunat',
+        'informacion_errores',
         'user_id'
     ];
 
@@ -53,6 +60,8 @@ class Comprobante extends Model
         'total_descuentos' => 'decimal:2',
         'total_otros_cargos' => 'decimal:2',
         'importe_total' => 'decimal:2',
+        'codigos_error_sunat' => 'array',
+        'informacion_errores' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
@@ -86,6 +95,11 @@ class Comprobante extends Model
     public function venta()
     {
         return $this->hasOne(Venta::class);
+    }
+
+    public function compra()
+    {
+        return $this->belongsTo(Compra::class);
     }
 
     // Scopes

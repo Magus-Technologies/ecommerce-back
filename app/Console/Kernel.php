@@ -52,6 +52,45 @@ class Kernel extends ConsoleKernel
             $hour = now()->hour;
             return $hour >= 2 && $hour <= 4;
         });
+
+        // ===== TAREAS DE FACTURACIÓN ELECTRÓNICA =====
+        
+        // Reintentar facturas fallidas cada 30 minutos
+        $schedule->command('facturacion:maintenance --task=retry-failed')
+            ->everyThirtyMinutes()
+            ->withoutOverlapping()
+            ->name('retry-failed-invoices')
+            ->appendOutputTo(storage_path('logs/facturacion-retry.log'));
+
+        // Limpieza diaria de logs (2:00 AM)
+        $schedule->command('facturacion:maintenance --task=cleanup-logs --days=30')
+            ->dailyAt('02:00')
+            ->withoutOverlapping()
+            ->name('cleanup-facturacion-logs')
+            ->appendOutputTo(storage_path('logs/facturacion-cleanup.log'));
+
+        // Backup diario de archivos importantes (3:00 AM)
+        $schedule->command('facturacion:maintenance --task=backup-files')
+            ->dailyAt('03:00')
+            ->withoutOverlapping()
+            ->name('backup-facturacion-files')
+            ->appendOutputTo(storage_path('logs/facturacion-backup.log'));
+
+        // Verificación de certificado cada 6 horas
+        $schedule->command('facturacion:maintenance --task=check-certificate')
+            ->everySixHours()
+            ->withoutOverlapping()
+            ->name('check-certificate')
+            ->appendOutputTo(storage_path('logs/facturacion-certificate.log'));
+
+        // Mantenimiento completo semanal (domingos 1:00 AM)
+        $schedule->command('facturacion:maintenance --task=all')
+            ->weekly()
+            ->sundays()
+            ->at('01:00')
+            ->withoutOverlapping()
+            ->name('weekly-facturacion-maintenance')
+            ->appendOutputTo(storage_path('logs/facturacion-weekly.log'));
     }
 
     /**

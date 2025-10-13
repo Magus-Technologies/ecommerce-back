@@ -16,8 +16,11 @@ use Greenter\Report\PdfReport;
 use App\Models\Comprobante;
 use App\Models\Cliente;
 use App\Models\SerieComprobante;
+use App\Models\SunatLog;
+use App\Models\SunatErrorCode;
 use Luecano\NumeroALetras\NumeroALetras;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class GreenterService
 {
@@ -45,7 +48,12 @@ class GreenterService
     );
 
     // Configurar servicios SUNAT
-    $this->see->setService(SunatEndpoints::FE_BETA); // Para producción usar SunatEndpoints::FE_PRODUCCION
+    $ambiente = config('services.greenter.ambiente', 'beta');
+    if ($ambiente === 'produccion') {
+        $this->see->setService(SunatEndpoints::FE_PRODUCCION);
+    } else {
+        $this->see->setService(SunatEndpoints::FE_BETA);
+    }
 }
 
     private function configurarEmpresa()
@@ -63,7 +71,7 @@ class GreenterService
                      ]));
     }
 
-    public function generarFactura($ventaId, $clienteData = null)
+    public function generarFactura($ventaId, $clienteData = null, $userId = null, $ipOrigen = null)
     {
         try {
             $venta = \App\Models\Venta::with(['detalles.producto', 'cliente'])->findOrFail($ventaId);
@@ -94,9 +102,19 @@ class GreenterService
 
             // Enviar a SUNAT
             $result = $this->see->send($invoice);
+            
+            // Log del envío a SUNAT
+            $xml = $this->see->getFactory()->getLastXml();
+            if ($xml) {
+                file_put_contents('xml_debug.xml', $xml);
+                Log::info('XML Generado', ['xml' => $xml]);
+                
+                // Crear log de SUNAT
+                $sunatLog = SunatLog::logEnvio($comprobante->id, $xml, $userId, $ipOrigen);
+            }
 
-            // Procesar respuesta
-            $this->procesarRespuestaSunat($comprobante, $result, $invoice);
+            // Procesar respuesta con logging
+            $this->procesarRespuestaSunatConLog($comprobante, $result, $invoice, $sunatLog ?? null);
 
             // Generar PDF
             $this->generarPdf($comprobante, $invoice);
@@ -157,7 +175,7 @@ class GreenterService
             'operacion_gravada' => $venta->subtotal,
             'total_igv' => $venta->igv,
             'importe_total' => $venta->total,
-            'user_id' => auth()->id() ?? 1,
+            'user_id' => 1, // Usuario por defecto para pruebas
             'estado' => 'PENDIENTE'
         ]);
 
@@ -184,17 +202,19 @@ class GreenterService
         return $comprobante;
     }
 
-    private function construirDocumentoGreenter($comprobante, $cliente)
+    public function construirDocumentoGreenter($comprobante, $cliente)
     {
         $invoice = new Invoice();
         
         // Datos básicos
+        $fechaEmision = Carbon::parse($comprobante->fecha_emision);
+        
         $invoice->setUblVersion('2.1')
-                ->setTipoOperacion('0101')
+                ->setTipoOperacion('1001')  // 1001 = Venta interna (Catálogo 51 UBL 2.1)
                 ->setTipoDoc($comprobante->tipo_comprobante)
                 ->setSerie($comprobante->serie)
                 ->setCorrelativo($comprobante->correlativo)
-                ->setFechaEmision(Carbon::parse($comprobante->fecha_emision))
+                ->setFechaEmision($fechaEmision)
                 ->setTipoMoneda($comprobante->moneda)
                 ->setCompany($this->company);
 
@@ -210,33 +230,52 @@ class GreenterService
 
         $invoice->setClient($client);
 
-        // Detalles
+        // Detalles - Asegurar precisión decimal
         $items = [];
         foreach ($comprobante->detalles as $detalle) {
+            $valorUnitario = (float)number_format((float)$detalle->valor_unitario, 2, '.', '');
+            $valorVenta = (float)number_format((float)$detalle->valor_venta, 2, '.', '');
+            $igv = (float)number_format((float)$detalle->igv, 2, '.', '');
+            $precioUnitario = (float)number_format((float)$detalle->precio_unitario, 2, '.', '');
+            
             $item = new SaleDetail();
             $item->setCodProducto($detalle->codigo_producto)
                  ->setUnidad($detalle->unidad_medida)
                  ->setDescripcion($detalle->descripcion)
-                 ->setCantidad($detalle->cantidad)
-                 ->setMtoValorUnitario($detalle->valor_unitario)
-                 ->setMtoValorVenta($detalle->valor_venta)
-                 ->setMtoBaseIgv($detalle->valor_venta)
-                 ->setPorcentajeIgv($detalle->porcentaje_igv)
-                 ->setIgv($detalle->igv)
+                 ->setCantidad((float)$detalle->cantidad)
+                 ->setMtoValorUnitario($valorUnitario)
+                 ->setMtoValorVenta($valorVenta)
+                 ->setMtoBaseIgv($valorVenta)
+                 ->setPorcentajeIgv((float)$detalle->porcentaje_igv)
+                 ->setIgv($igv)
                  ->setTipAfeIgv($detalle->tipo_afectacion_igv)
-                 ->setTotalImpuestos($detalle->igv)
-                 ->setMtoPrecioUnitario($detalle->precio_unitario);
+                 ->setTotalImpuestos($igv)
+                 ->setMtoPrecioUnitario($precioUnitario);
 
             $items[] = $item;
         }
 
         $invoice->setDetails($items);
 
-        // Totales
-        $invoice->setMtoOperGravadas($comprobante->operacion_gravada)
-                ->setMtoIGV($comprobante->total_igv)
-                ->setTotalImpuestos($comprobante->total_igv)
-                ->setMtoImpVenta($comprobante->importe_total);
+        // Totales - Asegurar precisión decimal y fórmula correcta
+        $mtoOperGravadas = number_format((float)$comprobante->operacion_gravada, 2, '.', '');
+        $mtoIGV = number_format((float)$comprobante->total_igv, 2, '.', '');
+        $mtoImpVenta = number_format((float)$comprobante->importe_total, 2, '.', '');
+        
+        // Verificar que la fórmula cuadre: MtoOperGravadas + IGV = MtoImpVenta
+        $calculado = number_format($mtoOperGravadas + $mtoIGV, 2, '.', '');
+        if ($calculado != $mtoImpVenta) {
+            throw new \Exception("Error de cálculo: $mtoOperGravadas + $mtoIGV = $calculado, pero MtoImpVenta es $mtoImpVenta");
+        }
+        
+        $invoice->setMtoOperGravadas((float)$mtoOperGravadas)
+                ->setMtoOperExoneradas(0.00)
+                ->setMtoOperInafectas(0.00)
+                ->setMtoIGV((float)$mtoIGV)
+                ->setValorVenta((float)$mtoOperGravadas)  // LineExtensionAmount (sin IGV)
+                ->setSubTotal((float)$mtoImpVenta)        // TaxInclusiveAmount (con IGV)
+                ->setTotalImpuestos((float)$mtoIGV)
+                ->setMtoImpVenta((float)$mtoImpVenta);    // PayableAmount
 
         // Leyendas
         $formatter = new NumeroALetras();
@@ -296,7 +335,7 @@ class GreenterService
 
         } catch (\Exception $e) {
             // Log del error pero no fallar el proceso
-            \Log::error('Error generando PDF: ' . $e->getMessage());
+            Log::error('Error generando PDF: ' . $e->getMessage());
         }
     }
 
@@ -354,5 +393,165 @@ class GreenterService
                 'error' => $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Procesar respuesta de SUNAT con logging completo
+     */
+    private function procesarRespuestaSunatConLog($comprobante, $result, $invoice, $sunatLog = null)
+    {
+        $startTime = microtime(true);
+        
+        if ($result->isSuccess()) {
+            // Éxito
+            $ticket = method_exists($result, 'getTicket') ? $result->getTicket() : null;
+            $comprobante->update([
+                'estado' => 'ACEPTADO',
+                'numero_ticket' => $ticket,
+                'fecha_aceptacion' => now(),
+                'mensaje_sunat' => 'El comprobante ha sido aceptado',
+                'xml_firmado' => $this->see->getFactory()->getLastXml(),
+                'hash_firma' => $this->generarHashFirma($invoice)
+            ]);
+
+            // Log de respuesta exitosa
+            if ($sunatLog) {
+                SunatLog::logRespuesta(
+                    $comprobante->id,
+                    'ACEPTADO',
+                    $ticket,
+                    $this->see->getFactory()->getLastXml(),
+                    method_exists($result, 'getCdrResponse') ? $result->getCdrResponse() : null,
+                    'El comprobante ha sido aceptado',
+                    null,
+                    round((microtime(true) - $startTime) * 1000)
+                );
+            }
+
+            Log::info('Factura aceptada por SUNAT', [
+                'comprobante_id' => $comprobante->id,
+                'ticket' => $ticket
+            ]);
+
+        } else {
+            // Error - Procesar códigos de error SUNAT
+            $errores = $result->getError()->getMessage();
+            $ticket = method_exists($result, 'getTicket') ? $result->getTicket() : null;
+            
+            // Extraer códigos de error del mensaje
+            $codigosError = $this->extraerCodigosError($errores);
+            $informacionErrores = $this->obtenerInformacionErrores($codigosError);
+            
+            $comprobante->update([
+                'estado' => 'RECHAZADO',
+                'numero_ticket' => $ticket,
+                'errores_sunat' => $errores,
+                'codigos_error_sunat' => json_encode($codigosError),
+                'informacion_errores' => json_encode($informacionErrores),
+                'mensaje_sunat' => 'El comprobante fue rechazado por SUNAT'
+            ]);
+
+            // Log de respuesta con error
+            if ($sunatLog) {
+                SunatLog::logRespuesta(
+                    $comprobante->id,
+                    'RECHAZADO',
+                    $ticket,
+                    $this->see->getFactory()->getLastXml(),
+                    method_exists($result, 'getCdrResponse') ? $result->getCdrResponse() : null,
+                    'El comprobante fue rechazado por SUNAT',
+                    $errores,
+                    round((microtime(true) - $startTime) * 1000)
+                );
+            }
+
+            Log::error('Factura rechazada por SUNAT', [
+                'comprobante_id' => $comprobante->id,
+                'ticket' => $ticket,
+                'errores' => $errores,
+                'codigos_error' => $codigosError,
+                'informacion_errores' => $informacionErrores
+            ]);
+        }
+    }
+
+    /**
+     * Generar hash de la firma digital
+     */
+    private function generarHashFirma($invoice)
+    {
+        try {
+            $xml = $this->see->getFactory()->getLastXml();
+            if ($xml) {
+                return hash('sha256', $xml);
+            }
+        } catch (\Exception $e) {
+            Log::warning('Error generando hash de firma: ' . $e->getMessage());
+        }
+        
+        return null;
+    }
+
+    /**
+     * Extraer códigos de error del mensaje de SUNAT
+     */
+    private function extraerCodigosError($mensajeError)
+    {
+        $codigos = [];
+        
+        // Buscar patrones como "0100", "0101", etc.
+        if (preg_match_all('/\b(\d{4})\b/', $mensajeError, $matches)) {
+            $codigos = array_unique($matches[1]);
+        }
+        
+        // Buscar patrones como "soap:Server.0100"
+        if (preg_match_all('/\.(\d{4})/', $mensajeError, $matches)) {
+            $codigos = array_merge($codigos, array_unique($matches[1]));
+        }
+        
+        // Buscar patrones como "error: 0100"
+        if (preg_match_all('/error:\s*(\d{4})/', $mensajeError, $matches)) {
+            $codigos = array_merge($codigos, array_unique($matches[1]));
+        }
+        
+        return array_unique($codigos);
+    }
+
+    /**
+     * Obtener información detallada de los códigos de error
+     */
+    private function obtenerInformacionErrores($codigosError)
+    {
+        $informacion = [];
+        
+        foreach ($codigosError as $codigo) {
+            $informacion[] = SunatErrorCode::obtenerInformacionError($codigo);
+        }
+        
+        return $informacion;
+    }
+
+    /**
+     * Obtener información de error por código
+     */
+    public function obtenerErrorPorCodigo($codigo)
+    {
+        return SunatErrorCode::obtenerInformacionError($codigo);
+    }
+
+    /**
+     * Obtener todos los códigos de error activos
+     */
+    public function obtenerTodosLosErrores()
+    {
+        return SunatErrorCode::obtenerActivos();
+    }
+
+    /**
+     * Obtener errores por categoría
+     */
+    public function obtenerErroresPorCategoria($categoria)
+    {
+        return SunatErrorCode::obtenerPorCategoria($categoria);
     }
 }

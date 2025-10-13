@@ -18,6 +18,7 @@ use App\Http\Controllers\UserRegistrationController;
 use App\Http\Controllers\CategoriasController;
 use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\VentasController;
+use App\Http\Controllers\ComprobantesController;
 use App\Http\Middleware\CheckPermission;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReniecController;
@@ -44,6 +45,9 @@ use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 
 use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\ComprasController;
+use App\Http\Controllers\FacturacionManualController;
+use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\SunatErrorController;
 
 
 
@@ -112,6 +116,51 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}', [VentasController::class, 'show']);
         Route::post('/{id}/facturar', [VentasController::class, 'facturar']);
         Route::patch('/{id}/anular', [VentasController::class, 'anular']);
+    });
+
+    // RUTAS DE COMPROBANTES (FACTURACIÓN ELECTRÓNICA)
+    Route::prefix('comprobantes')->group(function () {
+        Route::get('/', [ComprobantesController::class, 'index']);
+        Route::get('/estadisticas', [ComprobantesController::class, 'estadisticas']);
+        Route::get('/{id}', [ComprobantesController::class, 'show']);
+        Route::post('/{id}/reenviar', [ComprobantesController::class, 'reenviar']);
+        Route::post('/{id}/consultar', [ComprobantesController::class, 'consultar']);
+        Route::get('/{id}/pdf', [ComprobantesController::class, 'descargarPdf']);
+        Route::get('/{id}/xml', [ComprobantesController::class, 'descargarXml']);
+    });
+
+    // API RUTAS PARA FACTURACIÓN ELECTRÓNICA (SEMANA 2)
+    Route::prefix('facturas')->group(function () {
+        // Comprobantes principales
+        Route::get('/', [FacturacionManualController::class, 'index']); // Listar facturas
+        Route::post('/', [FacturacionManualController::class, 'store']); // Crear factura
+        Route::get('/{id}', [FacturacionManualController::class, 'show']); // Ver factura
+        Route::post('/{id}/enviar-sunat', [FacturacionManualController::class, 'enviarSUNAT']); // Enviar a SUNAT
+        Route::get('/{id}/pdf', [FacturacionManualController::class, 'descargarPdf']); // Descargar PDF
+        Route::get('/{id}/xml', [FacturacionManualController::class, 'descargarXml']); // Descargar XML
+        
+        // Utilidades
+        Route::get('/buscar-productos', [FacturacionManualController::class, 'buscarProductos']); // Buscar productos
+        Route::get('/clientes', [FacturacionManualController::class, 'getClientes']); // Listar clientes
+        Route::get('/series', [FacturacionManualController::class, 'getSeries']); // Listar series
+        Route::get('/estadisticas', [FacturacionManualController::class, 'estadisticas']); // Estadísticas
+    });
+
+    // WEBHOOKS PARA INTEGRACIÓN AUTOMÁTICA (SEMANA 3)
+    Route::prefix('webhook')->group(function () {
+        Route::post('/pago', [WebhookController::class, 'webhookPago']); // Webhook genérico de pago
+        Route::post('/culqi', [WebhookController::class, 'webhookCulqi']); // Webhook específico de Culqi
+    });
+
+    // CÓDIGOS DE ERROR SUNAT (REQUERIMIENTO DEL INGENIERO)
+    Route::prefix('sunat-errores')->group(function () {
+        Route::get('/', [SunatErrorController::class, 'index']); // Listar todos los códigos
+        Route::get('/categorias', [SunatErrorController::class, 'categorias']); // Listar categorías
+        Route::get('/estadisticas', [SunatErrorController::class, 'estadisticas']); // Estadísticas
+        Route::get('/buscar', [SunatErrorController::class, 'buscar']); // Buscar por texto
+        Route::post('/parsear', [SunatErrorController::class, 'parsear']); // Parsear mensaje SUNAT
+        Route::get('/categoria/{categoria}', [SunatErrorController::class, 'porCategoria']); // Por categoría
+        Route::get('/{codigo}', [SunatErrorController::class, 'show']); // Ver código específico
     });
 
 
@@ -573,8 +622,8 @@ Route::middleware('auth:sanctum')->group(function () {
         // Popups y Notificaciones para el cliente
         Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos'])->withoutMiddleware(['auth:sanctum']); // Ver popups activos para el cliente (sin autenticación)
         Route::get('/popups-probar-envio', [RecompensaNotificacionController::class, 'probarEnvioAutomatico']); // Probar envío automático de popups
-        Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto']); // Marcar popup como visto
-        Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup
+        Route::patch('/popups/{popupId}/marcar-visto', [RecompensaNotificacionController::class, 'marcarVisto'])->withoutMiddleware(['auth:sanctum']); // Marcar popup como visto
+        Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup'])->withoutMiddleware(['auth:sanctum']); // Cerrar popup
         Route::get('/notificaciones/historial', [RecompensaNotificacionController::class, 'historialNotificaciones']); // Historial de notificaciones
         Route::get('/popups-diagnostico', [RecompensaNotificacionController::class, 'diagnosticarPopups'])->withoutMiddleware(['auth:sanctum']); // Diagnóstico de popups
     });
