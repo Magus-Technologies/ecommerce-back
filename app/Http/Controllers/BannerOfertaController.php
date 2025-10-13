@@ -42,7 +42,8 @@ class BannerOfertaController extends Controller
     public function getBannerActivo()
     {
         $banner = BannerOferta::with(['productos' => function($query) {
-            $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock');
+            $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock', 'categoria_id', 'marca_id')
+                  ->with(['categoria:id,nombre', 'marca:id,nombre']);
         }])
         ->activos()
         ->ordenadosPorPrioridad()
@@ -59,6 +60,15 @@ class BannerOfertaController extends Controller
             $producto->precio = $producto->precio_venta;
             $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
             $producto->imagen_principal = $producto->imagen ? url('storage/productos/' . $producto->imagen) : null;
+
+            // Agregar información de categoría y marca
+            $producto->categoria_nombre = $producto->categoria ? $producto->categoria->nombre : null;
+            $producto->marca_nombre = $producto->marca ? $producto->marca->nombre : null;
+
+            // Limpiar relaciones innecesarias del JSON
+            unset($producto->categoria);
+            unset($producto->marca);
+
             return $producto;
         });
 
