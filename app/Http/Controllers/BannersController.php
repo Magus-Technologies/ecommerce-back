@@ -91,6 +91,43 @@ class BannersController extends Controller
     }
 
     /**
+     * ✅ NUEVO: Obtener banner activo para sidebar de shop (vertical)
+     */
+    public function bannerSidebarShopPublico()
+    {
+        try {
+            $banner = Banner::activos()
+                ->sidebar()
+                ->porPosicion('sidebar_shop')
+                ->ordenados()
+                ->first();
+
+            if (!$banner) {
+                return response()->json([
+                    'status' => 'success',
+                    'data' => null
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'id' => $banner->id,
+                    'titulo' => $banner->titulo,
+                    'enlace_url' => $banner->enlace_url,
+                    'imagen_url' => $banner->imagen_completa,
+                    'orden' => $banner->orden
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener banner sidebar shop: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Crear un nuevo banner
      */
     public function store(Request $request)
@@ -104,9 +141,9 @@ class BannersController extends Controller
             'precio_desde' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'orden' => 'nullable|integer|min:0',
-            'activo' => 'boolean',
-            'tipo_banner' => 'nullable|in:principal,horizontal', // ✅ NUEVO
-            'posicion_horizontal' => 'nullable|in:debajo_ofertas_especiales,debajo_categorias,debajo_ventas_flash' // ✅ NUEVO
+            'activo' => 'nullable|in:0,1,true,false', // ✅ Acepta FormData
+            'tipo_banner' => 'nullable|in:principal,horizontal,sidebar', // ✅ ACTUALIZADO: incluye sidebar
+            'posicion_horizontal' => 'nullable|in:debajo_ofertas_especiales,debajo_categorias,debajo_ventas_flash,sidebar_shop' // ✅ ACTUALIZADO
         ]);
 
         if ($validator->fails()) {
@@ -120,9 +157,11 @@ class BannersController extends Controller
         try {
             $data = $request->all();
 
-            // ✅ EL CAMPO YA VIENE CON EL NOMBRE CORRECTO
-            // No necesitamos mapear enlace_url
-            
+            // ✅ Convertir activo a booleano
+            if (isset($data['activo'])) {
+                $data['activo'] = filter_var($data['activo'], FILTER_VALIDATE_BOOLEAN);
+            }
+
             // Manejar la subida de imagen
             if ($request->hasFile('imagen')) {
                 $imagen = $request->file('imagen');
@@ -187,8 +226,8 @@ class BannersController extends Controller
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'orden' => 'nullable|integer|min:0',
             'activo' => 'sometimes|boolean',
-            'tipo_banner' => 'sometimes|in:principal,horizontal', // ✅ NUEVO
-            'posicion_horizontal' => 'nullable|in:debajo_ofertas_especiales,debajo_categorias,debajo_ventas_flash' // ✅ NUEVO
+            'tipo_banner' => 'sometimes|in:principal,horizontal,sidebar', // ✅ ACTUALIZADO: incluye sidebar
+            'posicion_horizontal' => 'nullable|in:debajo_ofertas_especiales,debajo_categorias,debajo_ventas_flash,sidebar_shop' // ✅ ACTUALIZADO
         ]);
 
         if ($validator->fails()) {
@@ -203,14 +242,16 @@ class BannersController extends Controller
             $banner = Banner::findOrFail($id);
             $data = $request->all();
 
-            // ✅ EL CAMPO YA VIENE CON EL NOMBRE CORRECTO
-            // No necesitamos mapear enlace_url
-            
+            // ✅ Convertir activo a booleano
+            if (isset($data['activo'])) {
+                $data['activo'] = filter_var($data['activo'], FILTER_VALIDATE_BOOLEAN);
+            }
+
             // Manejar la subida de nueva imagen
             if ($request->hasFile('imagen')) {
                 // Eliminar imagen anterior
                 $banner->eliminarImagenAnterior();
-                
+
                 // Subir nueva imagen
                 $imagen = $request->file('imagen');
                 $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
