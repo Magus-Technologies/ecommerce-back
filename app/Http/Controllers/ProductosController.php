@@ -54,16 +54,15 @@ class ProductosController extends Controller
             'descripcion' => 'nullable|string',
             'codigo_producto' => 'required|string|max:100|unique:productos,codigo_producto',
             'categoria_id' => 'required|exists:categorias,id',
+            'marca_id' => 'nullable|exists:marcas_productos,id', // ✅ AGREGADO
             'precio_compra' => 'required|numeric|min:0',
             'precio_venta' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'stock_minimo' => 'required|integer|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'activo' => 'boolean',
+            'destacado' => 'boolean',
             'mostrar_igv' => 'boolean',
-            'destacado' => 'boolean',        // <- NUEVA LÍNEA
-            'mostrar_igv' => 'boolean',
-
         ]);
 
         if ($validator->fails()) {
@@ -79,12 +78,13 @@ class ProductosController extends Controller
                 'descripcion',
                 'codigo_producto',
                 'categoria_id',
+                'marca_id',         // ✅ AGREGADO
                 'precio_compra',
                 'precio_venta',
                 'stock',
                 'stock_minimo',
                 'activo',
-                'destacado',        // <- NUEVA LÍNEA
+                'destacado',
                 'mostrar_igv'
             ]);
 

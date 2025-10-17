@@ -103,9 +103,9 @@ class UserHorario extends Model
         $hora = $fechaHora->format('H:i');
         $fecha = $fechaHora->format('Y-m-d');
 
-        Log::info("=== DEBUG DISPONIBILIDAD (ZONA HORARIA CORREGIDA) ===");
-        Log::info("Fecha/Hora Lima: {$fechaHora->format('Y-m-d H:i:s T')}");
-        Log::info("Usuario: {$userId}, Día: {$diaSemana}, Hora actual: {$hora}");
+        // Log::info("=== DEBUG DISPONIBILIDAD (ZONA HORARIA CORREGIDA) ===");
+        // Log::info("Fecha/Hora Lima: {$fechaHora->format('Y-m-d H:i:s T')}");
+        // Log::info("Usuario: {$userId}, Día: {$diaSemana}, Hora actual: {$hora}");
 
         // Verificar si hay excepción para fecha específica
         $excepcion = self::where('user_id', $userId)
@@ -143,10 +143,10 @@ class UserHorario extends Model
             $horaInicioHorario = self::extraerHora($horario->hora_inicio);
             $horaFinHorario = self::extraerHora($horario->hora_fin);
             
-            Log::info("Verificando horario: {$horaInicioHorario} - {$horaFinHorario}");
+            // Log::info("Verificando horario: {$horaInicioHorario} - {$horaFinHorario}");
             
             $disponible = $hora >= $horaInicioHorario && $hora <= $horaFinHorario;
-            Log::info("Comparación: {$hora} entre {$horaInicioHorario} y {$horaFinHorario} = " . ($disponible ? 'SÍ' : 'NO'));
+            // Log::info("Comparación: {$hora} entre {$horaInicioHorario} y {$horaFinHorario} = " . ($disponible ? 'SÍ' : 'NO'));
             
             if ($disponible) {
                 return true;
