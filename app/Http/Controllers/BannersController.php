@@ -295,3 +295,19 @@ class BannersController extends Controller
         }
     }
 }
+  
+  /**
+     * Obtener banners horizontales públicos
+     */
+    public function bannersHorizontalesPublicos()
+    {
+        return $this->bannersPublicos();
+    }
+
+    /**
+     * Obtener banner sidebar shop público
+     */
+    public function bannerSidebarShopPublico()
+    {
+        return $this->bannersPublicos();
+    }

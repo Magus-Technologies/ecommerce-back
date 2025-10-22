@@ -1,56 +1,70 @@
 <?php
+
 // routes/api.php
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\BannersPromocionalesController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CategoriasController;
+use App\Http\Controllers\ClientesController;
+use App\Http\Controllers\ComprasController;
+use App\Http\Controllers\CotizacionesController;
 use App\Http\Controllers\CuponesController;
+use App\Http\Controllers\DocumentTypeController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\EmpresaInfoController;
+use App\Http\Controllers\Facturacion\AuditoriaSunatController;
+use App\Http\Controllers\Facturacion\BajasController;
+use App\Http\Controllers\Facturacion\CatalogosSunatController;
+use App\Http\Controllers\Facturacion\CertificadosController;
+use App\Http\Controllers\Facturacion\ComprobantesArchivosController;
+use App\Http\Controllers\Facturacion\ComprobantesController;
+use App\Http\Controllers\Facturacion\ConfiguracionTributariaController;
+use App\Http\Controllers\Facturacion\EmpresaEmisoraController;
+use App\Http\Controllers\Facturacion\FacturacionManualController;
+use App\Http\Controllers\Facturacion\FacturacionStatusController;
+use App\Http\Controllers\Facturacion\GuiasRemisionController;
+use App\Http\Controllers\Facturacion\HistorialEnviosController;
+use App\Http\Controllers\Facturacion\IntegracionesController;
+use App\Http\Controllers\Facturacion\LogsController;
+use App\Http\Controllers\Facturacion\NotaCreditoController;
+use App\Http\Controllers\Facturacion\NotaDebitoController;
+use App\Http\Controllers\Facturacion\PagosController;
+use App\Http\Controllers\Facturacion\ReintentosController;
+use App\Http\Controllers\Facturacion\ReportesController;
+use App\Http\Controllers\Facturacion\ResumenesController;
+use App\Http\Controllers\Facturacion\SerieController;
+use App\Http\Controllers\Facturacion\SunatErrorController;
+use App\Http\Controllers\Facturacion\WebhookController;
+use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\OfertasController;
-use App\Http\Controllers\ProductoDetallesController;
-use App\Http\Controllers\SeccionController;
-use App\Http\Controllers\UsuariosController;
-use App\Http\Controllers\RoleController;
-use App\Http\Controllers\DocumentTypeController;
-use App\Http\Controllers\UbigeoController;
-use App\Http\Controllers\UserRegistrationController;
-use App\Http\Controllers\CategoriasController;
-use App\Http\Controllers\ProductosController;
-use App\Http\Controllers\VentasController;
-use App\Http\Controllers\ComprobantesController;
-use App\Http\Middleware\CheckPermission;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ReniecController;
-use App\Http\Controllers\ClientesController;
-use App\Http\Controllers\PedidosController;
 use App\Http\Controllers\PasswordResetController;
-use App\Http\Controllers\HorariosController;
-use App\Http\Controllers\EmailVerificationController;
-use App\Http\Controllers\CartController;
+use App\Http\Controllers\PedidosController;
+use App\Http\Controllers\ProductoDetallesController;
+use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\ReclamosController;
-
-use App\Http\Controllers\Recompensas\RecompensaController;
 use App\Http\Controllers\Recompensas\RecompensaAnalyticsController;
-use App\Http\Controllers\Recompensas\RecompensaSegmentoController;
-use App\Http\Controllers\Recompensas\RecompensaProductoController;
-use App\Http\Controllers\Recompensas\RecompensaPuntosController;
+use App\Http\Controllers\Recompensas\RecompensaClienteController;
+use App\Http\Controllers\Recompensas\RecompensaController;
 use App\Http\Controllers\Recompensas\RecompensaDescuentosController;
 use App\Http\Controllers\Recompensas\RecompensaEnviosController;
-use App\Http\Controllers\Recompensas\RecompensaRegalosController;
-use App\Http\Controllers\Recompensas\RecompensaClienteController;
 use App\Http\Controllers\Recompensas\RecompensaEstadisticaController;
-use App\Http\Controllers\Recompensas\RecompensaPopupController;
 use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
-
-use App\Http\Controllers\CotizacionesController;
-use App\Http\Controllers\ComprasController;
-use App\Http\Controllers\FacturacionManualController;
-use App\Http\Controllers\WebhookController;
-use App\Http\Controllers\SunatErrorController;
-
-
-
+use App\Http\Controllers\Recompensas\RecompensaPopupController;
+use App\Http\Controllers\Recompensas\RecompensaProductoController;
+use App\Http\Controllers\Recompensas\RecompensaPuntosController;
+use App\Http\Controllers\Recompensas\RecompensaRegalosController;
+use App\Http\Controllers\Recompensas\RecompensaSegmentoController;
+use App\Http\Controllers\ReniecController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SeccionController;
+use App\Http\Controllers\UbigeoController;
+use App\Http\Controllers\UserRegistrationController;
+use App\Http\Controllers\UsuariosController;
+use App\Http\Controllers\VentasController;
+use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AdminController::class, 'login'])->name('login');
 Route::post('/register', [AdminController::class, 'register']);
@@ -60,6 +74,7 @@ Route::post('/check-documento', [AdminController::class, 'checkDocumento']);
 Route::get('/document-types', [DocumentTypeController::class, 'getDocumentTypes']);
 
 Route::get('/reniec/buscar/{doc}', [ReniecController::class, 'buscar']);
+
 // Rutas para ubigeo
 Route::get('/departamentos', [UbigeoController::class, 'getDepartamentos']);
 Route::get('provincias/{departamentoId}', [UbigeoController::class, 'getProvincias']);
@@ -74,10 +89,13 @@ Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico
 Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
+Route::get('/banners-horizontales/publicos', [BannersController::class, 'bannersHorizontalesPublicos']); // ✅ NUEVO
+Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSidebarShopPublico']); // ✅ NUEVO
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
+Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
+Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
 Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
 Route::get('/marcas/por-categoria', [MarcaProductoController::class, 'marcasPorCategoria']);
-
 
 // Rutas públicas para ofertas
 Route::get('/ofertas/publicas', [OfertasController::class, 'ofertasPublicas']);
@@ -92,6 +110,10 @@ Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); //
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
 Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
 
+// Rutas públicas para formas de envío y tipos de pago
+Route::get('/formas-envio/activas', [FormaEnvioController::class, 'activas']);
+Route::get('/tipos-pago/activos', [TipoPagoController::class, 'activos']);
+
 // Rutas públicas de reclamos
 Route::post('/reclamos/crear', [ReclamosController::class, 'crear']);
 Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'buscarPorNumero']);
@@ -100,6 +122,29 @@ Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'busc
 Route::get('/arma-pc/categorias', [CategoriasController::class, 'categoriasArmaPc']);
 Route::get('/categorias/{id}/compatibles', [CategoriasController::class, 'getCategoriasCompatibles']);
 
+// =====================================================
+// ✅ SISTEMA DE GESTIÓN DE COOKIES - RUTAS PÚBLICAS
+// =====================================================
+Route::prefix('cookies')->group(function () {
+    // Obtener configuración pública del banner (sin autenticación)
+    Route::get('/configuracion/publica', [CookieConsentController::class, 'obtenerConfiguracionPublica']);
+
+    // Obtener preferencias del usuario actual (con o sin autenticación)
+    Route::get('/preferencias', [CookieConsentController::class, 'obtenerPreferencias']);
+
+    // Guardar preferencias personalizadas
+    Route::post('/preferencias', [CookieConsentController::class, 'guardarPreferencias']);
+
+    // Aceptar todas las cookies
+    Route::post('/aceptar-todo', [CookieConsentController::class, 'aceptarTodo']);
+
+    // Rechazar todas las cookies opcionales
+    Route::post('/rechazar-todo', [CookieConsentController::class, 'rechazarTodo']);
+
+    // Revocar consentimiento
+    Route::delete('/revocar', [CookieConsentController::class, 'revocarConsentimiento']);
+});
+// ============================================
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/user', [AdminController::class, 'user']);
@@ -107,43 +152,70 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AdminController::class, 'logout']);
 
     // NUEVAS RUTAS DE VENTAS
-    Route::prefix('ventas')->group(function () {
-        Route::get('/', [VentasController::class, 'index']);
-        Route::post('/', [VentasController::class, 'store']);
-        Route::get('/estadisticas', [VentasController::class, 'estadisticas']);
-        Route::get('/mis-ventas', [VentasController::class, 'misVentas']); // Para clientes e-commerce
-        Route::post('/ecommerce', [VentasController::class, 'crearVentaEcommerce']); // Para carrito
-        Route::get('/{id}', [VentasController::class, 'show']);
-        Route::post('/{id}/facturar', [VentasController::class, 'facturar']);
-        Route::patch('/{id}/anular', [VentasController::class, 'anular']);
+    // RUTAS DE VENTAS
+    Route::prefix('ventas')->middleware('permission:ventas.ver')->group(function () {
+        Route::get('/', [VentasController::class, 'index']); // Listar ventas
+        Route::get('/estadisticas', [VentasController::class, 'estadisticas']); // Estadísticas
+        Route::get('/mis-ventas', [VentasController::class, 'misVentas']); // Mis ventas (cliente e-commerce)
+        Route::get('/{id}', [VentasController::class, 'show'])->middleware('permission:ventas.show'); // Ver detalle
+        Route::get('/{id}/pdf', [VentasController::class, 'descargarPdf']); // Descargar PDF
+
+        Route::post('/', [VentasController::class, 'store'])->middleware('permission:ventas.create'); // Crear venta
+        Route::post('/ecommerce', [VentasController::class, 'crearVentaEcommerce'])->middleware('permission:ventas.create'); // Crear venta e-commerce
+        Route::post('/{id}/facturar', [VentasController::class, 'facturar'])->middleware('permission:ventas.facturar'); // Facturar venta
+        Route::post('/{id}/email', [VentasController::class, 'enviarEmail'])->middleware('permission:ventas.edit'); // Enviar por email
+        Route::patch('/{id}/anular', [VentasController::class, 'anular'])->middleware('permission:ventas.delete'); // Anular venta
+    });
+
+    // RUTAS DE UTILIDADES PARA VENTAS
+    Route::prefix('utilidades')->middleware('permission:ventas.ver')->group(function () {
+        Route::get('/clientes/buscar', [VentasController::class, 'buscarCliente']); // Buscar cliente
+        Route::post('/validar-ruc/{ruc}', [VentasController::class, 'validarRuc']); // Validar RUC
+        Route::get('/buscar-empresa/{ruc}', [VentasController::class, 'buscarEmpresa']); // Buscar empresa por RUC
     });
 
     // RUTAS DE COMPROBANTES (FACTURACIÓN ELECTRÓNICA)
-    Route::prefix('comprobantes')->group(function () {
+    Route::prefix('comprobantes')->middleware('permission:facturacion.comprobantes.ver')->group(function () {
         Route::get('/', [ComprobantesController::class, 'index']);
         Route::get('/estadisticas', [ComprobantesController::class, 'estadisticas']);
-        Route::get('/{id}', [ComprobantesController::class, 'show']);
-        Route::post('/{id}/reenviar', [ComprobantesController::class, 'reenviar']);
-        Route::post('/{id}/consultar', [ComprobantesController::class, 'consultar']);
+        Route::get('/{id}', [ComprobantesController::class, 'show'])->middleware('permission:facturacion.comprobantes.show');
         Route::get('/{id}/pdf', [ComprobantesController::class, 'descargarPdf']);
         Route::get('/{id}/xml', [ComprobantesController::class, 'descargarXml']);
+        Route::get('/{id}/cdr', [ComprobantesController::class, 'descargarCdr']);
+
+        Route::post('/{id}/reenviar', [ComprobantesController::class, 'reenviar'])->middleware('permission:facturacion.comprobantes.edit');
+        Route::post('/{id}/consultar', [ComprobantesController::class, 'consultar'])->middleware('permission:facturacion.comprobantes.edit');
+        Route::post('/{id}/email', [ComprobantesController::class, 'enviarEmail'])->middleware('permission:facturacion.comprobantes.edit');
+        Route::post('/{id}/whatsapp', [ComprobantesController::class, 'enviarWhatsApp'])->middleware('permission:facturacion.comprobantes.edit');
+        Route::patch('/{id}/anular', [ComprobantesController::class, 'anular'])->middleware('permission:facturacion.comprobantes.delete');
+    });
+
+    // RUTAS PARA SERIES (Facturación)
+    Route::prefix('series')->middleware('permission:facturacion.series.ver')->group(function () {
+        Route::get('/', [SerieController::class, 'index']); // Listar series
+        Route::get('/estadisticas', [SerieController::class, 'estadisticas']); // Estadísticas
+
+        Route::post('/', [SerieController::class, 'store'])->middleware('permission:facturacion.series.create'); // Crear serie
+        Route::patch('/{id}', [SerieController::class, 'update'])->middleware('permission:facturacion.series.edit'); // Actualizar serie
+        Route::post('/reservar-correlativo', [SerieController::class, 'reservarCorrelativo'])->middleware('permission:facturacion.series.edit'); // Reservar correlativo
     });
 
     // API RUTAS PARA FACTURACIÓN ELECTRÓNICA (SEMANA 2)
-    Route::prefix('facturas')->group(function () {
+    Route::prefix('facturas')->middleware('permission:facturacion.facturas.ver')->group(function () {
         // Comprobantes principales
         Route::get('/', [FacturacionManualController::class, 'index']); // Listar facturas
-        Route::post('/', [FacturacionManualController::class, 'store']); // Crear factura
-        Route::get('/{id}', [FacturacionManualController::class, 'show']); // Ver factura
-        Route::post('/{id}/enviar-sunat', [FacturacionManualController::class, 'enviarSUNAT']); // Enviar a SUNAT
+        Route::get('/{id}', [FacturacionManualController::class, 'show'])->middleware('permission:facturacion.facturas.show'); // Ver factura
         Route::get('/{id}/pdf', [FacturacionManualController::class, 'descargarPdf']); // Descargar PDF
         Route::get('/{id}/xml', [FacturacionManualController::class, 'descargarXml']); // Descargar XML
-        
+
         // Utilidades
         Route::get('/buscar-productos', [FacturacionManualController::class, 'buscarProductos']); // Buscar productos
         Route::get('/clientes', [FacturacionManualController::class, 'getClientes']); // Listar clientes
         Route::get('/series', [FacturacionManualController::class, 'getSeries']); // Listar series
         Route::get('/estadisticas', [FacturacionManualController::class, 'estadisticas']); // Estadísticas
+
+        Route::post('/', [FacturacionManualController::class, 'store'])->middleware('permission:facturacion.facturas.create'); // Crear factura
+        Route::post('/{id}/enviar-sunat', [FacturacionManualController::class, 'enviarSUNAT'])->middleware('permission:facturacion.facturas.edit'); // Enviar a SUNAT
     });
 
     // WEBHOOKS PARA INTEGRACIÓN AUTOMÁTICA (SEMANA 3)
@@ -163,6 +235,132 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{codigo}', [SunatErrorController::class, 'show']); // Ver código específico
     });
 
+    // ==============================
+    // FACTURACIÓN ELECTRÓNICA - API
+    // ==============================
+    Route::prefix('facturacion')->group(function () {
+
+        // Certificados
+        Route::prefix('certificados')->middleware('permission:facturacion.certificados.ver')->group(function () {
+            Route::get('/', [CertificadosController::class, 'index']);
+            Route::get('/{id}', [CertificadosController::class, 'show']);
+            Route::get('/{id}/validar', [CertificadosController::class, 'validar']);
+
+            Route::post('/', [CertificadosController::class, 'store'])->middleware('permission:facturacion.certificados.create');
+            Route::put('/{id}', [CertificadosController::class, 'update'])->middleware('permission:facturacion.certificados.edit');
+            Route::post('/{id}/activar', [CertificadosController::class, 'activar'])->middleware('permission:facturacion.certificados.edit');
+            Route::delete('/{id}', [CertificadosController::class, 'destroy'])->middleware('permission:facturacion.certificados.delete');
+        });
+
+        // Resúmenes (RC)
+        Route::prefix('resumenes')->middleware('permission:facturacion.resumenes.ver')->group(function () {
+            Route::get('/', [ResumenesController::class, 'index']);
+            Route::get('/{id}', [ResumenesController::class, 'show']);
+            Route::get('/{id}/xml', [ResumenesController::class, 'xml']);
+            Route::get('/{id}/cdr', [ResumenesController::class, 'cdr']);
+            Route::get('/{id}/ticket', [ResumenesController::class, 'consultarTicket']);
+
+            Route::post('/', [ResumenesController::class, 'store'])->middleware('permission:facturacion.resumenes.create');
+            Route::post('/{id}/enviar', [ResumenesController::class, 'enviar'])->middleware('permission:facturacion.resumenes.edit');
+        });
+
+        // Bajas (RA)
+        Route::prefix('bajas')->middleware('permission:facturacion.bajas.ver')->group(function () {
+            Route::get('/', [BajasController::class, 'index']);
+            Route::get('/{id}', [BajasController::class, 'show']);
+            Route::get('/{id}/xml', [BajasController::class, 'xml']);
+            Route::get('/{id}/cdr', [BajasController::class, 'cdr']);
+            Route::get('/{id}/ticket', [BajasController::class, 'consultarTicket']);
+
+            Route::post('/', [BajasController::class, 'store'])->middleware('permission:facturacion.bajas.create');
+            Route::post('/{id}/enviar', [BajasController::class, 'enviar'])->middleware('permission:facturacion.bajas.edit');
+        });
+
+        // Auditoría
+        Route::prefix('auditoria')->middleware('permission:facturacion.auditoria.ver')->group(function () {
+            Route::get('/', [AuditoriaSunatController::class, 'index']);
+            Route::get('/{id}', [AuditoriaSunatController::class, 'show']);
+        });
+
+        // Reintentos
+        Route::prefix('reintentos')->middleware('permission:facturacion.reintentos.ver')->group(function () {
+            Route::get('/', [ReintentosController::class, 'index']);
+
+            Route::post('/{id}/reintentar', [ReintentosController::class, 'reintentar'])->middleware('permission:facturacion.reintentos.edit');
+            Route::post('/reintentar-todo', [ReintentosController::class, 'reintentarTodo'])->middleware('permission:facturacion.reintentos.edit');
+            Route::put('/{id}/cancelar', [ReintentosController::class, 'cancelar'])->middleware('permission:facturacion.reintentos.edit');
+        });
+
+        // Catálogos SUNAT (solo lectura, no requiere permisos especiales)
+        Route::prefix('catalogos')->group(function () {
+            Route::get('/', [CatalogosSunatController::class, 'catalogos']);
+            Route::get('/principales', [CatalogosSunatController::class, 'catalogosPrincipales']);
+            Route::get('/buscar', [CatalogosSunatController::class, 'buscar']);
+            Route::get('/estadisticas', [CatalogosSunatController::class, 'estadisticas']);
+            Route::get('/{catalogo}', [CatalogosSunatController::class, 'index']);
+            Route::get('/{catalogo}/{codigo}', [CatalogosSunatController::class, 'show']);
+        });
+
+        // Empresa emisora
+        Route::middleware('permission:facturacion.empresa.ver')->group(function () {
+            Route::get('/empresa', [EmpresaEmisoraController::class, 'show']);
+            Route::get('/empresa/validar', [EmpresaEmisoraController::class, 'validar']);
+            Route::get('/empresa/info-publica', [EmpresaEmisoraController::class, 'infoPublica']);
+
+            Route::put('/empresa', [EmpresaEmisoraController::class, 'update'])->middleware('permission:facturacion.empresa.edit');
+        });
+
+        // Archivos de comprobantes
+        Route::prefix('comprobantes')->middleware('permission:facturacion.comprobantes.ver')->group(function () {
+            Route::get('/{id}/xml', [ComprobantesArchivosController::class, 'xml']);
+            Route::get('/{id}/cdr', [ComprobantesArchivosController::class, 'cdr']);
+            Route::get('/{id}/qr', [ComprobantesArchivosController::class, 'qr']);
+        });
+
+        // Salud del servicio (sin permisos, es público para admins)
+        Route::get('/status', [FacturacionStatusController::class, 'status']);
+
+        // Sistema de Contingencia
+        Route::prefix('contingencia')->middleware('permission:facturacion.contingencia.ver')->group(function () {
+            Route::get('/info', [App\Http\Controllers\Facturacion\ContingenciaController::class, 'info']);
+            Route::get('/estadisticas', [App\Http\Controllers\Facturacion\ContingenciaController::class, 'estadisticas']);
+
+            Route::post('/activar', [App\Http\Controllers\Facturacion\ContingenciaController::class, 'activar'])->middleware('permission:facturacion.contingencia.edit');
+            Route::post('/desactivar', [App\Http\Controllers\Facturacion\ContingenciaController::class, 'desactivar'])->middleware('permission:facturacion.contingencia.edit');
+            Route::post('/regularizar', [App\Http\Controllers\Facturacion\ContingenciaController::class, 'regularizar'])->middleware('permission:facturacion.contingencia.edit');
+            Route::post('/verificar', [App\Http\Controllers\Facturacion\ContingenciaController::class, 'verificar'])->middleware('permission:facturacion.contingencia.edit');
+        });
+    });
+
+    // RUTAS PARA NOTAS DE CRÉDITO Y DÉBITO
+    Route::prefix('notas-credito')->middleware('permission:facturacion.notas_credito.ver')->group(function () {
+        Route::get('/', [NotaCreditoController::class, 'index']);
+        Route::get('/estadisticas', [NotaCreditoController::class, 'estadisticas']);
+        Route::get('/{id}', [NotaCreditoController::class, 'show'])->middleware('permission:facturacion.notas_credito.show');
+
+        Route::post('/', [NotaCreditoController::class, 'store'])->middleware('permission:facturacion.notas_credito.create');
+        Route::post('/{id}/enviar-sunat', [NotaCreditoController::class, 'enviarSunat'])->middleware('permission:facturacion.notas_credito.edit');
+    });
+
+    Route::prefix('notas-debito')->middleware('permission:facturacion.notas_debito.ver')->group(function () {
+        Route::get('/', [NotaDebitoController::class, 'index']);
+        Route::get('/estadisticas', [NotaDebitoController::class, 'estadisticas']);
+        Route::get('/{id}', [NotaDebitoController::class, 'show'])->middleware('permission:facturacion.notas_debito.show');
+
+        Route::post('/', [NotaDebitoController::class, 'store'])->middleware('permission:facturacion.notas_debito.create');
+        Route::post('/{id}/enviar-sunat', [NotaDebitoController::class, 'enviarSunat'])->middleware('permission:facturacion.notas_debito.edit');
+    });
+
+    // RUTAS PARA GUÍAS DE REMISIÓN
+    Route::prefix('guias-remision')->middleware('permission:facturacion.guias_remision.ver')->group(function () {
+        Route::get('/', [GuiasRemisionController::class, 'index']);
+        Route::get('/estadisticas/resumen', [GuiasRemisionController::class, 'estadisticas']);
+        Route::get('/{id}', [GuiasRemisionController::class, 'show'])->middleware('permission:facturacion.guias_remision.show');
+        Route::get('/{id}/xml', [GuiasRemisionController::class, 'descargarXml']);
+
+        Route::post('/', [GuiasRemisionController::class, 'store'])->middleware('permission:facturacion.guias_remision.create');
+        Route::post('/{id}/enviar-sunat', [GuiasRemisionController::class, 'enviarSunat'])->middleware('permission:facturacion.guias_remision.edit');
+    });
 
     // Rutas de usuarios protegidas con permiso usuarios.ver
     Route::middleware('permission:usuarios.ver')->group(function () {
@@ -174,16 +372,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/usuarios/register', [UserRegistrationController::class, 'store'])->middleware('permission:usuarios.create');
     });
 
+    // RUTAS DE ROLES Y PERMISOS
+    Route::middleware('permission:roles.ver')->group(function () {
+        Route::get('/permissions', [RoleController::class, 'getPermissions']); // Listar todos los permisos
+        Route::get('/roles', [RoleController::class, 'getRoles']); // Listar roles
+        Route::get('/roles/{id}/permissions', [RoleController::class, 'getRolePermissions']); // Ver permisos de un rol
 
-    Route::get('/permissions', [RoleController::class, 'getPermissions']);
-    Route::get('/roles/{id}/permissions', [RoleController::class, 'getRolePermissions']);
-    Route::put('/roles/{id}/permissions', [RoleController::class, 'updateRolePermissions']);
-    Route::post('/roles', [RoleController::class, 'store']);
-    Route::delete('/roles/{id}', [RoleController::class, 'destroy']);
-
-
-
-    Route::get('/roles', [RoleController::class, 'getRoles']);
+        Route::post('/roles', [RoleController::class, 'store'])->middleware('permission:roles.create'); // Crear rol
+        Route::put('/roles/{id}/permissions', [RoleController::class, 'updateRolePermissions'])->middleware('permission:roles.edit'); // Actualizar permisos
+        Route::delete('/roles/{id}', [RoleController::class, 'destroy'])->middleware('permission:roles.delete'); // Eliminar rol
+    });
 
     // Productos - Protección con permisos
     Route::middleware('permission:productos.ver')->group(function () {
@@ -336,8 +534,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reordenar no tiene un permiso específico, se asume que está incluido en banners.edit o se deja sin protección
     Route::post('/banners/reordenar', [BannersController::class, 'reordenar']);
 
-
-
     // Protección de rutas del módulo banners promocionales con sus respectivos permisos
     Route::middleware('permission:banners_promocionales.ver')->group(function () {
         Route::get('/banners-promocionales', [BannersPromocionalesController::class, 'index']);
@@ -383,21 +579,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/clientes/{id}', [ClientesController::class, 'destroy']);
     });
 
-    // Rutas de Pedidos
-    Route::prefix('pedidos')->group(function () {
-        Route::get('/', [PedidosController::class, 'index'])->middleware('permission:pedidos.ver');
-        Route::get('/estados', [PedidosController::class, 'getEstados']);
-        Route::get('/metodos-pago', [PedidosController::class, 'getMetodosPago']);
-        Route::get('/estadisticas', [PedidosController::class, 'estadisticas']);
-        Route::post('/ecommerce', [PedidosController::class, 'crearPedidoEcommerce']); // Para carrito
-        Route::get('/mis-pedidos', [PedidosController::class, 'misPedidos']); // Para clientes
-        Route::get('/{id}/tracking', [PedidosController::class, 'getTrackingPedido']); // Tracking para clientes
-        Route::get('/usuario/{userId}', [PedidosController::class, 'pedidosPorUsuario']); // Para obtener pedidos de un usuario específico
-        Route::get('/{id}', [PedidosController::class, 'show'])->middleware('permission:pedidos.show');
-        Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit');
-        Route::patch('/{id}/estado', [PedidosController::class, 'actualizarEstado'])->middleware('permission:pedidos.edit');
-        Route::post('/{id}/cambiar-estado', [PedidosController::class, 'cambiarEstado'])->middleware('permission:pedidos.edit'); // Nuevo método con tracking
-        Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete');
+    // RUTAS DE PEDIDOS
+    Route::prefix('pedidos')->middleware('permission:pedidos.ver')->group(function () {
+        Route::get('/', [PedidosController::class, 'index']); // Listar pedidos
+        Route::get('/estados', [PedidosController::class, 'getEstados']); // Obtener estados disponibles
+        Route::get('/metodos-pago', [PedidosController::class, 'getMetodosPago']); // Obtener métodos de pago
+        Route::get('/estadisticas', [PedidosController::class, 'estadisticas']); // Estadísticas de pedidos
+        Route::get('/mis-pedidos', [PedidosController::class, 'misPedidos']); // Mis pedidos (cliente)
+        Route::get('/{id}', [PedidosController::class, 'show'])->middleware('permission:pedidos.show'); // Ver detalle
+        Route::get('/{id}/tracking', [PedidosController::class, 'getTrackingPedido']); // Ver tracking
+        Route::get('/usuario/{userId}', [PedidosController::class, 'pedidosPorUsuario']); // Pedidos por usuario
+
+        Route::post('/ecommerce', [PedidosController::class, 'crearPedidoEcommerce'])->middleware('permission:pedidos.create'); // Crear pedido e-commerce
+        Route::put('/{id}/estado', [PedidosController::class, 'updateEstado'])->middleware('permission:pedidos.edit'); // Actualizar estado
+        Route::patch('/{id}/estado', [PedidosController::class, 'actualizarEstado'])->middleware('permission:pedidos.edit'); // Actualizar estado (alt)
+        Route::post('/{id}/cambiar-estado', [PedidosController::class, 'cambiarEstado'])->middleware('permission:pedidos.edit'); // Cambiar estado con tracking
+        Route::delete('/{id}', [PedidosController::class, 'destroy'])->middleware('permission:pedidos.delete'); // Eliminar pedido
     });
 
     // Rutas de horarios protegidas con permisos
@@ -454,24 +651,23 @@ Route::middleware('auth:sanctum')->group(function () {
     // Rutas de reclamos para usuarios autenticados
     Route::prefix('reclamos')->group(function () {
         Route::get('/mis-reclamos', [ReclamosController::class, 'misReclamos']);
-        
+
         // Rutas para administradores
         Route::middleware('permission:reclamos.ver')->group(function () {
             Route::get('/', [ReclamosController::class, 'index']);
             Route::get('/estadisticas', [ReclamosController::class, 'estadisticas']);
             Route::get('/{id}', [ReclamosController::class, 'show'])->middleware('permission:reclamos.show');
         });
-        
+
         Route::middleware('permission:reclamos.edit')->group(function () {
             Route::patch('/{id}/respuesta', [ReclamosController::class, 'actualizarRespuesta']);
             Route::patch('/{id}/estado', [ReclamosController::class, 'cambiarEstado']);
         });
-        
+
         Route::middleware('permission:reclamos.delete')->group(function () {
             Route::delete('/{id}', [ReclamosController::class, 'destroy']);
         });
     });
-
 
     // ========================================
     // MÓDULO DE RECOMPENSAS
@@ -479,7 +675,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // GRUPO ADMINISTRACIÓN - Gestión de Recompensas
     Route::prefix('admin/recompensas')->middleware('permission:recompensas.ver')->group(function () {
-        
+
         // Gestión principal de recompensas
         Route::get('/', [RecompensaController::class, 'index']); // Listar recompensas
         Route::get('/popups', [RecompensaController::class, 'indexPopups']); // Listar recompensas para popups (solo activas, programadas y pausadas)
@@ -496,14 +692,14 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/comparativa', [RecompensaAnalyticsController::class, 'comparativa']); // Comparar períodos
             Route::get('/comportamiento-clientes', [RecompensaAnalyticsController::class, 'comportamientoClientes']); // Análisis de clientes
         });
-        
+
         // Creación y edición (requiere permisos específicos)
         Route::post('/', [RecompensaController::class, 'store'])->middleware('permission:recompensas.create'); // Crear recompensa
         Route::put('/{id}', [RecompensaController::class, 'update'])->middleware('permission:recompensas.edit'); // Editar recompensa (pausa automáticamente si está activa)
         Route::patch('/{id}/pause', [RecompensaController::class, 'pause'])->middleware('permission:recompensas.edit'); // Pausar recompensa
         Route::patch('/{id}/activate', [RecompensaController::class, 'activate'])->middleware('permission:recompensas.activate'); // Activar recompensa
         Route::delete('/{id}', [RecompensaController::class, 'destroy'])->middleware('permission:recompensas.delete'); // Cancelar recompensa
-        
+
         // Gestión de segmentos y clientes
         Route::prefix('{recompensaId}/segmentos')->middleware('permission:recompensas.segmentos')->group(function () {
             Route::get('/', [RecompensaSegmentoController::class, 'index']); // Listar segmentos asignados
@@ -513,10 +709,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/estadisticas', [RecompensaSegmentoController::class, 'estadisticasSegmentacion']); // Estadísticas de segmentación
             Route::post('/validar-cliente', [RecompensaSegmentoController::class, 'validarCliente']); // Validar cliente específico
         });
-        
+
         // Búsqueda de clientes para asignación
         Route::get('/clientes/buscar', [RecompensaSegmentoController::class, 'buscarClientes'])->middleware('permission:recompensas.segmentos');
-        
+
         // Gestión de productos y categorías
         Route::prefix('{recompensaId}/productos')->middleware('permission:recompensas.productos')->group(function () {
             Route::get('/', [RecompensaProductoController::class, 'index']); // Listar productos/categorías asignados
@@ -526,13 +722,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/estadisticas', [RecompensaProductoController::class, 'estadisticas']); // Estadísticas de productos
             Route::post('/validar-producto', [RecompensaProductoController::class, 'validarProducto']); // Validar producto específico
         });
-        
+
         // Búsqueda de productos y categorías
         Route::get('/productos/buscar', [RecompensaProductoController::class, 'buscarProductos'])->middleware('permission:recompensas.productos');
         Route::get('/categorias/buscar', [RecompensaProductoController::class, 'buscarCategorias'])->middleware('permission:recompensas.productos');
-        
+
         // Configuración de submódulos
-        
+
         // Submódulo de Puntos
         Route::prefix('{recompensaId}/puntos')->middleware('permission:recompensas.puntos')->group(function () {
             Route::get('/', [RecompensaPuntosController::class, 'index']); // Ver configuración
@@ -541,11 +737,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/{configId}', [RecompensaPuntosController::class, 'destroy']); // Eliminar configuración
             Route::post('/simular', [RecompensaPuntosController::class, 'simular']); // Simular cálculo de puntos
         });
-        
+
         // Utilidades para puntos
         Route::get('/puntos/ejemplos', [RecompensaPuntosController::class, 'ejemplos'])->middleware('permission:recompensas.puntos');
         Route::post('/puntos/validar', [RecompensaPuntosController::class, 'validar'])->middleware('permission:recompensas.puntos');
-        
+
         // Submódulo de Descuentos
         Route::prefix('{recompensaId}/descuentos')->middleware('permission:recompensas.descuentos')->group(function () {
             Route::get('/', [RecompensaDescuentosController::class, 'index']); // Ver configuración
@@ -555,11 +751,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/simular', [RecompensaDescuentosController::class, 'simular']); // Simular descuentos
             Route::post('/calcular', [RecompensaDescuentosController::class, 'calcular']); // Calcular descuento específico
         });
-        
+
         // Utilidades para descuentos
         Route::get('/descuentos/tipos', [RecompensaDescuentosController::class, 'tiposDisponibles'])->middleware('permission:recompensas.descuentos');
         Route::post('/descuentos/validar', [RecompensaDescuentosController::class, 'validar'])->middleware('permission:recompensas.descuentos');
-        
+
         // Submódulo de Envíos
         Route::prefix('{recompensaId}/envios')->middleware('permission:recompensas.envios')->group(function () {
             Route::get('/', [RecompensaEnviosController::class, 'index']); // Ver configuración
@@ -569,11 +765,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/validar', [RecompensaEnviosController::class, 'validar']); // Validar envío gratuito
             Route::get('/estadisticas-cobertura', [RecompensaEnviosController::class, 'estadisticasCobertura']); // Estadísticas de cobertura
         });
-        
+
         // Utilidades para envíos
         Route::get('/envios/zonas/buscar', [RecompensaEnviosController::class, 'buscarZonas'])->middleware('permission:recompensas.envios');
         Route::get('/envios/departamentos', [RecompensaEnviosController::class, 'departamentos'])->middleware('permission:recompensas.envios');
-        
+
         // Submódulo de Regalos
         Route::prefix('{recompensaId}/regalos')->middleware('permission:recompensas.regalos')->group(function () {
             Route::get('/', [RecompensaRegalosController::class, 'index']); // Ver configuración
@@ -584,10 +780,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/simular', [RecompensaRegalosController::class, 'simular']); // Simular regalos
             Route::get('/estadisticas', [RecompensaRegalosController::class, 'estadisticas']); // Estadísticas de regalos
         });
-        
+
         // Búsqueda de productos para regalos
         Route::get('/regalos/productos/buscar', [RecompensaRegalosController::class, 'buscarProductos'])->middleware('permission:recompensas.regalos');
-        
+
         // Submódulo de Popups
         Route::prefix('{recompensaId}/popups')->middleware('permission:recompensas.popups')->group(function () {
             Route::get('/', [RecompensaPopupController::class, 'index']); // Listar popups de la recompensa
@@ -598,27 +794,27 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::patch('/{popupId}/toggle', [RecompensaPopupController::class, 'toggleActivo']); // Activar/desactivar popup
             Route::get('/estadisticas-popups', [RecompensaPopupController::class, 'estadisticas']); // Estadísticas de popups
         });
-        
+
         // Gestión de Notificaciones (Admin)
         Route::prefix('{recompensaId}/notificaciones')->middleware('permission:recompensas.notificaciones')->group(function () {
             Route::post('/enviar', [RecompensaNotificacionController::class, 'enviarNotificacion']); // Enviar notificación a clientes
             Route::get('/estadisticas', [RecompensaNotificacionController::class, 'estadisticasNotificaciones']); // Estadísticas de notificaciones
         });
     });
-    
+
     // 🔹 GRUPO CLIENTE - Consulta de Recompensas (JWT)
     Route::prefix('cliente/recompensas')->group(function () {
-        
+
         // Recompensas disponibles para el cliente
         Route::get('/activas', [RecompensaClienteController::class, 'recompensasActivas']); // Ver recompensas activas que le aplican
         Route::get('/{id}/detalle', [RecompensaClienteController::class, 'detalleRecompensa']); // Ver detalle de recompensa específica
-        
+
         // Historial del cliente
         Route::get('/historial', [RecompensaClienteController::class, 'historialRecompensas']); // Consultar historial de recompensas recibidas
-        
+
         // Puntos del cliente
         Route::get('/puntos', [RecompensaClienteController::class, 'puntosAcumulados']); // Consultar puntos acumulados
-        
+
         // Popups y Notificaciones para el cliente
         Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivos'])->withoutMiddleware(['auth:sanctum']); // Ver popups activos para el cliente (sin autenticación)
         Route::get('/popups-probar-envio', [RecompensaNotificacionController::class, 'probarEnvioAutomatico']); // Probar envío automático de popups
@@ -628,17 +824,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/popups-diagnostico', [RecompensaNotificacionController::class, 'diagnosticarPopups'])->withoutMiddleware(['auth:sanctum']); // Diagnóstico de popups
     });
 
-    // 🔹 GRUPO PÚBLICO - Recompensas para Clientes No Registrados
-    Route::prefix('publico/recompensas')->withoutMiddleware(['auth:sanctum'])->group(function () {
-        
-        // Recompensas públicas (sin autenticación)
-        Route::get('/publicas', [RecompensaClienteController::class, 'recompensasPublicas']); // Ver recompensas para clientes no registrados
-        // Popups públicos (sin autenticación)
-        Route::get('/popups-activos', [RecompensaNotificacionController::class, 'popupsActivosPublico'])
-            ->name('publico.recompensas.popups-activos')
-            ->withoutMiddleware(['auth:sanctum']);
-        Route::patch('/popups/{popupId}/cerrar', [RecompensaNotificacionController::class, 'cerrarPopup']); // Cerrar popup público
-    });
+    // Nota: Las rutas públicas de recompensas están definidas al inicio del archivo (fuera de auth:sanctum)
 
     // 🔹 ENDPOINT DE DIAGNÓSTICO - Para verificar pop-ups
     Route::get('/popups/diagnostico', [RecompensaNotificacionController::class, 'diagnosticarPopups'])
@@ -669,9 +855,93 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/motorizados/{id}', [App\Http\Controllers\MotorizadosController::class, 'destroy']);
     });
 
+    // ========================================
+    // MÓDULOS ADICIONALES DE FACTURACIÓN
+    // ========================================
+
+    // RUTAS DE PAGOS
+    Route::prefix('pagos')->middleware('permission:facturacion.pagos.ver')->group(function () {
+        Route::get('/', [PagosController::class, 'index']); // Listar pagos
+        Route::get('/{id}', [PagosController::class, 'show'])->middleware('permission:facturacion.pagos.show'); // Ver detalle de pago
+        Route::get('/comprobante/{comprobanteId}', [PagosController::class, 'pagosPorComprobante']); // Pagos por comprobante
+        Route::get('/estadisticas/resumen', [PagosController::class, 'estadisticas']); // Estadísticas
+
+        Route::post('/', [PagosController::class, 'store'])->middleware('permission:facturacion.pagos.create'); // Registrar pago
+        Route::put('/{id}', [PagosController::class, 'update'])->middleware('permission:facturacion.pagos.edit'); // Actualizar pago
+        Route::post('/{id}/anular', [PagosController::class, 'anular'])->middleware('permission:facturacion.pagos.delete'); // Anular pago
+        Route::post('/registro-externo', [PagosController::class, 'registrarPagoExterno'])->middleware('permission:facturacion.pagos.create'); // Registro de pago externo
+    });
+
+    // RUTAS DE REPORTES
+    Route::prefix('reportes')->middleware('permission:facturacion.reportes.ver')->group(function () {
+        Route::get('/ventas', [ReportesController::class, 'reporteVentas']); // Reporte de ventas
+        Route::get('/anulaciones', [ReportesController::class, 'reporteAnulaciones']); // Reporte de anulaciones
+        Route::get('/impuestos', [ReportesController::class, 'reporteImpuestos']); // Reporte de impuestos
+        Route::get('/notas-credito', [ReportesController::class, 'reporteNotasCredito']); // Reporte notas de crédito
+        Route::get('/notas-debito', [ReportesController::class, 'reporteNotasDebito']); // Reporte notas de débito
+        Route::get('/pagos', [ReportesController::class, 'reportePagos']); // Reporte de pagos
+        Route::get('/consolidado', [ReportesController::class, 'reporteConsolidado']); // Reporte consolidado
+    });
+
+    // RUTAS DE HISTORIAL DE ENVÍOS
+    Route::prefix('historial-envios')->middleware('permission:facturacion.historial_envios.ver')->group(function () {
+        Route::get('/', [HistorialEnviosController::class, 'index']); // Listar historial
+        Route::get('/{id}', [HistorialEnviosController::class, 'show']); // Ver detalle de envío
+        Route::get('/comprobante/{comprobanteId}', [HistorialEnviosController::class, 'historialPorComprobante']); // Historial por comprobante
+        Route::get('/estadisticas/resumen', [HistorialEnviosController::class, 'estadisticas']); // Estadísticas
+        Route::get('/{id}/xml', [HistorialEnviosController::class, 'obtenerXml']); // Obtener XML
+        Route::get('/{id}/cdr', [HistorialEnviosController::class, 'obtenerCdr']); // Obtener CDR
+
+        Route::post('/{comprobanteId}/reenviar', [HistorialEnviosController::class, 'reenviar'])->middleware('permission:facturacion.historial_envios.edit'); // Reenviar
+        Route::post('/ticket/consultar', [HistorialEnviosController::class, 'consultarTicket'])->middleware('permission:facturacion.historial_envios.edit'); // Consultar ticket
+        Route::delete('/limpiar', [HistorialEnviosController::class, 'limpiarLogsAntiguos'])->middleware('permission:facturacion.historial_envios.delete'); // Limpiar logs antiguos
+    });
+
+    // RUTAS DE LOGS
+    Route::prefix('logs')->middleware('permission:facturacion.logs.ver')->group(function () {
+        Route::get('/', [LogsController::class, 'index']); // Listar logs
+        Route::get('/{id}', [LogsController::class, 'show']); // Ver detalle de log
+        Route::get('/estadisticas/resumen', [LogsController::class, 'estadisticas']); // Estadísticas
+        Route::get('/laravel/archivo', [LogsController::class, 'laravelLogs']); // Logs de Laravel
+        Route::get('/exportar/csv', [LogsController::class, 'exportarCsv']); // Exportar a CSV
+        Route::get('/modulo/{modulo}', [LogsController::class, 'logsPorModulo']); // Logs por módulo
+
+        Route::post('/', [LogsController::class, 'store'])->middleware('permission:facturacion.logs.create'); // Registrar log
+        Route::patch('/{id}/resolver', [LogsController::class, 'marcarResuelto'])->middleware('permission:facturacion.logs.edit'); // Marcar como resuelto
+        Route::delete('/limpiar', [LogsController::class, 'limpiarLogsAntiguos'])->middleware('permission:facturacion.logs.delete'); // Limpiar logs antiguos
+        Route::post('/alerta/crear', [LogsController::class, 'crearAlerta'])->middleware('permission:facturacion.logs.create'); // Crear alerta
+    });
+
+    // RUTAS DE CONFIGURACIÓN TRIBUTARIA
+    Route::prefix('configuracion-tributaria')->middleware('permission:facturacion.configuracion.ver')->group(function () {
+        Route::get('/', [ConfiguracionTributariaController::class, 'index']); // Obtener configuración
+        Route::get('/endpoints', [ConfiguracionTributariaController::class, 'obtenerEndpoints']); // Obtener endpoints
+        Route::get('/probar-conexion', [ConfiguracionTributariaController::class, 'probarConexion']); // Probar conexión
+
+        Route::put('/', [ConfiguracionTributariaController::class, 'update'])->middleware('permission:facturacion.configuracion.edit'); // Actualizar configuración
+        Route::post('/validar-sol', [ConfiguracionTributariaController::class, 'validarCredencialesSol'])->middleware('permission:facturacion.configuracion.edit'); // Validar SOL
+        Route::post('/validar-certificado', [ConfiguracionTributariaController::class, 'validarCertificado'])->middleware('permission:facturacion.configuracion.edit'); // Validar certificado
+        Route::post('/cambiar-ambiente', [ConfiguracionTributariaController::class, 'cambiarAmbiente'])->middleware('permission:facturacion.configuracion.edit'); // Cambiar ambiente
+    });
+
+    // RUTAS DE INTEGRACIONES
+    Route::prefix('integraciones')->middleware('permission:facturacion.integraciones.ver')->group(function () {
+        Route::get('/', [IntegracionesController::class, 'index']); // Listar integraciones
+        Route::get('/{id}', [IntegracionesController::class, 'show'])->middleware('permission:facturacion.integraciones.show'); // Ver detalle
+        Route::get('/{id}/probar', [IntegracionesController::class, 'probarConexion']); // Probar conexión
+
+        Route::post('/', [IntegracionesController::class, 'store'])->middleware('permission:facturacion.integraciones.create'); // Crear integración
+        Route::put('/{id}', [IntegracionesController::class, 'update'])->middleware('permission:facturacion.integraciones.edit'); // Actualizar integración
+        Route::delete('/{id}', [IntegracionesController::class, 'destroy'])->middleware('permission:facturacion.integraciones.delete'); // Eliminar integración
+        Route::post('/culqi', [IntegracionesController::class, 'culqi'])->middleware('permission:facturacion.integraciones.edit'); // Integración Culqi
+        Route::post('/contabilidad', [IntegracionesController::class, 'contabilidad'])->middleware('permission:facturacion.integraciones.edit'); // Integración contable
+        Route::post('/sincronizar', [IntegracionesController::class, 'sincronizarTodas'])->middleware('permission:facturacion.integraciones.edit'); // Sincronizar todas
+    });
+
+    // WEBHOOK PARA INTEGRACIONES
+    Route::post('/integraciones/{integracionId}/webhook', [IntegracionesController::class, 'webhook']); // Webhook genérico
 
 });
-
 
 // Rutas de recuperación de contraseña
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
@@ -708,60 +978,294 @@ Route::prefix('cotizacion')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    // ✅ RUTAS DE COTIZACIONES
-    Route::prefix('cotizaciones')->group(function () {
-        // Ruta para crear cotización desde checkout (requiere autenticación)
-        Route::post('/ecommerce', [CotizacionesController::class, 'crearCotizacionEcommerce']); // Crear cotización desde checkout
-
-        // Rutas para clientes
-        Route::get('/mis-cotizaciones', [CotizacionesController::class, 'misCotizaciones']); // Ver mis cotizaciones
-        Route::get('/{id}/pdf', [CotizacionesController::class, 'generarPDF']); // Generar PDF de cotización
-        Route::post('/{id}/convertir-compra', [CotizacionesController::class, 'convertirACompra']); // Convertir a compra
+    // RUTAS DE COTIZACIONES
+    Route::prefix('cotizaciones')->middleware('permission:cotizaciones.ver')->group(function () {
+        // Rutas administrativas de lectura
+        Route::get('/', [CotizacionesController::class, 'index']); // Listar todas
+        Route::get('/estadisticas', [CotizacionesController::class, 'estadisticas']); // Estadísticas
+        Route::get('/estados/lista', [CotizacionesController::class, 'getEstados']); // Obtener estados
+        Route::get('/{id}', [CotizacionesController::class, 'show'])->middleware('permission:cotizaciones.show'); // Ver detalle
+        Route::get('/{id}/pdf', [CotizacionesController::class, 'generarPDF']); // Generar PDF
         Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']); // Ver tracking
 
-        // Rutas para administradores
-        Route::middleware('permission:cotizaciones.ver')->group(function () {
-            Route::get('/', [CotizacionesController::class, 'index']); // Listar todas
-            Route::get('/estadisticas', [CotizacionesController::class, 'estadisticas']); // Estadísticas
-            Route::get('/{id}', [CotizacionesController::class, 'show'])->middleware('permission:cotizaciones.show'); // Ver detalle
-        });
+        // Rutas de cliente (autogestión)
+        Route::get('/mis-cotizaciones', [CotizacionesController::class, 'misCotizaciones']); // Ver mis cotizaciones
 
-        Route::middleware('permission:cotizaciones.edit')->group(function () {
-            Route::patch('/{id}/estado', [CotizacionesController::class, 'cambiarEstado']); // Cambiar estado
-        });
-
-        // Estados de cotización
-        Route::get('/estados/lista', [CotizacionesController::class, 'getEstados']); // Obtener estados
+        // Rutas de creación y modificación
+        Route::post('/ecommerce', [CotizacionesController::class, 'crearCotizacionEcommerce'])->middleware('permission:cotizaciones.create'); // Crear cotización desde checkout
+        Route::post('/{id}/convertir-compra', [CotizacionesController::class, 'convertirACompra'])->middleware('permission:cotizaciones.convertir'); // Convertir a compra
+        Route::patch('/{id}/estado', [CotizacionesController::class, 'cambiarEstado'])->middleware('permission:cotizaciones.edit'); // Cambiar estado
     });
 
-    // ✅ RUTAS DE COMPRAS
-    Route::prefix('compras')->group(function () {
-        // Rutas para clientes
-        Route::post('/', [ComprasController::class, 'store']); // Crear compra desde ecommerce
-        Route::get('/mis-compras', [ComprasController::class, 'misCompras']); // Ver mis compras
-        Route::post('/{id}/cancelar', [ComprasController::class, 'cancelar']); // Cancelar compra
+    // RUTAS DE COMPRAS
+    Route::prefix('compras')->middleware('permission:compras.ver')->group(function () {
+        // Rutas administrativas de lectura
+        Route::get('/', [ComprasController::class, 'index']); // Listar todas
+        Route::get('/estadisticas', [ComprasController::class, 'estadisticas']); // Estadísticas
+        Route::get('/estados/lista', [ComprasController::class, 'getEstados']); // Obtener estados
+        Route::get('/{id}', [ComprasController::class, 'show'])->middleware('permission:compras.show'); // Ver detalle
         Route::get('/{id}/tracking', [ComprasController::class, 'getTracking']); // Ver tracking
 
-        // Rutas para administradores
-        Route::middleware('permission:compras.ver')->group(function () {
-            Route::get('/', [ComprasController::class, 'index']); // Listar todas
-            Route::get('/estadisticas', [ComprasController::class, 'estadisticas']); // Estadísticas
-            Route::get('/{id}', [ComprasController::class, 'show'])->middleware('permission:compras.show'); // Ver detalle
-        });
+        // Rutas de cliente (autogestión)
+        Route::get('/mis-compras', [ComprasController::class, 'misCompras']); // Ver mis compras
 
-        Route::middleware('permission:compras.aprobar')->group(function () {
-            Route::post('/{id}/aprobar', [ComprasController::class, 'aprobar']); // Aprobar compra
-            Route::post('/{id}/rechazar', [ComprasController::class, 'rechazar']); // Rechazar compra
-        });
+        // Rutas de creación
+        Route::post('/', [ComprasController::class, 'store'])->middleware('permission:compras.create'); // Crear compra desde ecommerce
 
-        Route::middleware('permission:compras.edit')->group(function () {
-            Route::patch('/{id}/estado', [ComprasController::class, 'cambiarEstado']); // Cambiar estado
-            Route::post('/{id}/procesar-pago', [ComprasController::class, 'procesarPago']); // Procesar pago
-        });
-
-        // Estados de compra
-        Route::get('/estados/lista', [ComprasController::class, 'getEstados']); // Obtener estados
+        // Rutas de modificación
+        Route::post('/{id}/cancelar', [ComprasController::class, 'cancelar'])->middleware('permission:compras.cancelar'); // Cancelar compra
+        Route::post('/{id}/aprobar', [ComprasController::class, 'aprobar'])->middleware('permission:compras.aprobar'); // Aprobar compra
+        Route::post('/{id}/rechazar', [ComprasController::class, 'rechazar'])->middleware('permission:compras.aprobar'); // Rechazar compra
+        Route::patch('/{id}/estado', [ComprasController::class, 'cambiarEstado'])->middleware('permission:compras.edit'); // Cambiar estado
+        Route::post('/{id}/procesar-pago', [ComprasController::class, 'procesarPago'])->middleware('permission:compras.edit'); // Procesar pago
     });
 
 });
 
+// ========================================
+// RUTAS DE PRUEBA - FACTURACIÓN ELECTRÓNICA
+// ========================================
+use App\Http\Controllers\Facturacion\TestFacturacionController;
+
+Route::prefix('facturacion/test')->group(function () {
+    Route::get('/generar-factura-prueba', [TestFacturacionController::class, 'generarFacturaPrueba']);
+    Route::get('/verificar-configuracion', [TestFacturacionController::class, 'verificarConfiguracion']);
+    Route::get('/estado-sunat', [TestFacturacionController::class, 'estadoSunat']);
+});
+
+// ============================================
+// RUTAS DE CONTABILIDAD
+// ============================================
+
+use App\Http\Controllers\Cliente\MisDocumentosController;
+use App\Http\Controllers\Contabilidad\CajaChicaController;
+use App\Http\Controllers\Contabilidad\CajasController;
+use App\Http\Controllers\Contabilidad\CuentasPorCobrarController;
+use App\Http\Controllers\Contabilidad\CuentasPorPagarController;
+use App\Http\Controllers\Contabilidad\ExportacionesController;
+use App\Http\Controllers\Contabilidad\FlujoCajaController;
+use App\Http\Controllers\Contabilidad\KardexController;
+use App\Http\Controllers\Contabilidad\ProveedoresController;
+use App\Http\Controllers\Contabilidad\ReportesContablesController;
+use App\Http\Controllers\Contabilidad\UtilidadesController;
+use App\Http\Controllers\Contabilidad\VouchersController;
+
+Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
+
+    // ============================================
+    // CAJAS - Control de efectivo diario
+    // ============================================
+    Route::middleware('permission:contabilidad.cajas.ver')->group(function () {
+        Route::get('/cajas', [CajasController::class, 'index']);
+        Route::get('/cajas/{id}/reporte', [CajasController::class, 'reporte']);
+    });
+
+    Route::middleware('permission:contabilidad.cajas.create')->group(function () {
+        Route::post('/cajas', [CajasController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.cajas.edit')->group(function () {
+        Route::post('/cajas/aperturar', [CajasController::class, 'aperturar']);
+        Route::post('/cajas/{id}/cerrar', [CajasController::class, 'cerrar']);
+        Route::post('/cajas/transaccion', [CajasController::class, 'registrarTransaccion']);
+    });
+
+    // ============================================
+    // KARDEX - Control de inventario
+    // ============================================
+    Route::middleware('permission:contabilidad.kardex.ver')->group(function () {
+        Route::get('/kardex/producto/{productoId}', [KardexController::class, 'show']);
+        Route::get('/kardex/inventario-valorizado', [KardexController::class, 'inventarioValorizado']);
+    });
+
+    Route::middleware('permission:contabilidad.kardex.edit')->group(function () {
+        Route::post('/kardex/ajuste', [KardexController::class, 'ajuste']);
+    });
+
+    // ============================================
+    // CUENTAS POR COBRAR - Créditos a clientes
+    // ============================================
+    Route::middleware('permission:contabilidad.cxc.ver')->group(function () {
+        Route::get('/cuentas-por-cobrar', [CuentasPorCobrarController::class, 'index']);
+        Route::get('/cuentas-por-cobrar/antiguedad-saldos', [CuentasPorCobrarController::class, 'antiguedadSaldos']);
+    });
+
+    Route::middleware('permission:contabilidad.cxc.create')->group(function () {
+        Route::post('/cuentas-por-cobrar', [CuentasPorCobrarController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.cxc.edit')->group(function () {
+        Route::post('/cuentas-por-cobrar/{id}/pago', [CuentasPorCobrarController::class, 'registrarPago']);
+    });
+
+    // ============================================
+    // CUENTAS POR PAGAR - Deudas con proveedores
+    // ============================================
+    Route::middleware('permission:contabilidad.cxp.ver')->group(function () {
+        Route::get('/cuentas-por-pagar', [CuentasPorPagarController::class, 'index']);
+        Route::get('/cuentas-por-pagar/antiguedad-saldos', [CuentasPorPagarController::class, 'antiguedadSaldos']);
+    });
+
+    Route::middleware('permission:contabilidad.cxp.create')->group(function () {
+        Route::post('/cuentas-por-pagar', [CuentasPorPagarController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.cxp.edit')->group(function () {
+        Route::post('/cuentas-por-pagar/{id}/pago', [CuentasPorPagarController::class, 'registrarPago']);
+    });
+
+    // ============================================
+    // PROVEEDORES
+    // ============================================
+    Route::middleware('permission:contabilidad.proveedores.ver')->group(function () {
+        Route::get('/proveedores', [ProveedoresController::class, 'index']);
+        Route::get('/proveedores/{id}', [ProveedoresController::class, 'show']);
+    });
+
+    Route::middleware('permission:contabilidad.proveedores.create')->group(function () {
+        Route::post('/proveedores', [ProveedoresController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.proveedores.edit')->group(function () {
+        Route::put('/proveedores/{id}', [ProveedoresController::class, 'update']);
+    });
+
+    // ============================================
+    // CAJA CHICA - Gastos menores
+    // ============================================
+    Route::middleware('permission:contabilidad.caja_chica.ver')->group(function () {
+        Route::get('/caja-chica', [CajaChicaController::class, 'index']);
+        Route::get('/caja-chica/{id}/rendicion', [CajaChicaController::class, 'rendicion']);
+    });
+
+    Route::middleware('permission:contabilidad.caja_chica.create')->group(function () {
+        Route::post('/caja-chica', [CajaChicaController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.caja_chica.edit')->group(function () {
+        Route::post('/caja-chica/gasto', [CajaChicaController::class, 'registrarGasto']);
+        Route::post('/caja-chica/{id}/reposicion', [CajaChicaController::class, 'reposicion']);
+    });
+
+    // ============================================
+    // FLUJO DE CAJA - Proyecciones
+    // ============================================
+    Route::middleware('permission:contabilidad.flujo_caja.ver')->group(function () {
+        Route::get('/flujo-caja', [FlujoCajaController::class, 'index']);
+        Route::get('/flujo-caja/proyeccion-mensual', [FlujoCajaController::class, 'proyeccionMensual']);
+    });
+
+    Route::middleware('permission:contabilidad.flujo_caja.create')->group(function () {
+        Route::post('/flujo-caja', [FlujoCajaController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.flujo_caja.edit')->group(function () {
+        Route::post('/flujo-caja/{id}/registrar-real', [FlujoCajaController::class, 'registrarReal']);
+    });
+
+    // ============================================
+    // REPORTES CONTABLES
+    // ============================================
+    Route::middleware('permission:contabilidad.reportes.ver')->group(function () {
+        Route::get('/reportes/ventas-diarias', [ReportesContablesController::class, 'ventasDiarias']);
+        Route::get('/reportes/ventas-mensuales', [ReportesContablesController::class, 'ventasMensuales']);
+        Route::get('/reportes/productos-mas-vendidos', [ReportesContablesController::class, 'productosMasVendidos']);
+        Route::get('/reportes/rentabilidad-productos', [ReportesContablesController::class, 'rentabilidadProductos']);
+        Route::get('/reportes/dashboard-financiero', [ReportesContablesController::class, 'dashboardFinanciero']);
+    });
+
+    // ============================================
+    // UTILIDADES Y RENTABILIDAD
+    // ============================================
+    Route::middleware('permission:contabilidad.utilidades.ver')->group(function () {
+        // Consultas de utilidad
+        Route::get('/utilidades/venta/{ventaId}', [UtilidadesController::class, 'calcularUtilidadVenta']);
+        Route::get('/utilidades/reporte', [UtilidadesController::class, 'reporteUtilidades']);
+        Route::get('/utilidades/por-producto', [UtilidadesController::class, 'utilidadPorProducto']);
+        Route::get('/utilidades/gastos', [UtilidadesController::class, 'listarGastos']);
+        Route::get('/utilidades/gastos/por-categoria', [UtilidadesController::class, 'gastosPorCategoria']);
+        Route::get('/utilidades/comparativa/{anio}', [UtilidadesController::class, 'comparativaMensual']);
+        Route::get('/utilidades/punto-equilibrio', [UtilidadesController::class, 'puntoEquilibrio']);
+    });
+
+    Route::middleware('permission:contabilidad.utilidades.create')->group(function () {
+        // Registro de gastos
+        Route::post('/utilidades/gastos', [UtilidadesController::class, 'registrarGasto']);
+    });
+
+    Route::middleware('permission:contabilidad.utilidades.edit')->group(function () {
+        // Cálculos y actualizaciones
+        Route::post('/utilidades/mensual/{mes}/{anio}', [UtilidadesController::class, 'calcularUtilidadMensual']);
+    });
+
+    // ============================================
+    // EXPORTACIONES - PDF y Excel
+    // ============================================
+    Route::middleware('permission:contabilidad.reportes.ver')->group(function () {
+        // Exportar Caja
+        Route::get('/exportar/caja/{id}/pdf', [ExportacionesController::class, 'exportarCajaPDF']);
+        Route::get('/exportar/caja/{id}/excel', [ExportacionesController::class, 'exportarCajaExcel']);
+
+        // Exportar Kardex
+        Route::get('/exportar/kardex/{productoId}/pdf', [ExportacionesController::class, 'exportarKardexPDF']);
+        Route::get('/exportar/kardex/{productoId}/excel', [ExportacionesController::class, 'exportarKardexExcel']);
+
+        // Exportar Cuentas por Cobrar
+        Route::get('/exportar/cxc/pdf', [ExportacionesController::class, 'exportarCxCPDF']);
+        Route::get('/exportar/cxc/excel', [ExportacionesController::class, 'exportarCxCExcel']);
+
+        // Exportar Utilidades
+        Route::get('/exportar/utilidades/pdf', [ExportacionesController::class, 'exportarUtilidadesPDF']);
+        Route::get('/exportar/utilidades/excel', [ExportacionesController::class, 'exportarUtilidadesExcel']);
+
+        // Exportar TXT - Formato PLE SUNAT
+        Route::post('/exportar/ple/registro-ventas', [ExportacionesController::class, 'exportarRegistroVentasTXT']);
+        Route::post('/exportar/ple/registro-compras', [ExportacionesController::class, 'exportarRegistroComprasTXT']);
+
+        // Exportar TXT - Reportes simples
+        Route::get('/exportar/ventas/txt', [ExportacionesController::class, 'exportarVentasTXT']);
+        Route::get('/exportar/kardex/{productoId}/txt', [ExportacionesController::class, 'exportarKardexTXT']);
+    });
+
+    // ============================================
+    // VOUCHERS / BAUCHERS - Comprobantes de pago
+    // ============================================
+    Route::middleware('permission:contabilidad.vouchers.ver')->group(function () {
+        Route::get('/vouchers', [VouchersController::class, 'index']);
+        Route::get('/vouchers/pendientes', [VouchersController::class, 'pendientes']);
+        Route::get('/vouchers/{id}', [VouchersController::class, 'show']);
+        Route::get('/vouchers/{id}/descargar', [VouchersController::class, 'descargarArchivo']);
+    });
+
+    Route::middleware('permission:contabilidad.vouchers.create')->group(function () {
+        Route::post('/vouchers', [VouchersController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.vouchers.edit')->group(function () {
+        Route::post('/vouchers/{id}', [VouchersController::class, 'update']);
+        Route::post('/vouchers/{id}/verificar', [VouchersController::class, 'verificar']);
+    });
+
+    Route::middleware('permission:contabilidad.vouchers.delete')->group(function () {
+        Route::delete('/vouchers/{id}', [VouchersController::class, 'destroy']);
+    });
+});
+
+// ============================================
+// RUTAS PARA CLIENTES - Mis Documentos
+// ============================================
+Route::middleware(['auth:sanctum'])->prefix('cliente')->group(function () {
+    // Mis comprobantes
+    Route::get('/mis-comprobantes', [MisDocumentosController::class, 'misComprobantes']);
+    Route::get('/mis-comprobantes/{id}', [MisDocumentosController::class, 'verComprobante']);
+    Route::get('/mis-comprobantes/{id}/pdf', [MisDocumentosController::class, 'descargarComprobantePDF'])->name('api.cliente.descargar-comprobante');
+    Route::get('/mis-comprobantes/{id}/xml', [MisDocumentosController::class, 'descargarComprobanteXML']);
+    Route::post('/mis-comprobantes/{id}/reenviar', [MisDocumentosController::class, 'reenviarComprobante']);
+
+    // Mis ventas
+    Route::get('/mis-ventas', [MisDocumentosController::class, 'misVentas']);
+
+    // Mis cuentas por cobrar
+    Route::get('/mis-cuentas', [MisDocumentosController::class, 'misCuentasPorCobrar']);
+    Route::get('/estado-cuenta/pdf', [MisDocumentosController::class, 'descargarEstadoCuenta']);
+});

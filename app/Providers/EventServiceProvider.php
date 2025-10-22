@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Events\OnOrderCompleted;
 use App\Events\OnUserRegister;
 use App\Events\OnPaymentConfirmed;
+use App\Events\VentaCreated;
 use App\Listeners\ProcessOrderCompletionRewards;
 use App\Listeners\ProcessUserRegistrationRewards;
 use App\Listeners\ProcessAutomaticInvoicing;
+use App\Listeners\ProcessVentaCreated;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -36,6 +38,11 @@ class EventServiceProvider extends ServiceProvider
         
         OnPaymentConfirmed::class => [
             ProcessAutomaticInvoicing::class,
+        ],
+        
+        // Evento de venta creada - Integración con contabilidad
+        VentaCreated::class => [
+            ProcessVentaCreated::class,
         ],
     ];
 
