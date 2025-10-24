@@ -89,11 +89,9 @@ Route::get('/productos-publicos/{id}', [ProductosController::class, 'showPublico
 Route::get('/productos/buscar', [ProductosController::class, 'buscarProductos']);
 Route::get('/categorias-sidebar', [ProductosController::class, 'categoriasParaSidebar']);
 Route::get('/banners/publicos', [BannersController::class, 'bannersPublicos']);
-Route::get('/banners-horizontales/publicos', [BannersController::class, 'bannersHorizontalesPublicos']); // ✅ NUEVO
-Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSidebarShopPublico']); // ✅ NUEVO
+Route::get('/banners-horizontales/publicos', [BannersController::class, 'bannersHorizontalesPublicos']);
+Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSidebarShopPublico']);
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
-Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
-Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
 Route::get('/marcas/publicas', [MarcaProductoController::class, 'marcasPublicas']);
 Route::get('/marcas/por-categoria', [MarcaProductoController::class, 'marcasPorCategoria']);
 
@@ -110,9 +108,16 @@ Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']); //
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
 Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
 
+// Rutas públicas para banners de ofertas
+Route::get('/banners-ofertas/activo', [BannersController::class, 'bannerOfertaActivo']);
+Route::get('/banners-flash-sales/activos', [BannersController::class, 'bannersFlashSalesActivos']);
+
+// Rutas públicas de recompensas (popups)
+Route::get('/publico/recompensas/popups-activos', [RecompensaNotificacionController::class, 'popupsActivosPublico']);
+
 // Rutas públicas para formas de envío y tipos de pago
-Route::get('/formas-envio/activas', [FormaEnvioController::class, 'activas']);
-Route::get('/tipos-pago/activos', [TipoPagoController::class, 'activos']);
+// Route::get('/formas-envio/activas', [FormaEnvioController::class, 'activas']); // TODO: Crear controller
+// Route::get('/tipos-pago/activos', [TipoPagoController::class, 'activos']); // TODO: Crear controller
 
 // Rutas públicas de reclamos
 Route::post('/reclamos/crear', [ReclamosController::class, 'crear']);
@@ -125,6 +130,8 @@ Route::get('/categorias/{id}/compatibles', [CategoriasController::class, 'getCat
 // =====================================================
 // ✅ SISTEMA DE GESTIÓN DE COOKIES - RUTAS PÚBLICAS
 // =====================================================
+// TODO: Crear CookieConsentController
+/*
 Route::prefix('cookies')->group(function () {
     // Obtener configuración pública del banner (sin autenticación)
     Route::get('/configuracion/publica', [CookieConsentController::class, 'obtenerConfiguracionPublica']);
@@ -144,6 +151,7 @@ Route::prefix('cookies')->group(function () {
     // Revocar consentimiento
     Route::delete('/revocar', [CookieConsentController::class, 'revocarConsentimiento']);
 });
+*/
 // ============================================
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -156,14 +164,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('ventas')->middleware('permission:ventas.ver')->group(function () {
         Route::get('/', [VentasController::class, 'index']); // Listar ventas
         Route::get('/estadisticas', [VentasController::class, 'estadisticas']); // Estadísticas
+        Route::get('/estadisticas-sunat', [VentasController::class, 'estadisticasSunat']); // Estadísticas SUNAT
+        Route::get('/pendientes-facturar', [VentasController::class, 'pendientesFacturar']); // Pendientes de facturar
         Route::get('/mis-ventas', [VentasController::class, 'misVentas']); // Mis ventas (cliente e-commerce)
         Route::get('/{id}', [VentasController::class, 'show'])->middleware('permission:ventas.show'); // Ver detalle
         Route::get('/{id}/pdf', [VentasController::class, 'descargarPdf']); // Descargar PDF
+        Route::get('/{id}/xml', [VentasController::class, 'descargarXml']); // Descargar XML
+        Route::get('/{id}/cdr', [VentasController::class, 'descargarCdr']); // Descargar CDR
+        Route::get('/{id}/qr', [VentasController::class, 'descargarQr']); // Descargar QR
+        Route::get('/{id}/historial-sunat', [VentasController::class, 'historialSunat']); // Historial SUNAT
+        Route::get('/{id}/whatsapp-datos', [VentasController::class, 'obtenerDatosWhatsApp']); // Datos prellenados WhatsApp
+        Route::get('/{id}/email-datos', [VentasController::class, 'obtenerDatosEmail']); // Datos prellenados Email
 
         Route::post('/', [VentasController::class, 'store'])->middleware('permission:ventas.create'); // Crear venta
         Route::post('/ecommerce', [VentasController::class, 'crearVentaEcommerce'])->middleware('permission:ventas.create'); // Crear venta e-commerce
         Route::post('/{id}/facturar', [VentasController::class, 'facturar'])->middleware('permission:ventas.facturar'); // Facturar venta
+        Route::post('/{id}/enviar-sunat', [VentasController::class, 'enviarSunat'])->middleware('permission:ventas.facturar'); // Enviar comprobante a SUNAT (MANUAL)
+        Route::post('/{id}/reenviar-sunat', [VentasController::class, 'reenviarSunat'])->middleware('permission:ventas.facturar'); // Reenviar comprobante a SUNAT
+        Route::post('/{id}/consultar-sunat', [VentasController::class, 'consultarSunat'])->middleware('permission:ventas.facturar'); // Consultar estado en SUNAT
+        Route::post('/{id}/generar-pdf', [VentasController::class, 'generarPdf'])->middleware('permission:ventas.facturar'); // Generar PDF manualmente
         Route::post('/{id}/email', [VentasController::class, 'enviarEmail'])->middleware('permission:ventas.edit'); // Enviar por email
+        Route::post('/{id}/whatsapp', [VentasController::class, 'enviarWhatsApp'])->middleware('permission:ventas.edit'); // Enviar por WhatsApp
         Route::patch('/{id}/anular', [VentasController::class, 'anular'])->middleware('permission:ventas.delete'); // Anular venta
     });
 
@@ -178,11 +199,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('comprobantes')->middleware('permission:facturacion.comprobantes.ver')->group(function () {
         Route::get('/', [ComprobantesController::class, 'index']);
         Route::get('/estadisticas', [ComprobantesController::class, 'estadisticas']);
+        Route::get('/pendientes-envio', [ComprobantesController::class, 'pendientesEnvio']); // Pendientes de enviar
+        Route::get('/rechazados', [ComprobantesController::class, 'rechazados']); // Rechazados por SUNAT
         Route::get('/{id}', [ComprobantesController::class, 'show'])->middleware('permission:facturacion.comprobantes.show');
         Route::get('/{id}/pdf', [ComprobantesController::class, 'descargarPdf']);
         Route::get('/{id}/xml', [ComprobantesController::class, 'descargarXml']);
         Route::get('/{id}/cdr', [ComprobantesController::class, 'descargarCdr']);
 
+        Route::post('/{id}/enviar-sunat', [ComprobantesController::class, 'enviarSunat'])->middleware('permission:facturacion.comprobantes.edit'); // Enviar a SUNAT
+        Route::post('/{id}/consultar-estado', [ComprobantesController::class, 'consultarEstado'])->middleware('permission:facturacion.comprobantes.edit'); // Consultar estado
+        Route::post('/{id}/regenerar', [ComprobantesController::class, 'regenerar'])->middleware('permission:facturacion.comprobantes.edit'); // Regenerar XML/PDF
+        Route::post('/{id}/generar-nota-credito', [ComprobantesController::class, 'generarNotaCredito'])->middleware('permission:facturacion.notas_credito.create'); // Generar NC
+        Route::post('/{id}/generar-nota-debito', [ComprobantesController::class, 'generarNotaDebito'])->middleware('permission:facturacion.notas_debito.create'); // Generar ND
+        Route::post('/envio-masivo', [ComprobantesController::class, 'envioMasivo'])->middleware('permission:facturacion.comprobantes.edit'); // Envío masivo
         Route::post('/{id}/reenviar', [ComprobantesController::class, 'reenviar'])->middleware('permission:facturacion.comprobantes.edit');
         Route::post('/{id}/consultar', [ComprobantesController::class, 'consultar'])->middleware('permission:facturacion.comprobantes.edit');
         Route::post('/{id}/email', [ComprobantesController::class, 'enviarEmail'])->middleware('permission:facturacion.comprobantes.edit');
@@ -557,6 +586,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:clientes.ver')->group(function () {
         Route::get('/clientes', [ClientesController::class, 'index']);
         Route::get('/clientes/estadisticas', [ClientesController::class, 'estadisticas']);
+        Route::get('/clientes/buscar-por-documento', [ClientesController::class, 'buscarPorDocumento']);
 
     });
 

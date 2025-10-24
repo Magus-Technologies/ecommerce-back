@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Events\VentaCreated;
 use App\Services\KardexService;
 use App\Services\NotificacionService;
+use App\Services\GreenterService;
 use App\Models\CajaMovimiento;
 use App\Models\CajaTransaccion;
 use App\Models\UtilidadVenta;
@@ -32,7 +33,14 @@ class ProcessVentaCreated
             // 3. Calcular y registrar utilidad
             $this->calcularUtilidad($venta);
 
-            // 4. Enviar notificación al cliente
+            // 4. Generar comprobante electrónico LOCAL (si requiere factura)
+            // IMPORTANTE: Solo genera el XML localmente, NO envía a SUNAT automáticamente
+            // El envío a SUNAT debe hacerse manualmente desde el frontend: POST /api/ventas/{id}/enviar-sunat
+            if ($venta->requiere_factura && property_exists($venta, 'tipo_documento') && $venta->tipo_documento) {
+                $this->generarComprobanteLocal($venta);
+            }
+
+            // 5. Enviar notificación al cliente
             $this->enviarNotificacion($venta);
 
         } catch (\Exception $e) {
@@ -152,6 +160,118 @@ class ProcessVentaCreated
         } catch (\Exception $e) {
             Log::error('Error calculando utilidad: ' . $e->getMessage(), [
                 'venta_id' => $venta->id
+            ]);
+        }
+    }
+
+    /**
+     * Generar comprobante electrónico
+     * - VENTAS MANUALES (POS): Solo genera XML local, envío MANUAL a SUNAT
+     * - VENTAS ONLINE (E-commerce): Genera XML y envía AUTOMÁTICAMENTE a SUNAT
+     */
+    private function generarComprobanteLocal($venta)
+    {
+        try {
+            // Determinar si es venta online (e-commerce) o manual (POS)
+            $esVentaOnline = !empty($venta->user_cliente_id);
+            
+            Log::info('Iniciando generación de comprobante', [
+                'venta_id' => $venta->id,
+                'tipo_documento' => $venta->tipo_documento,
+                'origen' => $esVentaOnline ? 'E-COMMERCE (Online)' : 'POS (Manual)',
+                'envio_automatico' => $esVentaOnline ? 'SÍ' : 'NO'
+            ]);
+
+            $greenterService = app(GreenterService::class);
+
+            // OPCIÓN 1: VENTA ONLINE (E-commerce) - Envío AUTOMÁTICO a SUNAT
+            if ($esVentaOnline) {
+                Log::info('🌐 VENTA ONLINE detectada - Enviando AUTOMÁTICAMENTE a SUNAT', [
+                    'venta_id' => $venta->id,
+                    'user_cliente_id' => $venta->user_cliente_id
+                ]);
+
+                // Generar factura Y enviar a SUNAT automáticamente
+                $resultado = $greenterService->generarFactura(
+                    $venta->id,
+                    null, // clienteData (ya está en la venta)
+                    $venta->user_id,
+                    request()->ip() ?? '127.0.0.1',
+                    true  // ← enviarSunat = true (AUTOMÁTICO)
+                );
+
+                if ($resultado['success'] && isset($resultado['comprobante'])) {
+                    // Actualizar venta con estado FACTURADO (ya fue enviado y aceptado)
+                    $venta->update([
+                        'comprobante_id' => $resultado['comprobante']->id,
+                        'estado' => 'FACTURADO'
+                    ]);
+
+                    Log::info('✅ VENTA ONLINE: Comprobante enviado AUTOMÁTICAMENTE a SUNAT', [
+                        'venta_id' => $venta->id,
+                        'comprobante_id' => $resultado['comprobante']->id,
+                        'numero_completo' => $resultado['comprobante']->numero_completo,
+                        'comprobante_estado' => $resultado['comprobante']->estado,
+                        'venta_estado' => 'FACTURADO',
+                        'tiene_xml' => true,
+                        'tiene_pdf' => true,
+                        'tiene_cdr' => true,
+                        'mensaje_sunat' => $resultado['comprobante']->mensaje_sunat ?? 'Aceptado'
+                    ]);
+                } else {
+                    Log::error('❌ VENTA ONLINE: Error al enviar a SUNAT', [
+                        'venta_id' => $venta->id,
+                        'error' => $resultado['error'] ?? 'Error desconocido'
+                    ]);
+                }
+
+            } 
+            // OPCIÓN 2: VENTA MANUAL (POS) - Envío MANUAL a SUNAT
+            else {
+                Log::info('🏪 VENTA MANUAL (POS) detectada - Generando XML local (envío MANUAL)', [
+                    'venta_id' => $venta->id
+                ]);
+
+                // Solo generar factura LOCAL sin enviar a SUNAT
+                $resultado = $greenterService->generarFactura(
+                    $venta->id,
+                    null, // clienteData (ya está en la venta)
+                    $venta->user_id,
+                    request()->ip() ?? '127.0.0.1',
+                    false  // ← enviarSunat = false (MANUAL)
+                );
+
+                if ($resultado['success'] && isset($resultado['comprobante'])) {
+                    // Actualizar venta con estado PENDIENTE (esperando envío manual)
+                    $venta->update([
+                        'comprobante_id' => $resultado['comprobante']->id,
+                        'estado' => 'PENDIENTE'
+                    ]);
+
+                    Log::info('📝 VENTA MANUAL: XML generado localmente (esperando envío manual)', [
+                        'venta_id' => $venta->id,
+                        'comprobante_id' => $resultado['comprobante']->id,
+                        'numero_completo' => $resultado['comprobante']->numero_completo,
+                        'comprobante_estado' => $resultado['comprobante']->estado,
+                        'venta_estado' => 'PENDIENTE',
+                        'tiene_xml' => true,
+                        'tiene_pdf' => false,
+                        'tiene_cdr' => false,
+                        'nota' => 'XML firmado localmente. Usuario debe hacer clic en "Enviar a SUNAT"'
+                    ]);
+                } else {
+                    Log::warning('⚠️ VENTA MANUAL: No se pudo generar comprobante local', [
+                        'venta_id' => $venta->id,
+                        'error' => $resultado['message'] ?? $resultado['error'] ?? 'Error desconocido'
+                    ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::error('💥 Error generando comprobante electrónico: ' . $e->getMessage(), [
+                'venta_id' => $venta->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }

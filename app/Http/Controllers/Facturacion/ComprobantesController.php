@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Facturacion;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ComprobanteEmail;
 use App\Models\Comprobante;
 use App\Services\GreenterService;
 use App\Services\WhatsAppService;
-use App\Mail\ComprobanteEmail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Log;
 
 class ComprobantesController extends Controller
 {
@@ -47,8 +47,8 @@ class ComprobantesController extends Controller
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->where('numero_completo', 'LIKE', "%{$search}%")
-                      ->orWhere('cliente_razon_social', 'LIKE', "%{$search}%")
-                      ->orWhere('cliente_numero_documento', 'LIKE', "%{$search}%");
+                        ->orWhere('cliente_razon_social', 'LIKE', "%{$search}%")
+                        ->orWhere('cliente_numero_documento', 'LIKE', "%{$search}%");
                 });
             }
 
@@ -58,7 +58,7 @@ class ComprobantesController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al obtener comprobantes',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -67,18 +67,18 @@ class ComprobantesController extends Controller
     {
         try {
             $comprobante = Comprobante::with([
-                'cliente', 
-                'detalles.producto', 
+                'cliente',
+                'detalles.producto',
                 'user',
                 'comprobanteReferencia',
-                'notasRelacionadas'
+                'notasRelacionadas',
             ])->findOrFail($id);
 
             return response()->json($comprobante);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Comprobante no encontrado',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 404);
         }
     }
@@ -91,19 +91,19 @@ class ComprobantesController extends Controller
             if ($resultado['success']) {
                 return response()->json([
                     'message' => $resultado['mensaje'],
-                    'comprobante' => $resultado['comprobante']
+                    'comprobante' => $resultado['comprobante'],
                 ]);
             } else {
                 return response()->json([
                     'message' => 'Error al reenviar comprobante',
-                    'error' => $resultado['error']
+                    'error' => $resultado['error'],
                 ], 500);
             }
 
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al reenviar comprobante',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -118,19 +118,19 @@ class ComprobantesController extends Controller
                 return response()->json([
                     'message' => 'Estado consultado exitosamente',
                     'estado' => $resultado['estado'],
-                    'comprobante' => $comprobante->fresh()
+                    'comprobante' => $comprobante->fresh(),
                 ]);
             } else {
                 return response()->json([
                     'message' => 'Error al consultar estado',
-                    'error' => $resultado['error']
+                    'error' => $resultado['error'],
                 ], 500);
             }
 
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al consultar comprobante',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -140,9 +140,9 @@ class ComprobantesController extends Controller
         try {
             $comprobante = Comprobante::findOrFail($id);
 
-            if (!$comprobante->pdf_base64) {
+            if (! $comprobante->pdf_base64) {
                 return response()->json([
-                    'message' => 'PDF no disponible para este comprobante'
+                    'message' => 'PDF no disponible para este comprobante',
                 ], 404);
             }
 
@@ -151,13 +151,13 @@ class ComprobantesController extends Controller
 
             return Response::make($pdf, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => "attachment; filename=\"{$filename}\""
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al descargar PDF',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -167,9 +167,9 @@ class ComprobantesController extends Controller
         try {
             $comprobante = Comprobante::findOrFail($id);
 
-            if (!$comprobante->xml_firmado) {
+            if (! $comprobante->xml_firmado) {
                 return response()->json([
-                    'message' => 'XML no disponible para este comprobante'
+                    'message' => 'XML no disponible para este comprobante',
                 ], 404);
             }
 
@@ -177,13 +177,13 @@ class ComprobantesController extends Controller
 
             return Response::make($comprobante->xml_firmado, 200, [
                 'Content-Type' => 'application/xml',
-                'Content-Disposition' => "attachment; filename=\"{$filename}\""
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error al descargar XML',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -196,7 +196,7 @@ class ComprobantesController extends Controller
 
             $totalComprobantes = Comprobante::whereBetween('fecha_emision', [$fechaInicio, $fechaFin])->count();
             $montoTotal = Comprobante::whereBetween('fecha_emision', [$fechaInicio, $fechaFin])->sum('importe_total');
-            
+
             $estadisticasPorEstado = Comprobante::whereBetween('fecha_emision', [$fechaInicio, $fechaFin])
                 ->selectRaw('estado, COUNT(*) as cantidad, SUM(importe_total) as monto')
                 ->groupBy('estado')
@@ -214,15 +214,15 @@ class ComprobantesController extends Controller
                     'monto_total' => $montoTotal,
                     'por_estado' => $estadisticasPorEstado,
                     'por_tipo' => $estadisticasPorTipo,
-                    'periodo' => ['inicio' => $fechaInicio, 'fin' => $fechaFin]
-                ]
+                    'periodo' => ['inicio' => $fechaInicio, 'fin' => $fechaFin],
+                ],
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error al obtener estadísticas',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -235,10 +235,10 @@ class ComprobantesController extends Controller
         try {
             $comprobante = Comprobante::findOrFail($id);
 
-            if (!$comprobante->xml_respuesta_sunat) {
+            if (! $comprobante->xml_respuesta_sunat) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'CDR no disponible para este comprobante'
+                    'message' => 'CDR no disponible para este comprobante',
                 ], 404);
             }
 
@@ -246,14 +246,14 @@ class ComprobantesController extends Controller
 
             return Response::make($comprobante->xml_respuesta_sunat, 200, [
                 'Content-Type' => 'application/xml',
-                'Content-Disposition' => "attachment; filename=\"{$filename}\""
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error al descargar CDR',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -266,15 +266,15 @@ class ComprobantesController extends Controller
         try {
             $request->validate([
                 'email' => 'required|email',
-                'mensaje' => 'nullable|string|max:500'
+                'mensaje' => 'nullable|string|max:500',
             ]);
 
             $comprobante = Comprobante::with('cliente')->findOrFail($id);
 
-            if (!$comprobante->pdf_base64) {
+            if (! $comprobante->pdf_base64) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PDF no disponible para este comprobante'
+                    'message' => 'PDF no disponible para este comprobante',
                 ], 404);
             }
 
@@ -283,8 +283,8 @@ class ComprobantesController extends Controller
 
             Log::info('Comprobante enviado por email', [
                 'comprobante_id' => $comprobante->id,
-                'numero' => $comprobante->serie . '-' . $comprobante->correlativo,
-                'destinatario' => $request->email
+                'numero' => $comprobante->serie.'-'.$comprobante->correlativo,
+                'destinatario' => $request->email,
             ]);
 
             return response()->json([
@@ -292,21 +292,21 @@ class ComprobantesController extends Controller
                 'message' => 'Comprobante enviado por email exitosamente',
                 'data' => [
                     'email' => $request->email,
-                    'comprobante' => $comprobante->serie . '-' . str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT)
-                ]
+                    'comprobante' => $comprobante->serie.'-'.str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT),
+                ],
             ]);
 
         } catch (\Exception $e) {
             Log::error('Error al enviar email de comprobante', [
                 'comprobante_id' => $id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error al enviar email',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -319,34 +319,34 @@ class ComprobantesController extends Controller
         try {
             $request->validate([
                 'telefono' => 'required|string|min:9|max:15',
-                'mensaje' => 'nullable|string|max:500'
+                'mensaje' => 'nullable|string|max:500',
             ]);
 
             $comprobante = Comprobante::with('cliente')->findOrFail($id);
 
-            if (!$comprobante->pdf_base64) {
+            if (! $comprobante->pdf_base64) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PDF no disponible para este comprobante'
+                    'message' => 'PDF no disponible para este comprobante',
                 ], 404);
             }
 
             // Verificar si WhatsApp está habilitado
-            if (!WhatsAppService::estaHabilitado()) {
+            if (! WhatsAppService::estaHabilitado()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'El servicio de WhatsApp no está habilitado'
+                    'message' => 'El servicio de WhatsApp no está habilitado',
                 ], 503);
             }
 
             // Enviar comprobante por WhatsApp
-            $whatsappService = new WhatsAppService();
+            $whatsappService = new WhatsAppService;
             $whatsappService->enviarComprobante($comprobante, $request->telefono);
 
             Log::info('Comprobante enviado por WhatsApp', [
                 'comprobante_id' => $comprobante->id,
-                'numero' => $comprobante->serie . '-' . $comprobante->correlativo,
-                'telefono' => $request->telefono
+                'numero' => $comprobante->serie.'-'.$comprobante->correlativo,
+                'telefono' => $request->telefono,
             ]);
 
             return response()->json([
@@ -354,21 +354,21 @@ class ComprobantesController extends Controller
                 'message' => 'Comprobante enviado por WhatsApp exitosamente',
                 'data' => [
                     'telefono' => $request->telefono,
-                    'comprobante' => $comprobante->serie . '-' . str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT)
-                ]
+                    'comprobante' => $comprobante->serie.'-'.str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT),
+                ],
             ]);
 
         } catch (\Exception $e) {
             Log::error('Error al enviar WhatsApp de comprobante', [
                 'comprobante_id' => $id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error al enviar WhatsApp',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -380,7 +380,7 @@ class ComprobantesController extends Controller
     {
         try {
             $request->validate([
-                'motivo' => 'required|string|max:255'
+                'motivo' => 'required|string|max:255',
             ]);
 
             $comprobante = Comprobante::findOrFail($id);
@@ -388,33 +388,409 @@ class ComprobantesController extends Controller
             if ($comprobante->estado === 'ANULADO') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'El comprobante ya está anulado'
+                    'message' => 'El comprobante ya está anulado',
                 ], 400);
             }
 
             if ($comprobante->estado === 'ACEPTADO') {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No se puede anular un comprobante aceptado por SUNAT'
+                    'message' => 'No se puede anular un comprobante aceptado por SUNAT',
                 ], 400);
             }
 
             $comprobante->update([
                 'estado' => 'ANULADO',
-                'observaciones' => $request->motivo
+                'observaciones' => $request->motivo,
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Comprobante anulado exitosamente',
-                'data' => $comprobante
+                'data' => $comprobante,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error al anular comprobante',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Enviar o reenviar comprobante a SUNAT
+     * POST /api/comprobantes/{id}/enviar-sunat
+     */
+    public function enviarSunat($id)
+    {
+        try {
+            $comprobante = Comprobante::findOrFail($id);
+
+            if ($comprobante->estado === 'ACEPTADO') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Este comprobante ya fue aceptado por SUNAT',
+                ], 400);
+            }
+
+            if ($comprobante->estado === 'ANULADO') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede enviar un comprobante anulado',
+                ], 400);
+            }
+
+            // Enviar a SUNAT usando Greenter
+            $resultado = $this->greenterService->enviarComprobante($comprobante);
+
+            if ($resultado['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Comprobante enviado exitosamente a SUNAT',
+                    'data' => [
+                        'estado' => $comprobante->fresh()->estado,
+                        'mensaje_sunat' => $comprobante->fresh()->mensaje_sunat,
+                        'fecha_envio' => $comprobante->fresh()->fecha_envio_sunat,
+                    ],
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al enviar a SUNAT',
+                    'error' => $resultado['error'] ?? 'Error desconocido',
+                    'errores_sunat' => $resultado['errores_sunat'] ?? [],
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error al enviar comprobante a SUNAT', [
+                'comprobante_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar comprobante',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Consultar estado del comprobante en SUNAT
+     * POST /api/comprobantes/{id}/consultar-estado
+     */
+    public function consultarEstado($id)
+    {
+        try {
+            $comprobante = Comprobante::findOrFail($id);
+
+            if (! $comprobante->xml_firmado) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El comprobante no tiene XML firmado',
+                ], 400);
+            }
+
+            // Consultar estado en SUNAT
+            $resultado = $this->greenterService->consultarEstado($comprobante);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'estado_actual' => $comprobante->fresh()->estado,
+                    'mensaje_sunat' => $comprobante->fresh()->mensaje_sunat,
+                    'fecha_consulta' => now(),
+                    'resultado_consulta' => $resultado,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al consultar estado',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Regenerar XML y PDF del comprobante
+     * POST /api/comprobantes/{id}/regenerar
+     */
+    public function regenerar($id)
+    {
+        try {
+            $comprobante = Comprobante::findOrFail($id);
+
+            if ($comprobante->estado === 'ACEPTADO') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede regenerar un comprobante aceptado por SUNAT',
+                ], 400);
+            }
+
+            // Regenerar documentos
+            $resultado = $this->greenterService->regenerarDocumentos($comprobante);
+
+            if ($resultado['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Documentos regenerados exitosamente',
+                    'data' => [
+                        'tiene_xml' => $comprobante->fresh()->xml_firmado ? true : false,
+                        'tiene_pdf' => $comprobante->fresh()->pdf_base64 ? true : false,
+                    ],
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al regenerar documentos',
+                    'error' => $resultado['error'],
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al regenerar documentos',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Listar comprobantes pendientes de envío
+     * GET /api/comprobantes/pendientes-envio
+     */
+    public function pendientesEnvio(Request $request)
+    {
+        try {
+            $query = Comprobante::with(['cliente', 'user'])
+                ->where('estado', 'PENDIENTE')
+                ->orderBy('fecha_emision', 'desc');
+
+            // Filtros adicionales
+            if ($request->has('tipo_comprobante')) {
+                $query->where('tipo_comprobante', $request->tipo_comprobante);
+            }
+
+            if ($request->has('fecha_desde')) {
+                $query->where('fecha_emision', '>=', $request->fecha_desde);
+            }
+
+            $comprobantes = $query->paginate(20);
+
+            return response()->json([
+                'success' => true,
+                'data' => $comprobantes,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener comprobantes pendientes',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Listar comprobantes rechazados
+     * GET /api/comprobantes/rechazados
+     */
+    public function rechazados(Request $request)
+    {
+        try {
+            $query = Comprobante::with(['cliente', 'user'])
+                ->where('estado', 'RECHAZADO')
+                ->orderBy('fecha_respuesta_sunat', 'desc');
+
+            // Filtros adicionales
+            if ($request->has('tipo_comprobante')) {
+                $query->where('tipo_comprobante', $request->tipo_comprobante);
+            }
+
+            if ($request->has('fecha_desde')) {
+                $query->where('fecha_emision', '>=', $request->fecha_desde);
+            }
+
+            $comprobantes = $query->paginate(20);
+
+            return response()->json([
+                'success' => true,
+                'data' => $comprobantes,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener comprobantes rechazados',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Envío masivo de comprobantes a SUNAT
+     * POST /api/comprobantes/envio-masivo
+     */
+    public function envioMasivo(Request $request)
+    {
+        try {
+            $request->validate([
+                'comprobante_ids' => 'required|array|min:1',
+                'comprobante_ids.*' => 'required|integer|exists:comprobantes,id',
+            ]);
+
+            $resultados = [];
+            $exitosos = 0;
+            $fallidos = 0;
+
+            foreach ($request->comprobante_ids as $id) {
+                try {
+                    $comprobante = Comprobante::find($id);
+
+                    if ($comprobante->estado === 'PENDIENTE') {
+                        $resultado = $this->greenterService->enviarComprobante($comprobante);
+
+                        if ($resultado['success']) {
+                            $exitosos++;
+                            $resultados[] = [
+                                'comprobante_id' => $id,
+                                'numero_completo' => $comprobante->numero_completo,
+                                'success' => true,
+                                'mensaje' => 'Enviado exitosamente',
+                            ];
+                        } else {
+                            $fallidos++;
+                            $resultados[] = [
+                                'comprobante_id' => $id,
+                                'numero_completo' => $comprobante->numero_completo,
+                                'success' => false,
+                                'mensaje' => $resultado['error'] ?? 'Error desconocido',
+                            ];
+                        }
+                    } else {
+                        $resultados[] = [
+                            'comprobante_id' => $id,
+                            'numero_completo' => $comprobante->numero_completo,
+                            'success' => false,
+                            'mensaje' => "Estado no válido: {$comprobante->estado}",
+                        ];
+                        $fallidos++;
+                    }
+                } catch (\Exception $e) {
+                    $fallidos++;
+                    $resultados[] = [
+                        'comprobante_id' => $id,
+                        'success' => false,
+                        'mensaje' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Envío masivo completado: {$exitosos} exitosos, {$fallidos} fallidos",
+                'data' => [
+                    'total' => count($request->comprobante_ids),
+                    'exitosos' => $exitosos,
+                    'fallidos' => $fallidos,
+                    'resultados' => $resultados,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error en envío masivo',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Generar nota de crédito desde un comprobante
+     * POST /api/comprobantes/{id}/generar-nota-credito
+     */
+    public function generarNotaCredito(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'tipo_nota' => 'required|string|in:01,02,03,04,05,06,07,08,09',
+                'motivo' => 'required|string|max:500',
+                'items' => 'required|array|min:1',
+                'items.*.producto_id' => 'required|integer',
+                'items.*.cantidad' => 'required|numeric|min:0.01',
+                'items.*.precio_unitario' => 'required|numeric|min:0',
+            ]);
+
+            $comprobante = Comprobante::findOrFail($id);
+
+            if ($comprobante->estado !== 'ACEPTADO') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Solo se pueden generar notas de crédito para comprobantes aceptados',
+                ], 400);
+            }
+
+            // Crear nota de crédito
+            $notaCredito = $this->greenterService->generarNotaCredito($comprobante, $request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nota de crédito generada exitosamente',
+                'data' => $notaCredito,
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar nota de crédito',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Generar nota de débito desde un comprobante
+     * POST /api/comprobantes/{id}/generar-nota-debito
+     */
+    public function generarNotaDebito(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'tipo_nota' => 'required|string|in:01,02,03',
+                'motivo' => 'required|string|max:500',
+                'monto_adicional' => 'required|numeric|min:0.01',
+            ]);
+
+            $comprobante = Comprobante::findOrFail($id);
+
+            if ($comprobante->estado !== 'ACEPTADO') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Solo se pueden generar notas de débito para comprobantes aceptados',
+                ], 400);
+            }
+
+            // Crear nota de débito
+            $notaDebito = $this->greenterService->generarNotaDebito($comprobante, $request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Nota de débito generada exitosamente',
+                'data' => $notaDebito,
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar nota de débito',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

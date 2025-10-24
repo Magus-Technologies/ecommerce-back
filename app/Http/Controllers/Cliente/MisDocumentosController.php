@@ -4,11 +4,10 @@ namespace App\Http\Controllers\Cliente;
 
 use App\Http\Controllers\Controller;
 use App\Models\Comprobante;
-use App\Models\Venta;
 use App\Models\CuentaPorCobrar;
-use Illuminate\Http\Request;
+use App\Models\Venta;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Request;
 
 class MisDocumentosController extends Controller
 {
@@ -20,9 +19,9 @@ class MisDocumentosController extends Controller
         $user = auth()->user();
 
         // Obtener comprobantes del cliente
-        $query = Comprobante::where(function($q) use ($user) {
+        $query = Comprobante::where(function ($q) use ($user) {
             $q->where('user_id', $user->id)
-              ->orWhere('cliente_email', $user->email);
+                ->orWhere('cliente_email', $user->email);
         });
 
         if ($request->tipo_comprobante) {
@@ -50,9 +49,9 @@ class MisDocumentosController extends Controller
         $user = auth()->user();
 
         $comprobante = Comprobante::with('detalles')
-            ->where(function($q) use ($user) {
+            ->where(function ($q) use ($user) {
                 $q->where('user_id', $user->id)
-                  ->orWhere('cliente_email', $user->email);
+                    ->orWhere('cliente_email', $user->email);
             })
             ->findOrFail($id);
 
@@ -67,27 +66,29 @@ class MisDocumentosController extends Controller
         $user = auth()->user();
 
         $comprobante = Comprobante::with('detalles')
-            ->where(function($q) use ($user) {
+            ->where(function ($q) use ($user) {
                 $q->where('user_id', $user->id)
-                  ->orWhere('cliente_email', $user->email);
+                    ->orWhere('cliente_email', $user->email);
             })
             ->findOrFail($id);
 
         // Si ya tiene PDF guardado
         if ($comprobante->pdf_base64) {
             $pdf = base64_decode($comprobante->pdf_base64);
+
             return response($pdf, 200)
                 ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="' . $comprobante->serie . '-' . $comprobante->correlativo . '.pdf"');
+                ->header('Content-Disposition', 'attachment; filename="'.$comprobante->serie.'-'.$comprobante->correlativo.'.pdf"');
         }
 
         // Generar PDF
         $data = [
-            'comprobante' => $comprobante
+            'comprobante' => $comprobante,
         ];
 
         $pdf = PDF::loadView('exports.comprobante-cliente-pdf', $data);
-        return $pdf->download($comprobante->serie . '-' . $comprobante->correlativo . '.pdf');
+
+        return $pdf->download($comprobante->serie.'-'.$comprobante->correlativo.'.pdf');
     }
 
     /**
@@ -97,21 +98,21 @@ class MisDocumentosController extends Controller
     {
         $user = auth()->user();
 
-        $comprobante = Comprobante::where(function($q) use ($user) {
-                $q->where('user_id', $user->id)
-                  ->orWhere('cliente_email', $user->email);
-            })
+        $comprobante = Comprobante::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+                ->orWhere('cliente_email', $user->email);
+        })
             ->findOrFail($id);
 
-        if (!$comprobante->xml_firmado) {
+        if (! $comprobante->xml_firmado) {
             return response()->json(['error' => 'XML no disponible'], 404);
         }
 
         $xml = base64_decode($comprobante->xml_firmado);
-        
+
         return response($xml, 200)
             ->header('Content-Type', 'application/xml')
-            ->header('Content-Disposition', 'attachment; filename="' . $comprobante->serie . '-' . $comprobante->correlativo . '.xml"');
+            ->header('Content-Disposition', 'attachment; filename="'.$comprobante->serie.'-'.$comprobante->correlativo.'.xml"');
     }
 
     /**
@@ -147,7 +148,7 @@ class MisDocumentosController extends Controller
         // Buscar cliente asociado al usuario
         $cliente = $user->cliente;
 
-        if (!$cliente) {
+        if (! $cliente) {
             return response()->json(['error' => 'No tienes cuentas por cobrar'], 404);
         }
 
@@ -159,7 +160,7 @@ class MisDocumentosController extends Controller
 
         return response()->json([
             'cuentas' => $cuentas,
-            'total_pendiente' => $cuentas->sum('saldo_pendiente')
+            'total_pendiente' => $cuentas->sum('saldo_pendiente'),
         ]);
     }
 
@@ -171,7 +172,7 @@ class MisDocumentosController extends Controller
         $user = auth()->user();
         $cliente = $user->cliente;
 
-        if (!$cliente) {
+        if (! $cliente) {
             return response()->json(['error' => 'No tienes estado de cuenta'], 404);
         }
 
@@ -183,11 +184,12 @@ class MisDocumentosController extends Controller
         $data = [
             'cliente' => $cliente,
             'cuentas' => $cuentas,
-            'total_pendiente' => $cuentas->whereIn('estado', ['PENDIENTE', 'PARCIAL'])->sum('saldo_pendiente')
+            'total_pendiente' => $cuentas->whereIn('estado', ['PENDIENTE', 'PARCIAL'])->sum('saldo_pendiente'),
         ];
 
         $pdf = PDF::loadView('exports.estado-cuenta-pdf', $data);
-        return $pdf->download('estado-cuenta-' . $cliente->numero_documento . '.pdf');
+
+        return $pdf->download('estado-cuenta-'.$cliente->numero_documento.'.pdf');
     }
 
     /**
@@ -197,18 +199,18 @@ class MisDocumentosController extends Controller
     {
         $user = auth()->user();
 
-        $comprobante = Comprobante::where(function($q) use ($user) {
-                $q->where('user_id', $user->id)
-                  ->orWhere('cliente_email', $user->email);
-            })
+        $comprobante = Comprobante::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)
+                ->orWhere('cliente_email', $user->email);
+        })
             ->findOrFail($id);
 
         // Usar el servicio de notificaciones
         $notificacionService = app(\App\Services\NotificacionService::class);
-        
-        $cliente = (object)[
+
+        $cliente = (object) [
             'email' => $user->email,
-            'nombre_completo' => $user->name
+            'nombre_completo' => $user->name,
         ];
 
         $notificacionService->notificarComprobanteGenerado($comprobante, $cliente);

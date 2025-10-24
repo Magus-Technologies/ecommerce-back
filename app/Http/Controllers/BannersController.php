@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Banner;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class BannersController extends Controller
@@ -16,15 +15,15 @@ class BannersController extends Controller
     {
         try {
             $banners = Banner::ordenados()->get();
-            
+
             return response()->json([
                 'status' => 'success',
-                'data' => $banners
+                'data' => $banners,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al obtener banners: ' . $e->getMessage()
+                'message' => 'Error al obtener banners: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -45,18 +44,18 @@ class BannersController extends Controller
                     'enlace_url' => $banner->enlace_boton, // ✅ MAPEAR CORRECTAMENTE
                     'precio_desde' => $banner->precio_desde,
                     'imagen_url' => $banner->imagen_completa,
-                    'orden' => $banner->orden
+                    'orden' => $banner->orden,
                 ];
             });
-            
+
             return response()->json([
                 'status' => 'success',
-                'data' => $banners
+                'data' => $banners,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al obtener banners públicos: ' . $e->getMessage()
+                'message' => 'Error al obtener banners públicos: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -75,51 +74,51 @@ class BannersController extends Controller
             'precio_desde' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'orden' => 'nullable|integer|min:0',
-            'activo' => 'boolean'
+            'activo' => 'boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Datos de validación incorrectos',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         try {
             $data = $request->all();
-            
+
             // ✅ MAPEAR EL CAMPO CORRECTAMENTE
             if (isset($data['enlace_url'])) {
                 $data['enlace_boton'] = $data['enlace_url'];
                 unset($data['enlace_url']);
             }
-            
+
             // Manejar la subida de imagen
             if ($request->hasFile('imagen')) {
                 $imagen = $request->file('imagen');
-                $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
+                $nombreImagen = time().'_'.uniqid().'.'.$imagen->getClientOriginalExtension();
                 $rutaImagen = $imagen->storeAs('banners', $nombreImagen, 'public');
                 $data['imagen_url'] = $rutaImagen;
             }
 
             // Si no se especifica orden, usar el siguiente disponible
-            if (!isset($data['orden'])) {
+            if (! isset($data['orden'])) {
                 $data['orden'] = Banner::max('orden') + 1;
             }
 
             $banner = Banner::create($data);
-            
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Banner creado exitosamente',
-                'data' => $banner
+                'data' => $banner,
             ], 201);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al crear banner: ' . $e->getMessage()
+                'message' => 'Error al crear banner: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -131,15 +130,15 @@ class BannersController extends Controller
     {
         try {
             $banner = Banner::findOrFail($id);
-            
+
             return response()->json([
                 'status' => 'success',
-                'data' => $banner
+                'data' => $banner,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Banner no encontrado'
+                'message' => 'Banner no encontrado',
             ], 404);
         }
     }
@@ -158,51 +157,51 @@ class BannersController extends Controller
             'precio_desde' => 'nullable|numeric|min:0',
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'orden' => 'nullable|integer|min:0',
-            'activo' => 'sometimes|boolean' // ✅ AGREGAR SOMETIMES
+            'activo' => 'sometimes|boolean', // ✅ AGREGAR SOMETIMES
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Datos de validación incorrectos',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
         try {
             $banner = Banner::findOrFail($id);
             $data = $request->all();
-            
+
             // ✅ MAPEAR EL CAMPO CORRECTAMENTE
             if (isset($data['enlace_url'])) {
                 $data['enlace_boton'] = $data['enlace_url'];
                 unset($data['enlace_url']);
             }
-            
+
             // Manejar la subida de nueva imagen
             if ($request->hasFile('imagen')) {
                 // Eliminar imagen anterior
                 $banner->eliminarImagenAnterior();
-                
+
                 // Subir nueva imagen
                 $imagen = $request->file('imagen');
-                $nombreImagen = time() . '_' . uniqid() . '.' . $imagen->getClientOriginalExtension();
+                $nombreImagen = time().'_'.uniqid().'.'.$imagen->getClientOriginalExtension();
                 $rutaImagen = $imagen->storeAs('banners', $nombreImagen, 'public');
                 $data['imagen_url'] = $rutaImagen;
             }
 
             $banner->update($data);
-            
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Banner actualizado exitosamente',
-                'data' => $banner
+                'data' => $banner,
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al actualizar banner: ' . $e->getMessage()
+                'message' => 'Error al actualizar banner: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -214,21 +213,21 @@ class BannersController extends Controller
     {
         try {
             $banner = Banner::findOrFail($id);
-            
+
             // Eliminar imagen asociada
             $banner->eliminarImagenAnterior();
-            
+
             $banner->delete();
-            
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Banner eliminado exitosamente'
+                'message' => 'Banner eliminado exitosamente',
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al eliminar banner: ' . $e->getMessage()
+                'message' => 'Error al eliminar banner: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -240,19 +239,19 @@ class BannersController extends Controller
     {
         try {
             $banner = Banner::findOrFail($id);
-            $banner->activo = !$banner->activo;
+            $banner->activo = ! $banner->activo;
             $banner->save();
-            
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Estado del banner actualizado',
-                'data' => $banner
+                'data' => $banner,
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al cambiar estado del banner: ' . $e->getMessage()
+                'message' => 'Error al cambiar estado del banner: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -265,14 +264,14 @@ class BannersController extends Controller
         $validator = Validator::make($request->all(), [
             'banners' => 'required|array',
             'banners.*.id' => 'required|exists:banners,id',
-            'banners.*.orden' => 'required|integer|min:0'
+            'banners.*.orden' => 'required|integer|min:0',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Datos de validación incorrectos',
-                'errors' => $validator->errors()
+                'errors' => $validator->errors(),
             ], 422);
         }
 
@@ -281,22 +280,21 @@ class BannersController extends Controller
                 Banner::where('id', $bannerData['id'])
                     ->update(['orden' => $bannerData['orden']]);
             }
-            
+
             return response()->json([
                 'status' => 'success',
-                'message' => 'Orden de banners actualizado exitosamente'
+                'message' => 'Orden de banners actualizado exitosamente',
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al reordenar banners: ' . $e->getMessage()
+                'message' => 'Error al reordenar banners: '.$e->getMessage(),
             ], 500);
         }
     }
-}
-  
-  /**
+
+    /**
      * Obtener banners horizontales públicos
      */
     public function bannersHorizontalesPublicos()
@@ -311,3 +309,78 @@ class BannersController extends Controller
     {
         return $this->bannersPublicos();
     }
+
+    /**
+     * Obtener banner de oferta activo
+     */
+    public function bannerOfertaActivo()
+    {
+        try {
+            // Retornar el primer banner activo ordenado
+            $banner = Banner::activos()->ordenados()->first();
+
+            if (!$banner) {
+                return response()->json([
+                    'status' => 'success',
+                    'data' => null,
+                    'message' => 'No hay banner de oferta activo',
+                ]);
+            }
+
+            $bannerData = [
+                'id' => $banner->id,
+                'titulo' => $banner->titulo,
+                'subtitulo' => $banner->subtitulo,
+                'descripcion' => $banner->descripcion,
+                'texto_boton' => $banner->texto_boton,
+                'enlace_url' => $banner->enlace_boton,
+                'precio_desde' => $banner->precio_desde,
+                'imagen_url' => $banner->imagen_completa,
+                'orden' => $banner->orden,
+            ];
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $bannerData,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener banner de oferta activo: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener banners de flash sales activos
+     */
+    public function bannersFlashSalesActivos()
+    {
+        try {
+            // Retornar todos los banners activos
+            $banners = Banner::activos()->ordenados()->get()->map(function ($banner) {
+                return [
+                    'id' => $banner->id,
+                    'titulo' => $banner->titulo,
+                    'subtitulo' => $banner->subtitulo,
+                    'descripcion' => $banner->descripcion,
+                    'texto_boton' => $banner->texto_boton,
+                    'enlace_url' => $banner->enlace_boton,
+                    'precio_desde' => $banner->precio_desde,
+                    'imagen_url' => $banner->imagen_completa,
+                    'orden' => $banner->orden,
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $banners,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener banners de flash sales: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+}

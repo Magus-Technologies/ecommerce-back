@@ -66,6 +66,16 @@ class Comprobante extends Model
         'updated_at' => 'datetime'
     ];
 
+    protected $appends = [
+        'tiene_xml',
+        'tiene_pdf',
+        'tiene_cdr',
+        'numero_completo',
+        'tipo_documento',
+        'estado_sunat',
+        'documento_tipo'
+    ];
+
     // Relaciones
     public function cliente()
     {
@@ -150,6 +160,63 @@ class Comprobante extends Model
     public function getEsNotaAttribute()
     {
         return in_array($this->tipo_comprobante, ['07', '08']);
+    }
+
+    public function getTieneXmlAttribute()
+    {
+        return !empty($this->xml_firmado);
+    }
+
+    public function getTienePdfAttribute()
+    {
+        return !empty($this->pdf_base64);
+    }
+
+    public function getTieneCdrAttribute()
+    {
+        return !empty($this->xml_respuesta_sunat);
+    }
+
+    public function getNumeroCompletoAttribute()
+    {
+        return $this->serie . '-' . str_pad($this->correlativo, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function getTipoDocumentoAttribute()
+    {
+        return $this->tipo_comprobante;
+    }
+
+    public function getEstadoSunatAttribute()
+    {
+        // Si tiene CDR y estado es ACEPTADO
+        if ($this->tiene_cdr && $this->estado === 'ACEPTADO') {
+            return 'ACEPTADO';
+        }
+
+        // Si está pendiente o no se envió
+        if (in_array($this->estado, ['PENDIENTE', 'BORRADOR'])) {
+            return 'PENDIENTE';
+        }
+
+        // Si fue rechazado
+        if ($this->estado === 'RECHAZADO') {
+            return 'RECHAZADO';
+        }
+
+        return $this->estado ?? 'PENDIENTE';
+    }
+
+    public function getDocumentoTipoAttribute()
+    {
+        $tipos = [
+            '01' => 'FT',  // Factura
+            '03' => 'BI',  // Boleta
+            '07' => 'NC',  // Nota Crédito
+            '08' => 'ND',  // Nota Débito
+            '09' => 'NV'   // Nota Venta
+        ];
+        return $tipos[$this->tipo_comprobante] ?? 'NV';
     }
 
     // Métodos de utilidad
