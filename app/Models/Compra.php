@@ -38,7 +38,12 @@ class Compra extends Model
         'ubicacion_completa',
         'aprobada_por',
         'fecha_aprobacion',
-        'user_id'
+        'user_id',
+        // Campos de facturación
+        'requiere_factura',
+        'datos_facturacion',
+        'comprobante_id',
+        'facturado_automaticamente'
     ];
 
     protected $casts = [
@@ -50,7 +55,10 @@ class Compra extends Model
         'fecha_compra' => 'datetime',
         'fecha_aprobacion' => 'datetime',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'requiere_factura' => 'boolean',
+        'datos_facturacion' => 'array',
+        'facturado_automaticamente' => 'boolean'
     ];
 
     // Relación con cotización origen
@@ -99,6 +107,12 @@ class Compra extends Model
     public function tracking()
     {
         return $this->hasMany(CompraTracking::class)->orderBy('fecha_cambio', 'asc');
+    }
+
+    // Relación con Comprobante
+    public function comprobante()
+    {
+        return $this->belongsTo(Comprobante::class, 'comprobante_id');
     }
 
     // Accessor para obtener el nombre del cliente
@@ -279,5 +293,67 @@ class Compra extends Model
     public function scopeActivas($query)
     {
         return $query->whereNotIn('estado_compra_id', [7, 8]); // No canceladas ni rechazadas
+    }
+
+    // Verificar si requiere facturación
+    public function requiereFacturacion(): bool
+    {
+        return $this->requiere_factura === true;
+    }
+
+    // Verificar si ya está facturada
+    public function estaFacturada(): bool
+    {
+        return $this->comprobante_id !== null;
+    }
+
+    // Verificar si puede facturarse (está pagada y aún no tiene comprobante)
+    public function puedeFacturarse(): bool
+    {
+        return $this->estado_compra_id == 3 && // Estado Pagada
+               !$this->estaFacturada() &&
+               $this->requiereFacturacion();
+    }
+
+    // Obtener datos de facturación completos
+    public function getDatosFacturacionCompletos()
+    {
+        $datos = $this->datos_facturacion ?? [];
+
+        // Si no hay datos de facturación y hay cliente, usar datos del cliente
+        if (empty($datos) && $this->cliente_id) {
+            return [
+                'tipo_documento' => $this->cliente->tipo_documento ?? '1',
+                'numero_documento' => $this->cliente->numero_documento ?? $this->numero_documento,
+                'razon_social' => $this->cliente->razon_social ?? $this->cliente_nombre,
+                'direccion' => $this->cliente->direccion ?? $this->direccion_envio,
+                'email' => $this->cliente->email ?? $this->cliente_email,
+                'telefono' => $this->cliente->telefono ?? $this->telefono_contacto
+            ];
+        }
+
+        // Si no hay cliente pero hay userCliente
+        if (empty($datos) && $this->user_cliente_id && $this->userCliente) {
+            return [
+                'tipo_documento' => $this->userCliente->tipo_documento ?? '1',
+                'numero_documento' => $this->userCliente->numero_documento ?? $this->numero_documento,
+                'razon_social' => $this->userCliente->nombres . ' ' . $this->userCliente->apellidos,
+                'direccion' => $this->direccion_envio,
+                'email' => $this->userCliente->email ?? $this->cliente_email,
+                'telefono' => $this->telefono_contacto
+            ];
+        }
+
+        return $datos;
+    }
+
+    // Validar que tenga datos suficientes para facturar
+    public function tieneDatosParaFacturar(): bool
+    {
+        $datos = $this->getDatosFacturacionCompletos();
+
+        return !empty($datos['numero_documento']) &&
+               !empty($datos['razon_social']) &&
+               !empty($datos['direccion']);
     }
 }

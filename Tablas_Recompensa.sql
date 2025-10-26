@@ -128,3 +128,28 @@ CREATE TABLE recompensas_notificaciones_clientes (
   FOREIGN KEY (cliente_id) REFERENCES user_clientes(id) ON DELETE CASCADE,
   FOREIGN KEY (popup_id) REFERENCES recompensas_popups(id) ON DELETE CASCADE
 );
+-- SOLUCIÓN: Generar token para el admin y corregir pop-ups
+
+-- 1. Generar token para el usuario admin (ID: 1)
+INSERT INTO personal_access_tokens (
+    tokenable_type, 
+    tokenable_id, 
+    name, 
+    token, 
+    abilities, 
+    last_used_at, 
+    expires_at, 
+    created_at, 
+    updated_at
+) VALUES (
+    'App\\Models\\User',
+    1,
+    'admin_token_directo',
+    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+    '["*"]',
+    NULL,
+    NULL,
+    NOW(),
+    NOW()
+);
+

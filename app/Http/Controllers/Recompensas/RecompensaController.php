@@ -141,9 +141,10 @@ class RecompensaController extends Controller
                 ], 422);
             }
 
-            // Aplicar lógica automática de estados
-            $fechaInicio = Carbon::parse($request->fecha_inicio);
-            $fechaActual = Carbon::today();
+            // Aplicar lógica automática de estados (normalizando a inicio de día y respetando timezone de la app)
+            $timezone = config('app.timezone');
+            $fechaInicio = Carbon::parse($request->fecha_inicio, $timezone)->startOfDay();
+            $fechaActual = now($timezone)->startOfDay();
             $estadoAutomatico = '';
 
             if ($fechaInicio->isSameDay($fechaActual)) {
@@ -273,34 +274,88 @@ class RecompensaController extends Controller
                 ],
                 'configuracion' => [
                     'clientes' => $recompensa->clientes->map(function($cliente) {
-                        return [
+                        $result = [
                             'id' => $cliente->id,
                             'segmento' => $cliente->segmento,
                             'segmento_nombre' => $cliente->segmento_nombre,
-                            'cliente' => $cliente->cliente,
                             'es_cliente_especifico' => $cliente->es_cliente_especifico
                         ];
+
+                        // Solo incluir cliente si es específico y existe
+                        if ($cliente->es_cliente_especifico && $cliente->cliente) {
+                            $result['cliente'] = [
+                                'id' => $cliente->cliente->id,
+                                'nombre_completo' => trim($cliente->cliente->nombres . ' ' . $cliente->cliente->apellidos),
+                                'email' => $cliente->cliente->email
+                            ];
+                        } else {
+                            $result['cliente'] = null;
+                        }
+
+                        return $result;
                     }),
                     'productos' => $recompensa->productos->map(function($producto) {
-                        return [
+                        $result = [
                             'id' => $producto->id,
-                            'tipo_elemento' => $producto->tipo_elemento,
-                            'nombre_elemento' => $producto->nombre_elemento,
-                            'producto' => $producto->producto,
-                            'categoria' => $producto->categoria
+                            'tipo_elemento' => strtolower($producto->tipo_elemento)
                         ];
+
+                        // Incluir producto si es tipo producto
+                        if ($producto->es_producto_especifico && $producto->producto) {
+                            $result['producto'] = [
+                                'id' => $producto->producto->id,
+                                'nombre' => $producto->producto->nombre,
+                                'precio' => $producto->producto->precio_venta ?? 0
+                            ];
+                            $result['categoria'] = null;
+                        }
+                        // Incluir categoría si es tipo categoría
+                        elseif ($producto->es_categoria_especifica && $producto->categoria) {
+                            $result['producto'] = null;
+                            $result['categoria'] = [
+                                'id' => $producto->categoria->id,
+                                'nombre' => $producto->categoria->nombre
+                            ];
+                        }
+                        else {
+                            $result['producto'] = null;
+                            $result['categoria'] = null;
+                        }
+
+                        return $result;
                     }),
                     'puntos' => $recompensa->puntos->map(function($punto) {
-                        return $punto->getResumenConfiguracion();
+                        return [
+                            'id' => $punto->id,
+                            'tipo_calculo' => $punto->tipo_calculo ?? 'porcentaje',
+                            'valor' => $punto->puntos_por_compra ?? 0,
+                            'minimo_compra' => $punto->compra_minima ?? 0,
+                            'maximo_puntos' => $punto->maximo_puntos ?? null,
+                            'multiplicador_nivel' => $punto->multiplicador_nivel ?? 1
+                        ];
                     }),
                     'descuentos' => $recompensa->descuentos->map(function($descuento) {
-                        return $descuento->getResumenConfiguracion();
+                        return [
+                            'id' => $descuento->id,
+                            'tipo_calculo' => $descuento->tipo_descuento ?? 'porcentaje',
+                            'valor' => $descuento->valor_descuento ?? 0,
+                            'minimo_compra' => $descuento->compra_minima ?? 0
+                        ];
                     }),
                     'envios' => $recompensa->envios->map(function($envio) {
-                        return $envio->getResumenConfiguracion();
+                        return [
+                            'id' => $envio->id,
+                            'minimo_compra' => $envio->compra_minima ?? 0,
+                            'zonas_aplicables' => $envio->zonas_aplicables ?? []
+                        ];
                     }),
                     'regalos' => $recompensa->regalos->map(function($regalo) {
-                        return $regalo->getResumenConfiguracion();
+                        return [
+                            'id' => $regalo->id,
+                            'producto_id' => $regalo->producto_id ?? null,
+                            'cantidad' => $regalo->cantidad ?? 1,
+                            'minimo_compra' => $regalo->compra_minima ?? 0
+                        ];
                     })
                 ],
                 'historial_reciente' => $recompensa->historial->map(function($historial) {
@@ -958,8 +1013,9 @@ class RecompensaController extends Controller
                 ], 422);
             }
 
-            $fechaInicio = Carbon::parse($request->fecha_inicio);
-            $fechaActual = Carbon::today();
+            $timezone = config('app.timezone');
+            $fechaInicio = Carbon::parse($request->fecha_inicio, $timezone)->startOfDay();
+            $fechaActual = now($timezone)->startOfDay();
             
             $estadosDisponibles = [];
             $estadoPorDefecto = '';

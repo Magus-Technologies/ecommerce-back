@@ -120,14 +120,14 @@ class RecompensaProducto extends Model
     public function getTipoElementoAttribute(): string
     {
         if ($this->es_producto_especifico) {
-            return 'Producto';
+            return 'producto';
         }
 
         if ($this->es_categoria_especifica) {
-            return 'Categoría';
+            return 'categoria';
         }
 
-        return 'Desconocido';
+        return 'desconocido';
     }
 
     // Métodos de utilidad

@@ -63,5 +63,11 @@ class DatabaseSeeder extends Seeder
 
         $this->call(EliminarPermisosAntiguosSeeder::class);
 
+        // Series base para facturación electrónica (Factura/Boleta)
+        $this->call(SeriesComprobantesSeeder::class);
+
+        // Permisos del módulo de facturación
+        $this->call(FacturacionPermisosSeeder::class);
+
     }
 }

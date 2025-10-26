@@ -35,11 +35,13 @@ return [
         ],
     ],
     'greenter' => [
+        'ambiente' => env('GREENTER_AMBIENTE', 'beta'), // beta o produccion
         'fe_url' => env('GREENTER_FE_URL'),
         'fe_user' => env('GREENTER_FE_USER'),
         'fe_password' => env('GREENTER_FE_PASSWORD'),
         'cert_path' => storage_path('app/' . env('GREENTER_CERT_PATH')),
         'private_key_path' => storage_path('app/' . env('GREENTER_PRIVATE_KEY_PATH')),
+        'webhook_secret' => env('GREENTER_WEBHOOK_SECRET'),
     ],
 
     'company' => [
