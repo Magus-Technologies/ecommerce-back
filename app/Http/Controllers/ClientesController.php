@@ -598,4 +598,80 @@ public function deleteFoto(Request $request): JsonResponse
         ], 500);
     }
 }
+
+    /**
+     * Buscar cliente por número de documento en ambas tablas (clientes y user_clientes)
+     * GET /api/clientes/buscar-por-documento?numero_documento=76165963
+     */
+    public function buscarPorDocumento(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'numero_documento' => 'required|string'
+            ]);
+
+            $numeroDocumento = $request->input('numero_documento');
+            $resultado = null;
+
+            // 1. Buscar PRIMERO en 'user_clientes' (usuarios registrados - tiene datos completos)
+            $userCliente = UserCliente::select('numero_documento', 'nombres', 'apellidos', 'email', 'telefono')
+                ->where('numero_documento', $numeroDocumento)
+                ->where('estado', true)
+                ->first();
+
+            if ($userCliente) {
+                // Cliente encontrado en user_clientes
+                $resultado = [
+                    'numero_documento' => $userCliente->numero_documento ?? null,
+                    'nombres' => $userCliente->nombres ?? null,
+                    'apellidos' => $userCliente->apellidos ?? null,
+                    'email' => $userCliente->email ?? null,
+                    'telefono' => $userCliente->telefono ?? null,
+                    'direccion' => null
+                ];
+            }
+
+            // 2. Si no se encuentra, buscar en 'clientes' (facturación - solo para empresas/RUC)
+            if (!$resultado) {
+                $clienteFacturacion = \App\Models\Cliente::select('numero_documento', 'email', 'telefono', 'direccion')
+                    ->where('numero_documento', $numeroDocumento)
+                    ->where('activo', true)
+                    ->first();
+
+                if ($clienteFacturacion) {
+                    // Cliente encontrado en tabla clientes (facturación)
+                    $resultado = [
+                        'numero_documento' => $clienteFacturacion->numero_documento ?? null,
+                        'nombres' => null,
+                        'apellidos' => null,
+                        'email' => $clienteFacturacion->email ?? null,
+                        'telefono' => $clienteFacturacion->telefono ?? null,
+                        'direccion' => $clienteFacturacion->direccion ?? null
+                    ];
+                }
+            }
+
+            // 3. Retornar resultado
+            if ($resultado) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [$resultado] // Envuelto en array para consistencia con el frontend
+                ]);
+            }
+
+            // No se encontró en ninguna tabla
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró cliente con el número de documento: ' . $numeroDocumento,
+                'data' => []
+            ], 404);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al buscar cliente: ' . $e->getMessage(),
+                'data' => []
+            ], 500);
+        }
+    }
 }

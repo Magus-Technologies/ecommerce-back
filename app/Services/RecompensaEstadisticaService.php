@@ -412,7 +412,7 @@ class RecompensaEstadisticaService
             default => Carbon::now()->endOfMonth()
         };
 
-        return DB::table('recompensas_historial')
+        $resultado = DB::table('recompensas_historial')
             ->whereBetween('fecha_aplicacion', [$fechaInicio, $fechaFin])
             ->selectRaw('
                 COUNT(*) as total_aplicaciones,
@@ -421,6 +421,17 @@ class RecompensaEstadisticaService
                 AVG(puntos_otorgados) as promedio_puntos
             ')
             ->first();
+
+        // Convertir el objeto a array y manejar valores null
+        return [
+            'total_aplicaciones' => $resultado->total_aplicaciones ?? 0,
+            'clientes_unicos' => $resultado->clientes_unicos ?? 0,
+            'puntos_otorgados' => $resultado->puntos_otorgados ?? 0,
+            'promedio_puntos' => round($resultado->promedio_puntos ?? 0, 2),
+            'periodo' => $periodo,
+            'fecha_inicio' => $fechaInicio->toDateString(),
+            'fecha_fin' => $fechaFin->toDateString()
+        ];
     }
 
     /**

@@ -131,8 +131,9 @@ class RecompensaCliente extends Model
                 return $totalCompras >= 1000;
 
             case self::SEGMENTO_NO_REGISTRADOS:
-                // Para clientes no registrados, siempre aplica
-                return true;
+                // Este segmento es exclusivo para visitantes no autenticados (público)
+                // Nunca debe aplicar cuando evaluamos contra un UserCliente autenticado
+                return false;
 
             default:
                 return false;

@@ -15,7 +15,10 @@ class SerieComprobante extends Model
         'tipo_comprobante',
         'serie',
         'correlativo',
-        'activo'
+        'activo',
+        'sede_id',
+        'caja_id',
+        'descripcion'
     ];
 
     protected $casts = [

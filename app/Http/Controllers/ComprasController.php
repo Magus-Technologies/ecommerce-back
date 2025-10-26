@@ -9,8 +9,10 @@ use App\Models\EstadoCompra;
 use App\Models\Cotizacion;
 use App\Models\CotizacionTracking;
 use App\Models\Producto;
+use App\Services\FacturacionComprasService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ComprasController extends Controller
@@ -760,11 +762,54 @@ class ComprasController extends Controller
 
             DB::commit();
 
-            return response()->json([
+            // FACTURACIÓN AUTOMÁTICA - Si la compra requiere factura, generarla
+            $resultadoFacturacion = null;
+            if ($compra->requiereFacturacion()) {
+                try {
+                    $facturacionService = app(FacturacionComprasService::class);
+                    $resultadoFacturacion = $facturacionService->generarComprobanteAutomatico($compra);
+
+                    if ($resultadoFacturacion['success']) {
+                        Log::info('Comprobante generado automáticamente al procesar pago', [
+                            'compra_id' => $compra->id,
+                            'comprobante_id' => $resultadoFacturacion['comprobante']->id
+                        ]);
+                    } else {
+                        Log::warning('Falló la facturación automática al procesar pago', [
+                            'compra_id' => $compra->id,
+                            'error' => $resultadoFacturacion['error'] ?? 'Error desconocido'
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error en facturación automática', [
+                        'compra_id' => $compra->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            $respuesta = [
                 'status' => 'success',
                 'message' => 'Pago procesado exitosamente',
-                'compra' => $compra->load(['estadoCompra'])
-            ]);
+                'compra' => $compra->load(['estadoCompra', 'comprobante'])
+            ];
+
+            // Agregar información de facturación si se generó
+            if ($resultadoFacturacion && $resultadoFacturacion['success']) {
+                $respuesta['facturacion'] = [
+                    'comprobante_generado' => true,
+                    'numero_comprobante' => $resultadoFacturacion['comprobante']->serie . '-' . $resultadoFacturacion['comprobante']->correlativo,
+                    'estado_sunat' => $resultadoFacturacion['comprobante']->estado
+                ];
+            } elseif ($resultadoFacturacion && !$resultadoFacturacion['success']) {
+                $respuesta['facturacion'] = [
+                    'comprobante_generado' => false,
+                    'mensaje' => 'El comprobante se generará en segundo plano',
+                    'error' => $resultadoFacturacion['error'] ?? null
+                ];
+            }
+
+            return response()->json($respuesta);
 
         } catch (\Exception $e) {
             DB::rollback();
