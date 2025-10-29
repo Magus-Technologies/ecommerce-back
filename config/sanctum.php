@@ -45,9 +45,11 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | Configurado a 720 minutos (12 horas) para expiración automática.
+    |
     */
 
-    'expiration' => null,
+    'expiration' => 720, // 12 horas = 720 minutos
 
     /*
     |--------------------------------------------------------------------------

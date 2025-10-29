@@ -123,3 +123,12 @@ Route::get('/publico/recompensas/popups-activos', [RecompensaNotificacionControl
 // ============================================
 Route::post('/reclamos/crear', [ReclamosController::class, 'crear']);
 Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'buscarPorNumero']);
+
+// ============================================
+// VERIFICACIÓN DE EMAIL Y RECUPERACIÓN DE CONTRASEÑA
+// ============================================
+Route::post('/verify-email', [\App\Http\Controllers\EmailVerificationController::class, 'verify']);
+Route::post('/resend-verification', [\App\Http\Controllers\EmailVerificationController::class, 'resendVerification']);
+Route::post('/forgot-password', [\App\Http\Controllers\PasswordResetController::class, 'forgotPassword']);
+Route::post('/reset-password', [\App\Http\Controllers\PasswordResetController::class, 'resetPassword']);
+Route::post('/verify-reset-token', [\App\Http\Controllers\PasswordResetController::class, 'verifyResetToken']);
