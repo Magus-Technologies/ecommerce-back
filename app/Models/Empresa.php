@@ -21,7 +21,7 @@ class Empresa extends Model
         'email',
         'website',
         'whatsapp',
-        'logo'
+        'logo',
     ];
 
     /**
