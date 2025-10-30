@@ -63,6 +63,11 @@ class Venta extends Model
         return $this->hasMany(VentaDetalle::class);
     }
 
+    public function metodosPago()
+    {
+        return $this->hasMany(VentaMetodoPago::class);
+    }
+
     // Scopes
     public function scopePorEstado($query, $estado)
     {
@@ -121,6 +126,19 @@ class Venta extends Model
     public function getTipoVentaAttribute()
     {
         return $this->user_cliente_id ? 'E-commerce' : 'Tradicional';
+    }
+
+    public function getEsPagoMixtoAttribute()
+    {
+        return $this->metodosPago()->count() > 1;
+    }
+
+    public function getMetodoPagoDisplayAttribute()
+    {
+        if ($this->es_pago_mixto) {
+            return 'MIXTO';
+        }
+        return $this->metodo_pago ?? 'No especificado';
     }
 
     // Métodos de utilidad

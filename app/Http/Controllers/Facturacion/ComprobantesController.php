@@ -278,6 +278,23 @@ class ComprobantesController extends Controller
                 ], 404);
             }
 
+            // Regenerar PDF con QR actualizado antes de enviar
+            try {
+                $pdfService = app(\App\Services\PdfGeneratorService::class);
+                $pdfService->generarPdfSunat($comprobante->fresh());
+                $comprobante = $comprobante->fresh(); // Recargar con PDF actualizado
+                
+                Log::info('PDF regenerado con QR para email', [
+                    'comprobante_id' => $comprobante->id
+                ]);
+            } catch (\Exception $pdfError) {
+                // Si falla la regeneración, usar el PDF existente
+                Log::warning('No se pudo regenerar PDF, usando existente', [
+                    'comprobante_id' => $comprobante->id,
+                    'error' => $pdfError->getMessage()
+                ]);
+            }
+
             // Enviar email con el comprobante adjunto
             Mail::to($request->email)->send(new ComprobanteEmail($comprobante, $request->mensaje));
 

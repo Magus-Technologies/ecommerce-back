@@ -180,9 +180,16 @@ class VentasController extends Controller
 
             // Datos de venta
             'descuento_total' => 'nullable|numeric|min:0',
-            'metodo_pago' => 'required|string|max:50',
+            'metodo_pago' => 'nullable|string|max:50',
             'observaciones' => 'nullable|string',
             'requiere_factura' => 'nullable|boolean',
+
+            // Pagos mixtos (opcional)
+            'pagos' => 'nullable|array|min:1',
+            'pagos.*.metodo_pago' => 'required_with:pagos|string|max:50',
+            'pagos.*.monto' => 'required_with:pagos|numeric|min:0.01',
+            'pagos.*.referencia' => 'nullable|string|max:100',
+            'pagos.*.observaciones' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -193,8 +200,35 @@ class VentasController extends Controller
             ], 422);
         }
 
+        // Validar que exista al menos un método de pago
+        if (!$request->has('pagos') && !$request->has('metodo_pago')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe especificar al menos un método de pago',
+                'errors' => ['pagos' => ['El campo pagos o metodo_pago es requerido']],
+            ], 422);
+        }
+
         // Validar caja abierta para ventas en efectivo
-        if (in_array(strtolower($request->metodo_pago ?? ''), ['efectivo', 'cash'])) {
+        $tieneEfectivo = false;
+        
+        // Verificar si hay efectivo en pago simple
+        if ($request->has('metodo_pago') && in_array(strtolower($request->metodo_pago), ['efectivo', 'cash'])) {
+            $tieneEfectivo = true;
+        }
+        
+        // Verificar si hay efectivo en pagos mixtos
+        if ($request->has('pagos') && is_array($request->pagos)) {
+            foreach ($request->pagos as $pago) {
+                if (isset($pago['metodo_pago']) && in_array(strtolower($pago['metodo_pago']), ['efectivo', 'cash'])) {
+                    $tieneEfectivo = true;
+                    break;
+                }
+            }
+        }
+        
+        // Si hay efectivo, validar caja abierta
+        if ($tieneEfectivo) {
             $cajaAbierta = \App\Models\CajaMovimiento::where('estado', 'ABIERTA')
                 ->where('user_id', \Illuminate\Support\Facades\Auth::id() ?? 1)
                 ->exists();
@@ -373,6 +407,33 @@ class VentasController extends Controller
             $descuentoTotal = $request->descuento_total ?? 0;
             $total = $subtotal + $igvTotal - $descuentoTotal;
 
+            // 6.5. VALIDAR PAGOS MIXTOS
+            $pagosMixtos = [];
+            $metodoPagoSimple = null;
+
+            if ($request->has('pagos') && is_array($request->pagos) && count($request->pagos) > 0) {
+                // Modo pagos mixtos
+                $sumaPagos = 0;
+                foreach ($request->pagos as $pago) {
+                    $sumaPagos += $pago['monto'];
+                    $pagosMixtos[] = [
+                        'metodo_pago' => $pago['metodo_pago'],
+                        'monto' => $pago['monto'],
+                        'referencia' => $pago['referencia'] ?? null,
+                    ];
+                }
+
+                // Validar que la suma de pagos sea igual al total
+                if (abs($sumaPagos - $total) > 0.01) { // Tolerancia de 1 centavo por redondeo
+                    throw new \Exception("La suma de pagos (" . number_format($sumaPagos, 2) . ") debe ser igual al total de la venta (" . number_format($total, 2) . ")");
+                }
+
+                $metodoPagoSimple = 'MIXTO'; // Indicador de pago mixto
+            } else {
+                // Modo pago simple (retrocompatibilidad)
+                $metodoPagoSimple = $request->metodo_pago;
+            }
+
             // 7. AUTO-COMPLETAR DATOS DE VENTA
             $fechaVenta = now()->format('Y-m-d');
             $horaVenta = now()->format('H:i:s');
@@ -392,7 +453,7 @@ class VentasController extends Controller
                 'total' => $total,
                 'estado' => 'PENDIENTE',
                 'requiere_factura' => $requiereFactura,
-                'metodo_pago' => $request->metodo_pago,
+                'metodo_pago' => $metodoPagoSimple,
                 'observaciones' => $request->observaciones,
                 'user_id' => \Illuminate\Support\Facades\Auth::id() ?? 1,
             ];
@@ -439,44 +500,76 @@ class VentasController extends Controller
                 $prod['producto']->decrement('stock', $prod['cantidad']);
             }
 
+            // 8.5. GUARDAR MÉTODOS DE PAGO (si es pago mixto)
+            if (!empty($pagosMixtos)) {
+                foreach ($pagosMixtos as $pago) {
+                    \App\Models\VentaMetodoPago::create([
+                        'venta_id' => $venta->id,
+                        'metodo' => $pago['metodo_pago'],
+                        'monto' => $pago['monto'],
+                        'referencia' => $pago['referencia'],
+                    ]);
+                }
+
+                \Illuminate\Support\Facades\Log::info('Pagos mixtos registrados', [
+                    'venta_id' => $venta->id,
+                    'cantidad_pagos' => count($pagosMixtos),
+                    'metodos' => array_column($pagosMixtos, 'metodo_pago')
+                ]);
+            }
+
             DB::commit();
 
             // Disparar evento para procesar integraciones
             event(new VentaCreated($venta->load(['cliente', 'userCliente', 'detalles.producto'])));
 
             // 9. RESPUESTA EXITOSA CON TODOS LOS DATOS
+            $responseData = [
+                'id' => $venta->id,
+                'codigo_venta' => $venta->codigo_venta ?? 'V-' . str_pad($venta->id, 6, '0', STR_PAD_LEFT),
+                'cliente' => $cliente,
+                'user_cliente' => $userCliente,
+                'detalles' => $venta->detalles->map(function($detalle) {
+                    return [
+                        'producto_id' => $detalle->producto_id,
+                        'codigo_producto' => $detalle->codigo_producto,
+                        'nombre_producto' => $detalle->nombre_producto,
+                        'cantidad' => $detalle->cantidad,
+                        'precio_unitario' => $detalle->precio_unitario,
+                        'descuento_unitario' => $detalle->descuento_unitario,
+                        'subtotal' => $detalle->subtotal_linea,
+                        'igv' => $detalle->igv_linea,
+                        'total' => $detalle->total_linea,
+                    ];
+                }),
+                'subtotal' => round($subtotal, 2),
+                'igv' => round($igvTotal, 2),
+                'descuento_total' => round($descuentoTotal, 2),
+                'total' => round($total, 2),
+                'fecha_venta' => $fechaVenta,
+                'hora_venta' => $horaVenta,
+                'tipo_documento' => $tipoDocumento,
+                'moneda' => $moneda,
+                'estado' => $venta->estado,
+                'requiere_factura' => $requiereFactura,
+                'metodo_pago' => $metodoPagoSimple,
+            ];
+
+            // Incluir métodos de pago si es pago mixto
+            if (!empty($pagosMixtos)) {
+                $responseData['metodos_pago'] = $venta->metodosPago->map(function($mp) {
+                    return [
+                        'metodo' => $mp->metodo,
+                        'monto' => $mp->monto,
+                        'referencia' => $mp->referencia,
+                    ];
+                });
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Venta registrada exitosamente',
-                'data' => [
-                    'id' => $venta->id,
-                    'codigo_venta' => $venta->codigo_venta ?? 'V-' . str_pad($venta->id, 6, '0', STR_PAD_LEFT),
-                    'cliente' => $cliente,
-                    'user_cliente' => $userCliente,
-                    'detalles' => $venta->detalles->map(function($detalle) {
-                        return [
-                            'producto_id' => $detalle->producto_id,
-                            'codigo_producto' => $detalle->codigo_producto,
-                            'nombre_producto' => $detalle->nombre_producto,
-                            'cantidad' => $detalle->cantidad,
-                            'precio_unitario' => $detalle->precio_unitario,
-                            'descuento_unitario' => $detalle->descuento_unitario,
-                            'subtotal' => $detalle->subtotal_linea,
-                            'igv' => $detalle->igv_linea,
-                            'total' => $detalle->total_linea,
-                        ];
-                    }),
-                    'subtotal' => round($subtotal, 2),
-                    'igv' => round($igvTotal, 2),
-                    'descuento_total' => round($descuentoTotal, 2),
-                    'total' => round($total, 2),
-                    'fecha_venta' => $fechaVenta,
-                    'hora_venta' => $horaVenta,
-                    'tipo_documento' => $tipoDocumento,
-                    'moneda' => $moneda,
-                    'estado' => $venta->estado,
-                    'requiere_factura' => $requiereFactura,
-                ],
+                'data' => $responseData,
             ], 201);
 
         } catch (\Exception $e) {
@@ -1079,26 +1172,49 @@ class VentasController extends Controller
             $mensajeTexto = $request->mensaje ?? "Estimado(a) {$nombreCliente}, adjuntamos su comprobante electrónico {$comprobante->numero_completo}.";
 
             try {
-                // OPCIÓN: Implementar envío real de email
-                // Ejemplo con Laravel Mail:
-                // Mail::to($request->email)->send(
-                //     new \App\Mail\ComprobanteEmail($venta, $mensajeTexto)
-                // );
+                // Regenerar PDF con QR actualizado antes de enviar
+                try {
+                    $pdfService = app(\App\Services\PdfGeneratorService::class);
+                    $pdfService->generarPdfSunat($comprobante->fresh());
+                    $comprobante = $comprobante->fresh(); // Recargar con PDF actualizado
+                    
+                    \Illuminate\Support\Facades\Log::info('PDF regenerado con QR para email', [
+                        'comprobante_id' => $comprobante->id
+                    ]);
+                } catch (\Exception $pdfError) {
+                    // Si falla la regeneración, usar el PDF existente
+                    \Illuminate\Support\Facades\Log::warning('No se pudo regenerar PDF, usando existente', [
+                        'comprobante_id' => $comprobante->id,
+                        'error' => $pdfError->getMessage()
+                    ]);
+                }
 
-                // Por ahora simulamos el envío exitoso
-                // URLs de descarga (para incluir en el email)
-                $pdfUrl = url("/api/ventas/{$id}/pdf");
-                $xmlUrl = url("/api/ventas/{$id}/xml");
+                // Enviar email con el comprobante adjunto
+                \Illuminate\Support\Facades\Mail::to($request->email)->send(
+                    new \App\Mail\ComprobanteEmail($comprobante, $mensajeTexto)
+                );
 
-                // Registrar envío exitoso
-                \App\Models\NotificacionEnviada::create([
+                \Illuminate\Support\Facades\Log::info('Email enviado exitosamente', [
                     'venta_id' => $venta->id,
-                    'tipo' => 'email',
-                    'destinatario' => $request->email,
-                    'mensaje' => $mensajeTexto,
-                    'estado' => 'ENVIADO',
-                    'fecha_envio' => now()
+                    'email' => $request->email,
+                    'comprobante' => $comprobante->numero_completo
                 ]);
+
+                // Registrar envío exitoso (opcional, no falla si hay error)
+                try {
+                    \App\Models\NotificacionEnviada::registrarEnvio(
+                        $venta->id,
+                        'email',
+                        $request->email,
+                        $mensajeTexto,
+                        $comprobante->id
+                    );
+                } catch (\Exception $e) {
+                    // No fallar si el registro falla
+                    \Illuminate\Support\Facades\Log::warning('No se pudo registrar el envío de email', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
 
                 return response()->json([
                     'success' => true,
@@ -1106,25 +1222,40 @@ class VentasController extends Controller
                     'data' => [
                         'email' => $request->email,
                         'comprobante' => $comprobante->numero_completo,
-                        'mensaje' => $mensajeTexto,
-                        'pdf_url' => $pdfUrl,
-                        'xml_url' => $xmlUrl
+                        'fecha_envio' => now()->format('Y-m-d H:i:s')
                     ]
                 ]);
 
             } catch (\Exception $e) {
-                // Registrar error en el envío
-                \App\Models\NotificacionEnviada::create([
+                \Illuminate\Support\Facades\Log::error('Error al enviar email', [
                     'venta_id' => $venta->id,
-                    'tipo' => 'email',
-                    'destinatario' => $request->email,
-                    'mensaje' => $mensajeTexto,
-                    'estado' => 'ERROR',
-                    'error_mensaje' => $e->getMessage(),
-                    'fecha_envio' => now()
+                    'email' => $request->email,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
 
-                throw $e;
+                // Registrar error en el envío (opcional)
+                try {
+                    \App\Models\NotificacionEnviada::registrarError(
+                        $venta->id,
+                        'email',
+                        $request->email,
+                        $e->getMessage(),
+                        $mensajeTexto,
+                        $comprobante->id ?? null
+                    );
+                } catch (\Exception $regError) {
+                    // No fallar si el registro falla
+                    \Illuminate\Support\Facades\Log::warning('No se pudo registrar el error de envío', [
+                        'error' => $regError->getMessage()
+                    ]);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al enviar email',
+                    'error' => $e->getMessage()
+                ], 500);
             }
 
         } catch (\Exception $e) {
@@ -1682,18 +1813,25 @@ class VentasController extends Controller
 
                 // OPCIÓN: Si tienes API de WhatsApp Business configurada, úsala aquí
                 // Ejemplo con servicio hipotético:
+                // TODO: Implementar envío real de WhatsApp
                 // $whatsappService = app(\App\Services\WhatsAppService::class);
                 // $resultado = $whatsappService->enviarMensaje($telefono, $mensajeTexto, [$pdfUrl, $xmlUrl]);
 
-                // Registrar envío exitoso
-                \App\Models\NotificacionEnviada::create([
+                // Por ahora simulamos el envío exitoso
+                \Log::info('WhatsApp simulado enviado', [
                     'venta_id' => $venta->id,
-                    'tipo' => 'whatsapp',
-                    'destinatario' => $telefono,
-                    'mensaje' => $mensajeTexto,
-                    'estado' => 'ENVIADO',
-                    'fecha_envio' => now()
+                    'telefono' => $telefono,
+                    'comprobante' => $comprobante->numero_completo
                 ]);
+
+                // Registrar envío exitoso (opcional, no falla si hay error)
+                \App\Models\NotificacionEnviada::registrarEnvio(
+                    $venta->id,
+                    'whatsapp',
+                    $telefono,
+                    $mensajeTexto,
+                    $comprobante->id
+                );
 
                 return response()->json([
                     'success' => true,
@@ -1701,24 +1839,30 @@ class VentasController extends Controller
                     'data' => [
                         'whatsapp_url' => $whatsappUrl,
                         'telefono' => $telefono,
-                        'mensaje' => $mensajeTexto,
+                        'mensaje' => $mensajeCompleto,
                         'comprobante' => $comprobante->numero_completo,
                         'pdf_url' => $pdfUrl,
-                        'xml_url' => $xmlUrl
+                        'xml_url' => $xmlUrl,
+                        'fecha_envio' => now()->format('Y-m-d H:i:s')
                     ]
                 ]);
 
             } catch (\Exception $e) {
-                // Registrar error en el envío
-                \App\Models\NotificacionEnviada::create([
+                \Log::error('Error al enviar WhatsApp', [
                     'venta_id' => $venta->id,
-                    'tipo' => 'whatsapp',
-                    'destinatario' => $telefono,
-                    'mensaje' => $mensajeTexto,
-                    'estado' => 'ERROR',
-                    'error_mensaje' => $e->getMessage(),
-                    'fecha_envio' => now()
+                    'telefono' => $telefono,
+                    'error' => $e->getMessage()
                 ]);
+
+                // Registrar error en el envío (opcional)
+                \App\Models\NotificacionEnviada::registrarError(
+                    $venta->id,
+                    'whatsapp',
+                    $telefono,
+                    $e->getMessage(),
+                    $mensajeTexto,
+                    $comprobante->id ?? null
+                );
 
                 throw $e;
             }

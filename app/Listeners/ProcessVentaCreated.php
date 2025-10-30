@@ -40,8 +40,8 @@ class ProcessVentaCreated
                 $this->generarComprobanteLocal($venta);
             }
 
-            // 5. Enviar notificación al cliente
-            $this->enviarNotificacion($venta);
+            // 5. NO enviar notificación automáticamente - El usuario debe hacerlo manualmente
+            // $this->enviarNotificacion($venta);
 
         } catch (\Exception $e) {
             Log::error('Error procesando venta creada: ' . $e->getMessage(), [
@@ -278,9 +278,20 @@ class ProcessVentaCreated
 
     /**
      * Enviar notificación al cliente
+     * DESHABILITADO: Las notificaciones deben enviarse MANUALMENTE desde el frontend
+     * Usar: POST /api/ventas/{id}/email o POST /api/ventas/{id}/whatsapp
      */
     private function enviarNotificacion($venta)
     {
+        // MÉTODO DESHABILITADO - No enviar notificaciones automáticas
+        Log::info('Notificación NO enviada (deshabilitada)', [
+            'venta_id' => $venta->id,
+            'nota' => 'Usuario debe enviar manualmente usando POST /api/ventas/{id}/email o /api/ventas/{id}/whatsapp'
+        ]);
+        
+        return;
+        
+        /* CÓDIGO ORIGINAL COMENTADO
         try {
             $cliente = $venta->cliente ?? $venta->userCliente;
 
@@ -322,5 +333,6 @@ class ProcessVentaCreated
                 'venta_id' => $venta->id
             ]);
         }
+        */
     }
 }
