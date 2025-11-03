@@ -9,7 +9,7 @@
         "php": "^8.2",
         "bacon/bacon-qr-code": "^2.0",
         "barryvdh/laravel-dompdf": "^3.1",
-        "doctrine/dbal": "^4.2",
+        "doctrine/dbal": "^4.3",
         "dompdf/dompdf": "^3.1",
         "google/apiclient": "*",
         "greenter/greenter": "^5.1",

@@ -569,7 +569,7 @@ class VentasController extends Controller
             if (! empty($pagosMixtos)) {
                 $responseData['metodos_pago'] = $venta->metodosPago->map(function ($mp) {
                     return [
-                        'metodo' => $mp->metodo,
+                        'metodo_pago' => $mp->metodo,  // Cambiado de 'metodo' a 'metodo_pago' para consistencia con update
                         'monto' => $mp->monto,
                         'referencia' => $mp->referencia,
                     ];
@@ -678,7 +678,7 @@ class VentasController extends Controller
             if ($venta->metodo_pago === 'MIXTO' && $venta->metodosPago->count() > 0) {
                 $metodosPago = $venta->metodosPago->map(function ($mp) {
                     return [
-                        'metodo' => $mp->metodo,
+                        'metodo_pago' => $mp->metodo,  // Cambiado de 'metodo' a 'metodo_pago' para consistencia con update
                         'monto' => $mp->monto,
                         'referencia' => $mp->referencia,
                     ];
@@ -1861,12 +1861,18 @@ class VentasController extends Controller
             $mensajeTexto = $request->mensaje ?? "Hola {$nombreCliente}, adjunto tu comprobante electrónico {$comprobante->numero_completo}";
 
             try {
-                // URLs de descarga
-                $pdfUrl = url("/api/ventas/{$id}/pdf");
-                $xmlUrl = url("/api/ventas/{$id}/xml");
+                // Construir número completo del comprobante
+                $numeroCompleto = $comprobante->numero_completo ??
+                    ($comprobante->ruc_emisor . '-' .
+                     $comprobante->tipo_comprobante . '-' .
+                     $comprobante->serie . '-' .
+                     str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT));
+
+                // URL pública del PDF (sin autenticación, para WhatsApp)
+                $pdfUrl = url("/api/venta/comprobante/pdf/{$id}/{$numeroCompleto}");
 
                 // Generar link de WhatsApp
-                $mensajeCompleto = $mensajeTexto."\n\n📄 PDF: ".$pdfUrl."\n📋 XML: ".$xmlUrl;
+                $mensajeCompleto = $mensajeTexto."\n\n📄 Ver comprobante: ".$pdfUrl;
                 $whatsappUrl = "https://wa.me/{$telefono}?text=".urlencode($mensajeCompleto);
 
                 // OPCIÓN: Si tienes API de WhatsApp Business configurada, úsala aquí
@@ -1898,9 +1904,8 @@ class VentasController extends Controller
                         'whatsapp_url' => $whatsappUrl,
                         'telefono' => $telefono,
                         'mensaje' => $mensajeCompleto,
-                        'comprobante' => $comprobante->numero_completo,
+                        'comprobante' => $numeroCompleto,
                         'pdf_url' => $pdfUrl,
-                        'xml_url' => $xmlUrl,
                         'fecha_envio' => now()->format('Y-m-d H:i:s'),
                     ],
                 ]);
@@ -2154,6 +2159,611 @@ class VentasController extends Controller
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                 ],
+            ], 500);
+        }
+    }
+
+    /**
+     * Actualizar una venta existente
+     * PUT /api/ventas/{id}
+     * 
+     * RESTRICCIONES:
+     * - Solo ventas en estado PENDIENTE
+     * - Solo ventas SIN comprobante generado
+     * - Ajusta stock correctamente (devuelve stock anterior, descuenta nuevo)
+     * - Actualiza kardex
+     */
+    public function update(Request $request, $id)
+    {
+        // Validación de entrada
+        $validator = Validator::make($request->all(), [
+            'cliente_id' => 'nullable|exists:clientes,id',
+            'user_cliente_id' => 'nullable|exists:user_clientes,id',
+
+            // Datos de cliente no registrado
+            'cliente_datos' => 'nullable|array',
+            'cliente_datos.tipo_documento' => 'nullable|in:1,4,6,7,0',
+            'cliente_datos.numero_documento' => 'nullable|string|max:20',
+            'cliente_datos.razon_social' => 'nullable|string|max:255',
+            'cliente_datos.nombre_comercial' => 'nullable|string|max:255',
+            'cliente_datos.direccion' => 'nullable|string|max:500',
+            'cliente_datos.email' => 'nullable|email|max:255',
+            'cliente_datos.telefono' => 'nullable|string|max:20',
+
+            // Productos
+            'productos' => 'required|array|min:1',
+            'productos.*.producto_id' => 'required|exists:productos,id',
+            'productos.*.cantidad' => 'required|numeric|min:0.01',
+            'productos.*.precio_unitario' => 'required|numeric|min:0',
+            'productos.*.descuento_unitario' => 'nullable|numeric|min:0',
+
+            // Datos de venta
+            'descuento_total' => 'nullable|numeric|min:0',
+            'metodo_pago' => 'nullable|string|max:50',
+            'observaciones' => 'nullable|string',
+            'requiere_factura' => 'nullable|boolean',
+
+            // Pagos mixtos
+            'pagos' => 'nullable|array|min:1',
+            'pagos.*.metodo_pago' => 'required_with:pagos|string|max:50',
+            'pagos.*.monto' => 'required_with:pagos|numeric|min:0.01',
+            'pagos.*.referencia' => 'nullable|string|max:100',
+            'pagos.*.observaciones' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos de validación incorrectos',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Validar que exista al menos un método de pago
+        if (! $request->has('pagos') && ! $request->has('metodo_pago')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe especificar al menos un método de pago',
+                'errors' => ['pagos' => ['El campo pagos o metodo_pago es requerido']],
+            ], 422);
+        }
+
+        // Validar caja abierta para ventas en efectivo
+        $tieneEfectivo = false;
+
+        // Verificar si hay efectivo en pago simple
+        if ($request->has('metodo_pago') && in_array(strtolower($request->metodo_pago), ['efectivo', 'cash'])) {
+            $tieneEfectivo = true;
+        }
+
+        // Verificar si hay efectivo en pagos mixtos
+        if ($request->has('pagos') && is_array($request->pagos)) {
+            foreach ($request->pagos as $pago) {
+                if (isset($pago['metodo_pago']) && in_array(strtolower($pago['metodo_pago']), ['efectivo', 'cash'])) {
+                    $tieneEfectivo = true;
+                    break;
+                }
+            }
+        }
+
+        // Si hay efectivo, validar caja abierta
+        if ($tieneEfectivo) {
+            $cajaAbierta = \App\Models\CajaMovimiento::where('estado', 'ABIERTA')
+                ->where('user_id', \Illuminate\Support\Facades\Auth::id() ?? 1)
+                ->exists();
+
+            if (! $cajaAbierta) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Debe aperturar una caja antes de registrar ventas en efectivo',
+                    'errors' => ['caja' => ['No hay caja abierta']],
+                ], 422);
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            // 1. BUSCAR Y VALIDAR LA VENTA
+            $venta = Venta::with(['detalles.producto', 'metodosPago'])->findOrFail($id);
+
+            // 2. VALIDAR QUE PUEDE EDITARSE
+            if (!$venta->puedeEditar()) {
+                $razon = $venta->estado !== 'PENDIENTE' 
+                    ? "La venta está en estado {$venta->estado}" 
+                    : "La venta ya tiene un comprobante generado";
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta venta no puede ser editada',
+                    'razon' => $razon,
+                    'estado_actual' => $venta->estado,
+                    'tiene_comprobante' => $venta->comprobante_id !== null,
+                ], 422);
+            }
+
+            // 3. RESTAURAR STOCK DE LOS PRODUCTOS ANTERIORES
+            \Log::info('Iniciando restauración de stock', [
+                'venta_id' => $venta->id,
+                'cantidad_productos' => $venta->detalles->count(),
+            ]);
+
+            foreach ($venta->detalles as $detalleAnterior) {
+                $producto = Producto::find($detalleAnterior->producto_id);
+                if ($producto) {
+                    $stockAnterior = $producto->stock;
+                    $producto->stock += $detalleAnterior->cantidad;
+                    $producto->save();
+                    
+                    \Log::info('Stock restaurado al editar venta', [
+                        'venta_id' => $venta->id,
+                        'producto_id' => $producto->id,
+                        'producto_nombre' => $producto->nombre,
+                        'stock_anterior' => $stockAnterior,
+                        'cantidad_restaurada' => $detalleAnterior->cantidad,
+                        'stock_actual' => $producto->stock,
+                    ]);
+                }
+            }
+
+            // 4. GESTIÓN DE CLIENTE (igual que en store)
+            $cliente = null;
+            $userCliente = null;
+
+            if ($request->filled('cliente_id') && $request->cliente_id) {
+                $cliente = Cliente::find($request->cliente_id);
+                if (!$cliente) {
+                    throw new \Exception("Cliente no encontrado con ID: {$request->cliente_id}");
+                }
+            } elseif ($request->filled('user_cliente_id') && $request->user_cliente_id) {
+                $userCliente = UserCliente::find($request->user_cliente_id);
+                if (!$userCliente) {
+                    throw new \Exception("Usuario cliente no encontrado con ID: {$request->user_cliente_id}");
+                }
+                if ($userCliente->cliente_facturacion_id) {
+                    $cliente = Cliente::find($userCliente->cliente_facturacion_id);
+                }
+            } elseif ($request->has('cliente_datos') && !empty($request->cliente_datos)) {
+                $clienteData = $request->cliente_datos;
+                if (!empty($clienteData['numero_documento'])) {
+                    $cliente = Cliente::where('numero_documento', $clienteData['numero_documento'])->first();
+                    if (!$cliente) {
+                        $cliente = Cliente::create([
+                            'tipo_documento' => $clienteData['tipo_documento'] ?? '0',
+                            'numero_documento' => $clienteData['numero_documento'],
+                            'razon_social' => $clienteData['razon_social'] ?? 'Cliente',
+                            'nombre_comercial' => $clienteData['nombre_comercial'] ?? $clienteData['razon_social'] ?? 'Cliente',
+                            'direccion' => $clienteData['direccion'] ?? 'Sin dirección',
+                            'email' => $clienteData['email'] ?? null,
+                            'telefono' => $clienteData['telefono'] ?? null,
+                            'activo' => true,
+                        ]);
+
+                        \Log::info('Cliente creado al editar venta', [
+                            'venta_id' => $id,
+                            'cliente_id' => $cliente->id,
+                            'numero_documento' => $cliente->numero_documento,
+                        ]);
+                    } else {
+                        // Actualizar datos del cliente existente si se proporcionan
+                        $updateData = [];
+                        if (!empty($clienteData['razon_social'])) {
+                            $updateData['razon_social'] = $clienteData['razon_social'];
+                        }
+                        if (!empty($clienteData['nombre_comercial'])) {
+                            $updateData['nombre_comercial'] = $clienteData['nombre_comercial'];
+                        }
+                        if (!empty($clienteData['direccion'])) {
+                            $updateData['direccion'] = $clienteData['direccion'];
+                        }
+                        if (!empty($clienteData['email'])) {
+                            $updateData['email'] = $clienteData['email'];
+                        }
+                        if (!empty($clienteData['telefono'])) {
+                            $updateData['telefono'] = $clienteData['telefono'];
+                        }
+
+                        if (!empty($updateData)) {
+                            $cliente->update($updateData);
+
+                            \Log::info('Cliente actualizado al editar venta', [
+                                'venta_id' => $id,
+                                'cliente_id' => $cliente->id,
+                                'datos_actualizados' => $updateData,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            if (!$cliente && !$userCliente) {
+                $cliente = Cliente::firstOrCreate(
+                    ['tipo_documento' => '0', 'numero_documento' => '00000000'],
+                    [
+                        'razon_social' => 'CLIENTE GENERAL',
+                        'nombre_comercial' => 'CLIENTE GENERAL',
+                        'direccion' => '-',
+                        'activo' => true,
+                    ]
+                );
+            }
+
+            // 5. VALIDAR Y PROCESAR NUEVOS PRODUCTOS
+            $subtotal = 0;
+            $igvTotal = 0;
+            $productosVenta = [];
+
+            \Log::info('Iniciando validación de productos nuevos', [
+                'venta_id' => $venta->id,
+                'cantidad_productos_nuevos' => count($request->productos),
+            ]);
+
+            foreach ($request->productos as $index => $prod) {
+                // IMPORTANTE: Refrescar el producto desde la BD para obtener el stock actualizado
+                $producto = Producto::find($prod['producto_id']);
+                if (!$producto) {
+                    throw new \Exception("Producto no encontrado con ID: {$prod['producto_id']}");
+                }
+
+                // Validar stock (ahora con el stock ya restaurado)
+                \Log::info('Validando stock de producto', [
+                    'producto_id' => $producto->id,
+                    'producto_nombre' => $producto->nombre,
+                    'stock_disponible' => $producto->stock,
+                    'cantidad_solicitada' => $prod['cantidad'],
+                ]);
+
+                if ($producto->stock < $prod['cantidad']) {
+                    throw new \Exception("Stock insuficiente para el producto '{$producto->nombre}'. Stock disponible: {$producto->stock}, solicitado: {$prod['cantidad']}");
+                }
+
+                $cantidad = $prod['cantidad'];
+                $precioUnitario = $prod['precio_unitario'];
+                $descuentoUnitario = $prod['descuento_unitario'] ?? 0;
+
+                $codigoProducto = $producto->codigo_producto ?? 'PROD-'.$producto->id;
+                $descripcion = $producto->nombre;
+                $unidadMedida = 'NIU';
+                $tipoAfectacionIgv = $producto->mostrar_igv ? '10' : '20';
+
+                $subtotalProducto = $cantidad * $precioUnitario;
+                $descuentoProducto = $descuentoUnitario * $cantidad;
+                $subtotalNeto = $subtotalProducto - $descuentoProducto;
+
+                if ($tipoAfectacionIgv == '10') {
+                    $precioSinIgv = $precioUnitario / 1.18;
+                    $baseImponible = $subtotalNeto / 1.18;
+                    $igvLinea = $subtotalNeto - $baseImponible;
+                } else {
+                    $precioSinIgv = $precioUnitario;
+                    $baseImponible = $subtotalNeto;
+                    $igvLinea = 0;
+                }
+
+                $totalLinea = $subtotalNeto;
+                $subtotal += $baseImponible;
+                $igvTotal += $igvLinea;
+
+                $productosVenta[] = [
+                    'producto' => $producto,
+                    'cantidad' => $cantidad,
+                    'precio_unitario' => $precioUnitario,
+                    'precio_sin_igv' => $precioSinIgv,
+                    'descuento_unitario' => $descuentoUnitario,
+                    'codigo_producto' => $codigoProducto,
+                    'descripcion' => $descripcion,
+                    'unidad_medida' => $unidadMedida,
+                    'tipo_afectacion_igv' => $tipoAfectacionIgv,
+                    'subtotal_linea' => $baseImponible,
+                    'igv_linea' => $igvLinea,
+                    'total_linea' => $totalLinea,
+                ];
+            }
+
+            $descuentoTotal = $request->descuento_total ?? 0;
+            $total = $subtotal + $igvTotal - $descuentoTotal;
+
+            // 6. VALIDAR PAGOS MIXTOS
+            $pagosMixtos = [];
+            $metodoPagoSimple = null;
+
+            if ($request->has('pagos') && is_array($request->pagos) && count($request->pagos) > 0) {
+                $sumaPagos = 0;
+                foreach ($request->pagos as $pago) {
+                    $sumaPagos += $pago['monto'];
+                    $pagosMixtos[] = [
+                        'metodo_pago' => $pago['metodo_pago'],
+                        'monto' => $pago['monto'],
+                        'referencia' => $pago['referencia'] ?? null,
+                    ];
+                }
+
+                if (abs($sumaPagos - $total) > 0.01) {
+                    throw new \Exception('La suma de pagos ('.number_format($sumaPagos, 2).') debe ser igual al total de la venta ('.number_format($total, 2).')');
+                }
+
+                $metodoPagoSimple = 'MIXTO';
+            } else {
+                $metodoPagoSimple = $request->metodo_pago;
+            }
+
+            // 7. ACTUALIZAR LA VENTA
+            $venta->update([
+                'cliente_id' => $cliente?->id,
+                'user_cliente_id' => $userCliente?->id,
+                'subtotal' => $subtotal,
+                'igv' => $igvTotal,
+                'descuento_total' => $descuentoTotal,
+                'total' => $total,
+                'requiere_factura' => $request->requiere_factura ?? $venta->requiere_factura,
+                'metodo_pago' => $metodoPagoSimple,
+                'observaciones' => $request->observaciones,
+            ]);
+
+            // 8. ELIMINAR DETALLES ANTERIORES
+            $venta->detalles()->delete();
+
+            // 9. CREAR NUEVOS DETALLES Y DESCONTAR STOCK
+            \Log::info('Creando nuevos detalles y descontando stock', [
+                'venta_id' => $venta->id,
+                'cantidad_productos' => count($productosVenta),
+            ]);
+
+            foreach ($productosVenta as $prod) {
+                VentaDetalle::create([
+                    'venta_id' => $venta->id,
+                    'producto_id' => $prod['producto']->id,
+                    'codigo_producto' => $prod['codigo_producto'],
+                    'nombre_producto' => $prod['descripcion'],
+                    'descripcion_producto' => $prod['producto']->descripcion,
+                    'cantidad' => $prod['cantidad'],
+                    'precio_unitario' => $prod['precio_unitario'],
+                    'precio_sin_igv' => $prod['precio_sin_igv'],
+                    'descuento_unitario' => $prod['descuento_unitario'],
+                    'subtotal_linea' => $prod['subtotal_linea'],
+                    'igv_linea' => $prod['igv_linea'],
+                    'total_linea' => $prod['total_linea'],
+                ]);
+
+                // Descontar nuevo stock - Refrescar producto desde BD
+                $productoActualizado = Producto::find($prod['producto']->id);
+                $stockAntes = $productoActualizado->stock;
+                $productoActualizado->stock -= $prod['cantidad'];
+                $productoActualizado->save();
+                
+                \Log::info('Stock descontado al editar venta', [
+                    'venta_id' => $venta->id,
+                    'producto_id' => $productoActualizado->id,
+                    'producto_nombre' => $productoActualizado->nombre,
+                    'stock_antes' => $stockAntes,
+                    'cantidad_descontada' => $prod['cantidad'],
+                    'stock_despues' => $productoActualizado->stock,
+                    'producto_id' => $prod['producto']->id,
+                    'cantidad_descontada' => $prod['cantidad'],
+                    'stock_actual' => $prod['producto']->stock,
+                ]);
+            }
+
+            // 10. ACTUALIZAR MÉTODOS DE PAGO
+            if (!empty($pagosMixtos)) {
+                $venta->metodosPago()->delete();
+                foreach ($pagosMixtos as $pago) {
+                    \App\Models\VentaMetodoPago::create([
+                        'venta_id' => $venta->id,
+                        'metodo' => $pago['metodo_pago'],
+                        'monto' => $pago['monto'],
+                        'referencia' => $pago['referencia'],
+                    ]);
+                }
+            } else {
+                $venta->metodosPago()->delete();
+            }
+
+            DB::commit();
+
+            \Log::info('Venta actualizada exitosamente', [
+                'venta_id' => $venta->id,
+                'codigo_venta' => $venta->codigo_venta,
+                'total_anterior' => $venta->getOriginal('total'),
+                'total_nuevo' => $total,
+            ]);
+
+            // 11. RESPUESTA
+            $venta->load(['cliente', 'userCliente', 'detalles.producto', 'metodosPago']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Venta actualizada exitosamente',
+                'data' => [
+                    'id' => $venta->id,
+                    'codigo_venta' => $venta->codigo_venta,
+                    'cliente' => $cliente,
+                    'user_cliente' => $userCliente,
+                    'detalles' => $venta->detalles->map(function ($detalle) {
+                        return [
+                            'producto_id' => $detalle->producto_id,
+                            'codigo_producto' => $detalle->codigo_producto,
+                            'nombre_producto' => $detalle->nombre_producto,
+                            'cantidad' => $detalle->cantidad,
+                            'precio_unitario' => $detalle->precio_unitario,
+                            'descuento_unitario' => $detalle->descuento_unitario,
+                            'subtotal' => $detalle->subtotal_linea,
+                            'igv' => $detalle->igv_linea,
+                            'total' => $detalle->total_linea,
+                        ];
+                    }),
+                    'subtotal' => round($subtotal, 2),
+                    'igv' => round($igvTotal, 2),
+                    'descuento_total' => round($descuentoTotal, 2),
+                    'total' => round($total, 2),
+                    'estado' => $venta->estado,
+                    'requiere_factura' => $venta->requiere_factura,
+                    'metodo_pago' => $metodoPagoSimple,
+                    'metodos_pago' => !empty($pagosMixtos) ? $venta->metodosPago->map(function ($mp) {
+                        return [
+                            'metodo_pago' => $mp->metodo,  // Cambiado de 'metodo' a 'metodo_pago' para consistencia
+                            'monto' => $mp->monto,
+                            'referencia' => $mp->referencia,
+                        ];
+                    }) : null,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+
+            \Log::error('Error al actualizar venta', [
+                'venta_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            $statusCode = 500;
+            $errorType = 'error_servidor';
+
+            if (strpos($e->getMessage(), 'no encontrado') !== false) {
+                $statusCode = 404;
+                $errorType = 'recurso_no_encontrado';
+            } elseif (strpos($e->getMessage(), 'Stock insuficiente') !== false) {
+                $statusCode = 422;
+                $errorType = 'stock_insuficiente';
+            } elseif (strpos($e->getMessage(), 'no puede ser editada') !== false) {
+                $statusCode = 422;
+                $errorType = 'venta_no_editable';
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar venta',
+                'error' => $e->getMessage(),
+                'error_type' => $errorType,
+            ], $statusCode);
+        }
+    }
+
+    /**
+     * Descargar PDF del comprobante de forma pública (sin autenticación)
+     * GET /api/venta/comprobante/pdf/{ventaId}/{ruc}-{tipoComprobante}-{serie}-{correlativo}
+     * 
+     * Ejemplo: /api/venta/comprobante/pdf/3/20538381978-03-B001-607
+     */
+    public function descargarPdfPublico($ventaId, $numeroCompleto)
+    {
+        try {
+            // Buscar la venta
+            $venta = Venta::with(['comprobante'])->findOrFail($ventaId);
+
+            if (!$venta->comprobante) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta venta no tiene un comprobante electrónico',
+                ], 404);
+            }
+
+            $comprobante = $venta->comprobante;
+
+            // Validar que el número de comprobante coincida (seguridad)
+            $numeroComprobanteEsperado = $comprobante->numero_completo ??
+                ($comprobante->ruc_emisor . '-' .
+                 $comprobante->tipo_comprobante . '-' .
+                 $comprobante->serie . '-' .
+                 str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT));
+
+            if ($numeroCompleto !== $numeroComprobanteEsperado) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Número de comprobante no válido',
+                ], 403);
+            }
+
+            // Validar que tenga PDF
+            if (empty($comprobante->pdf_base64)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El comprobante no tiene PDF generado',
+                ], 404);
+            }
+
+            // Decodificar el PDF
+            $pdfContent = base64_decode($comprobante->pdf_base64);
+
+            // Nombre del archivo
+            $filename = "comprobante-{$numeroCompleto}.pdf";
+
+            // Retornar el PDF
+            return response($pdfContent, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
+                ->header('Cache-Control', 'public, max-age=3600');
+
+        } catch (\Exception $e) {
+            \Log::error('Error al descargar PDF público', [
+                'venta_id' => $ventaId,
+                'numero_completo' => $numeroCompleto,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al descargar PDF',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Generar URL pública para compartir comprobante
+     * GET /api/ventas/{id}/url-publica
+     */
+    public function generarUrlPublica($id)
+    {
+        try {
+            $venta = Venta::with(['comprobante'])->findOrFail($id);
+
+            if (!$venta->comprobante) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta venta no tiene un comprobante electrónico',
+                ], 404);
+            }
+
+            $comprobante = $venta->comprobante;
+
+            // Validar que tenga PDF
+            if (empty($comprobante->pdf_base64)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El comprobante no tiene PDF generado',
+                ], 404);
+            }
+
+            // Construir número completo del comprobante
+            $numeroCompleto = $comprobante->numero_completo ??
+                ($comprobante->ruc_emisor . '-' .
+                 $comprobante->tipo_comprobante . '-' .
+                 $comprobante->serie . '-' .
+                 str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT));
+
+            // Generar URL pública
+            $urlPublica = url("/api/venta/comprobante/pdf/{$venta->id}/{$numeroCompleto}");
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'url_publica' => $urlPublica,
+                    'numero_completo' => $numeroCompleto,
+                    'venta_id' => $venta->id,
+                    'comprobante_id' => $comprobante->id,
+                    'tipo_comprobante' => $comprobante->tipo_comprobante,
+                    'serie' => $comprobante->serie,
+                    'correlativo' => $comprobante->correlativo,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar URL pública',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

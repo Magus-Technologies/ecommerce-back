@@ -161,6 +161,12 @@ class Venta extends Model
         return in_array($this->estado, ['PENDIENTE', 'FACTURADO']);
     }
 
+    public function puedeEditar()
+    {
+        // Solo se puede editar si está PENDIENTE y NO tiene comprobante
+        return $this->estado === 'PENDIENTE' && $this->comprobante_id === null;
+    }
+
     public function getClienteParaFacturacion()
     {
         // Si es una venta de e-commerce, usar el cliente de facturación del UserCliente

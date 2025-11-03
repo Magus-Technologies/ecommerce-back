@@ -9,7 +9,7 @@ use App\Models\EstadoCotizacion;
 use App\Models\UserCliente;
 use App\Models\Producto;
 use App\Models\Compra;
-use App\Models\Empresa;
+use App\Models\EmpresaInfo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -700,7 +700,7 @@ class CotizacionesController extends Controller
             }
 
             // Obtener datos de la empresa
-            $empresa = Empresa::obtenerEmpresa();
+            $empresa = EmpresaInfo::first();
             if (!$empresa) {
                 $empresa = (object) [
                     'nombre_empresa' => 'Tu Empresa',

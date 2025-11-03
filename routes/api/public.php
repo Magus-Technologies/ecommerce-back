@@ -123,3 +123,8 @@ Route::get('/publico/recompensas/popups-activos', [RecompensaNotificacionControl
 // ============================================
 Route::post('/reclamos/crear', [ReclamosController::class, 'crear']);
 Route::get('/reclamos/buscar/{numeroReclamo}', [ReclamosController::class, 'buscarPorNumero']);
+
+// ============================================
+// COMPROBANTES PÚBLICOS (para WhatsApp)
+// ============================================
+Route::get('/venta/comprobante/pdf/{ventaId}/{numeroCompleto}', [\App\Http\Controllers\VentasController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');

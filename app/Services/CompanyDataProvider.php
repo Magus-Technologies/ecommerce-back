@@ -14,30 +14,31 @@ class CompanyDataProvider
     {
         try {
             $empresa = EmpresaInfo::first();
-            
+
             if (!$empresa) {
                 Log::warning('No se encontró información de empresa en la BD');
                 return $this->getDefaultCompanyInfo();
             }
 
             return [
-                'ruc' => $empresa->ruc,
-                'razon_social' => $empresa->razon_social,
-                'nombre_comercial' => $empresa->nombre_empresa ?? $empresa->razon_social,
-                'direccion_fiscal' => $empresa->direccion,
-                'distrito' => $empresa->distrito,
-                'provincia' => $empresa->provincia,
-                'departamento' => $empresa->departamento,
-                'ubigeo' => $empresa->ubigeo,
-                'telefono' => $empresa->telefono ?? $empresa->celular,
-                'email' => $empresa->email,
-                'web' => $empresa->website,
+                'ruc' => $empresa->ruc ?? '00000000000',
+                'razon_social' => $empresa->razon_social ?? $empresa->nombre_empresa ?? 'EMPRESA NO CONFIGURADA',
+                'nombre_comercial' => $empresa->nombre_empresa ?? $empresa->razon_social ?? 'Empresa',
+                'direccion_fiscal' => $empresa->direccion ?? 'Dirección no configurada',
+                'distrito' => $empresa->distrito ?? null,
+                'provincia' => $empresa->provincia ?? null,
+                'departamento' => $empresa->departamento ?? null,
+                'ubigeo' => $empresa->ubigeo ?? null,
+                'telefono' => $empresa->telefono ?? $empresa->celular ?? null,
+                'email' => $empresa->email ?? null,
+                'web' => $empresa->website ?? null,
                 'logo_path' => $this->getLogoPath($empresa->logo),
             ];
-            
+
         } catch (\Exception $e) {
             Log::error('Error al obtener información de empresa desde BD', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return $this->getDefaultCompanyInfo();
         }
