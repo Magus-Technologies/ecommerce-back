@@ -2,157 +2,156 @@
 
 namespace App\Services;
 
-use Greenter\See;
-use Greenter\Ws\Services\SunatEndpoints;
+use App\Models\Cliente;
+use App\Models\Comprobante;
+use App\Models\SerieComprobante;
+use App\Models\SunatErrorCode;
+use App\Models\SunatLog;
+use Carbon\Carbon;
 use Greenter\Model\Client\Client;
-use Greenter\Model\Company\Company;
 use Greenter\Model\Company\Address;
+use Greenter\Model\Company\Company;
 use Greenter\Model\Sale\Invoice;
-use Greenter\Model\Sale\SaleDetail;
 use Greenter\Model\Sale\Legend;
+use Greenter\Model\Sale\SaleDetail;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
-use App\Models\Comprobante;
-use App\Models\Cliente;
-use App\Models\SerieComprobante;
-use App\Models\SunatLog;
-use App\Models\SunatErrorCode;
-use Luecano\NumeroALetras\NumeroALetras;
-use Carbon\Carbon;
+use Greenter\See;
+use Greenter\Ws\Services\SunatEndpoints;
 use Illuminate\Support\Facades\Log;
+use Luecano\NumeroALetras\NumeroALetras;
 
 class GreenterService
 {
     private $see;
+
     private $company;
 
     public function __construct()
 
     {
-            putenv('OPENSSL_CONF=/etc/pki/tls/openssl.cnf');
-
-        $this->see = new See();
+        $this->see = new See;
         $this->configurarSee();
         $this->configurarEmpresa();
     }
 
-   private function configurarSee()
-{
-    $ambiente = env('GREENTER_MODE', 'BETA');
-    
-    // Configurar certificado según ambiente
-    if (strtoupper($ambiente) === 'BETA') {
-        // Para BETA, usar el certificado de prueba de Greenter
-        // Este certificado ya viene incluido en la librería y no requiere configuración adicional
-        $certPath = __DIR__ . '/../../vendor/greenter/xmldsig/src/Certificate/certificate.pem';
-        
-        if (file_exists($certPath)) {
-            $certificadoContenido = file_get_contents($certPath);
-            $this->see->setCertificate($certificadoContenido);
-            Log::info('Usando certificado de prueba de Greenter para BETA');
-        } else {
-            // Fallback: intentar usar el certificado configurado
-            $certPath = storage_path('app/' . env('GREENTER_CERT_PATH', 'certificates/certificate.pem'));
+    private function configurarSee()
+    {
+        $ambiente = env('GREENTER_MODE', 'BETA');
+
+        // Configurar certificado según ambiente
+        if (strtoupper($ambiente) === 'BETA') {
+            // Para BETA, usar el certificado de prueba de Greenter
+            // Este certificado ya viene incluido en la librería y no requiere configuración adicional
+            $certPath = __DIR__.'/../../vendor/greenter/xmldsig/src/Certificate/certificate.pem';
+
             if (file_exists($certPath)) {
                 $certificadoContenido = file_get_contents($certPath);
                 $this->see->setCertificate($certificadoContenido);
-                Log::info('Usando certificado personalizado desde storage');
+                Log::info('Usando certificado de prueba de Greenter para BETA');
             } else {
-                throw new \Exception("Certificado no encontrado. Verifica la instalación de Greenter o configura GREENTER_CERT_PATH");
+                // Fallback: intentar usar el certificado configurado
+                $certPath = storage_path('app/'.env('GREENTER_CERT_PATH', 'certificates/certificate.pem'));
+                if (file_exists($certPath)) {
+                    $certificadoContenido = file_get_contents($certPath);
+                    $this->see->setCertificate($certificadoContenido);
+                    Log::info('Usando certificado personalizado desde storage');
+                } else {
+                    throw new \Exception('Certificado no encontrado. Verifica la instalación de Greenter o configura GREENTER_CERT_PATH');
+                }
             }
-        }
-        
-        // Credenciales de prueba BETA
-        $solUser = env('GREENTER_FE_USER', '20000000001MODDATOS');
-        $solPassword = env('GREENTER_FE_PASSWORD', 'MODDATOS');
-        
-        $this->see->setService(SunatEndpoints::FE_BETA);
-        
-    } else {
-        // Para PRODUCCIÓN, usar certificado real de la empresa
-        $certPath = storage_path('app/' . env('GREENTER_CERT_PATH'));
-        
-        if (empty($certPath) || !file_exists($certPath)) {
-            throw new \Exception("Certificado de producción no encontrado en: {$certPath}");
-        }
-        
-        $certificadoContenido = file_get_contents($certPath);
-        $this->see->setCertificate($certificadoContenido);
-        
-        // Credenciales reales de producción
-        $solUser = env('GREENTER_FE_USER');
-        $solPassword = env('GREENTER_FE_PASSWORD');
-        
-        if (empty($solUser) || empty($solPassword)) {
-            throw new \Exception('Las credenciales SOL de producción no están configuradas');
-        }
-        
-        $this->see->setService(SunatEndpoints::FE_PRODUCCION);
-    }
-    
-    // Configurar credenciales SOL
-    $this->see->setCredentials($solUser, $solPassword);
-    
-    // Configurar clave SOL si existe (para algunos casos)
-    $claveSOL = env('GREENTER_CLAVE_SOL');
-    if (!empty($claveSOL)) {
-        // $this->see->setClaveSOL($claveSOL); // Método no disponible en esta versión
-    }
 
-    Log::info('GreenterService configurado correctamente', [
-        'ambiente' => $ambiente,
-        'usuario_sol' => $solUser,
-        'endpoint' => $ambiente === 'BETA' ? 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService' : 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService'
-    ]);
-}
+            // Credenciales de prueba BETA
+            $solUser = env('GREENTER_FE_USER', '20000000001MODDATOS');
+            $solPassword = env('GREENTER_FE_PASSWORD', 'MODDATOS');
+
+            $this->see->setService(SunatEndpoints::FE_BETA);
+
+        } else {
+            // Para PRODUCCIÓN, usar certificado real de la empresa
+            $certPath = storage_path('app/'.env('GREENTER_CERT_PATH'));
+
+            if (empty($certPath) || ! file_exists($certPath)) {
+                throw new \Exception("Certificado de producción no encontrado en: {$certPath}");
+            }
+
+            $certificadoContenido = file_get_contents($certPath);
+            $this->see->setCertificate($certificadoContenido);
+
+            // Credenciales reales de producción
+            $solUser = env('GREENTER_FE_USER');
+            $solPassword = env('GREENTER_FE_PASSWORD');
+
+            if (empty($solUser) || empty($solPassword)) {
+                throw new \Exception('Las credenciales SOL de producción no están configuradas');
+            }
+
+            $this->see->setService(SunatEndpoints::FE_PRODUCCION);
+        }
+
+        // Configurar credenciales SOL
+        $this->see->setCredentials($solUser, $solPassword);
+
+        // Configurar clave SOL si existe (para algunos casos)
+        $claveSOL = env('GREENTER_CLAVE_SOL');
+        if (! empty($claveSOL)) {
+            // $this->see->setClaveSOL($claveSOL); // Método no disponible en esta versión
+        }
+
+        Log::info('GreenterService configurado correctamente', [
+            'ambiente' => $ambiente,
+            'usuario_sol' => $solUser,
+            'endpoint' => $ambiente === 'BETA' ? 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService' : 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService',
+        ]);
+    }
 
     private function configurarEmpresa()
     {
-        $this->company = new Company();
+        $this->company = new Company;
         $this->company->setRuc(config('services.company.ruc'))
-                     ->setRazonSocial(config('services.company.name'))
-                     ->setNombreComercial(config('services.company.name'))
-                     ->setAddress(new Address([
-                         'direccion' => config('services.company.address'),
-                         'distrito' => config('services.company.district'),
-                         'provincia' => config('services.company.province'),
-                         'departamento' => config('services.company.department'),
-                         'ubigueo' => '150101' // Lima-Lima-Lima por defecto
-                     ]));
+            ->setRazonSocial(config('services.company.name'))
+            ->setNombreComercial(config('services.company.name'))
+            ->setAddress(new Address([
+                'direccion' => config('services.company.address'),
+                'distrito' => config('services.company.district'),
+                'provincia' => config('services.company.province'),
+                'departamento' => config('services.company.department'),
+                'ubigueo' => '150101', // Lima-Lima-Lima por defecto
+            ]));
     }
 
     public function generarFactura($ventaId, $clienteData = null, $userId = null, $ipOrigen = null, $enviarSunat = false)
     {
         try {
             $venta = \App\Models\Venta::with(['detalles.producto', 'cliente', 'userCliente'])->findOrFail($ventaId);
-            
+
             // CORRECCIÓN 1: Determinar cliente correctamente
             // Si se envían datos de cliente, procesarlos y actualizar la venta
-            if ($clienteData && !empty($clienteData)) {
+            if ($clienteData && ! empty($clienteData)) {
                 $cliente = $this->procesarDatosCliente($clienteData);
-                
+
                 // Actualizar la venta con el nuevo cliente
                 $venta->update(['cliente_id' => $cliente->id]);
-                
+
                 Log::info('Cliente actualizado en venta', [
                     'venta_id' => $venta->id,
                     'cliente_id' => $cliente->id,
-                    'razon_social' => $cliente->razon_social
+                    'razon_social' => $cliente->razon_social,
                 ]);
             } else {
                 // Usar el cliente existente de la venta
                 $cliente = $venta->cliente;
             }
-            
+
             // Determinar tipo de comprobante
             $tipoComprobante = $cliente->tipo_documento === '6' ? '01' : '03'; // Factura o Boleta
-            
+
             // Obtener serie
             $serie = SerieComprobante::where('tipo_comprobante', $tipoComprobante)
-                                   ->where('activo', true)
-                                   ->first();
-            
-            if (!$serie) {
+                ->where('activo', true)
+                ->first();
+
+            if (! $serie) {
                 throw new \Exception("No hay series configuradas para el tipo de comprobante {$tipoComprobante}");
             }
 
@@ -170,34 +169,34 @@ class GreenterService
             try {
                 // Generar XML firmado sin enviar a SUNAT
                 $xmlSigned = $this->see->getXmlSigned($invoice);
-                
+
                 if ($xmlSigned) {
                     $comprobante->update([
                         'xml_firmado' => $xmlSigned,
-                        'tiene_xml' => true
+                        'tiene_xml' => true,
                     ]);
-                    
+
                     Log::info('XML firmado generado y guardado', [
                         'comprobante_id' => $comprobante->id,
-                        'xml_length' => strlen($xmlSigned)
+                        'xml_length' => strlen($xmlSigned),
                     ]);
                 } else {
                     Log::error('No se pudo generar el XML firmado', [
-                        'comprobante_id' => $comprobante->id
+                        'comprobante_id' => $comprobante->id,
                     ]);
                     throw new \Exception('No se pudo generar el XML firmado del comprobante');
                 }
             } catch (\Exception $e) {
                 Log::error('Error al generar XML firmado', [
                     'comprobante_id' => $comprobante->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
-                throw new \Exception('Error al generar XML: ' . $e->getMessage());
+                throw new \Exception('Error al generar XML: '.$e->getMessage());
             }
 
             // CORRECCIÓN 2 y 3: Actualizar venta con comprobante_id SIEMPRE
             $venta->update([
-                'comprobante_id' => $comprobante->id
+                'comprobante_id' => $comprobante->id,
             ]);
 
             // Solo enviar a SUNAT si se solicita explícitamente
@@ -219,26 +218,26 @@ class GreenterService
 
                 // Actualizar estado de venta
                 $venta->update([
-                    'estado' => 'FACTURADO'
+                    'estado' => 'FACTURADO',
                 ]);
 
                 return [
                     'success' => true,
                     'comprobante' => $comprobante->fresh(),
-                    'mensaje' => 'Comprobante generado y enviado correctamente'
+                    'mensaje' => 'Comprobante generado y enviado correctamente',
                 ];
             } else {
                 // Solo generar comprobante sin enviar a SUNAT
                 $comprobante->update([
                     'estado' => 'PENDIENTE',
                     'tiene_pdf' => false,
-                    'tiene_cdr' => false
+                    'tiene_cdr' => false,
                 ]);
 
                 return [
                     'success' => true,
                     'comprobante' => $comprobante->fresh(),
-                    'mensaje' => 'Comprobante generado correctamente. Pendiente de envío a SUNAT.'
+                    'mensaje' => 'Comprobante generado correctamente. Pendiente de envío a SUNAT.',
                 ];
             }
 
@@ -246,12 +245,12 @@ class GreenterService
             Log::error('Error en generarFactura', [
                 'venta_id' => $ventaId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -260,11 +259,11 @@ class GreenterService
     {
         // Buscar cliente existente o crear uno nuevo
         $cliente = Cliente::where('numero_documento', $clienteData['numero_documento'])->first();
-        
-        if (!$cliente) {
+
+        if (! $cliente) {
             // Asegurar que direccion no esté vacía
-            $direccion = !empty($clienteData['direccion']) ? $clienteData['direccion'] : 'Sin dirección';
-            
+            $direccion = ! empty($clienteData['direccion']) ? $clienteData['direccion'] : 'Sin dirección';
+
             $cliente = Cliente::create([
                 'tipo_documento' => $clienteData['tipo_documento'],
                 'numero_documento' => $clienteData['numero_documento'],
@@ -272,7 +271,7 @@ class GreenterService
                 'direccion' => $direccion,
                 'email' => $clienteData['email'] ?? null,
                 'telefono' => $clienteData['telefono'] ?? null,
-                'activo' => true
+                'activo' => true,
             ]);
         }
 
@@ -288,16 +287,16 @@ class GreenterService
         if (is_null($texto) || $texto === '') {
             return '';
         }
-        
+
         // Convertir a string si no lo es
         $texto = (string) $texto;
 
         // Asegurar UTF-8 válido
         $texto = mb_convert_encoding($texto, 'UTF-8', 'UTF-8');
-        
+
         // Eliminar caracteres de control excepto saltos de línea y tabulaciones
         $texto = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $texto);
-        
+
         // Reemplazar caracteres problemáticos comunes
         $texto = str_replace([
             '°', // Grado
@@ -310,10 +309,10 @@ class GreenterService
             'R',
             'C',
         ], $texto);
-        
+
         // Limitar longitud para evitar problemas
         $texto = mb_substr($texto, 0, 250, 'UTF-8');
-        
+
         return trim($texto);
     }
 
@@ -335,7 +334,7 @@ class GreenterService
             'importe_total' => $venta->total,
             'metodo_pago' => $venta->metodo_pago, // Guardar método de pago de la venta
             'user_id' => 1, // Usuario por defecto para pruebas
-            'estado' => 'PENDIENTE'
+            'estado' => 'PENDIENTE',
         ]);
 
         // Crear detalles
@@ -354,7 +353,7 @@ class GreenterService
                 'porcentaje_igv' => 18.00,
                 'igv' => $detalle->igv_linea,
                 'tipo_afectacion_igv' => '10',
-                'importe_total' => $detalle->total_linea
+                'importe_total' => $detalle->total_linea,
             ]);
         }
 
@@ -363,43 +362,43 @@ class GreenterService
 
     public function construirDocumentoGreenter($comprobante, $cliente)
     {
-        $invoice = new Invoice();
+        $invoice = new Invoice;
 
         // Datos básicos
         $fechaEmision = Carbon::parse($comprobante->fecha_emision);
 
         $invoice->setUblVersion('2.1')
-                ->setTipoOperacion('0101')  // 0101 = Venta interna
-                ->setTipoDoc($comprobante->tipo_comprobante)
-                ->setSerie($comprobante->serie)
-                ->setCorrelativo($comprobante->correlativo)
-                ->setFechaEmision($fechaEmision)
-                ->setTipoMoneda($comprobante->moneda)
-                ->setCompany($this->company);
-        
+            ->setTipoOperacion('0101')  // 0101 = Venta interna
+            ->setTipoDoc($comprobante->tipo_comprobante)
+            ->setSerie($comprobante->serie)
+            ->setCorrelativo($comprobante->correlativo)
+            ->setFechaEmision($fechaEmision)
+            ->setTipoMoneda($comprobante->moneda)
+            ->setCompany($this->company);
+
         // CORRECCIÓN ERROR 3244: Agregar forma de pago desde la venta
         // Determinar si es contado o crédito según el método de pago
         $metodoPago = strtoupper($comprobante->metodo_pago ?? 'CONTADO');
-        
+
         // Métodos de pago que se consideran "al contado"
         $metodosContado = ['EFECTIVO', 'YAPE', 'PLIN', 'TARJETA', 'TRANSFERENCIA', 'CONTADO'];
-        
+
         if (in_array($metodoPago, $metodosContado)) {
             // Pago al contado
-            $formaPago = new \Greenter\Model\Sale\FormaPagos\FormaPagoContado();
+            $formaPago = new \Greenter\Model\Sale\FormaPagos\FormaPagoContado;
         } else {
             // Pago a crédito (por defecto si no es contado)
-            $formaPago = new \Greenter\Model\Sale\FormaPagos\FormaPagoContado();
+            $formaPago = new \Greenter\Model\Sale\FormaPagos\FormaPagoContado;
             // TODO: Implementar FormaPagoCredito cuando se necesite
         }
-        
+
         $invoice->setFormaPago($formaPago);
 
         // Cliente - CORRECCIÓN UTF-8
-        $client = new Client();
+        $client = new Client;
         $client->setTipoDoc($comprobante->cliente_tipo_documento)
-               ->setNumDoc($comprobante->cliente_numero_documento)
-               ->setRznSocial($this->limpiarTextoXML($comprobante->cliente_razon_social));
+            ->setNumDoc($comprobante->cliente_numero_documento)
+            ->setRznSocial($this->limpiarTextoXML($comprobante->cliente_razon_social));
 
         if ($cliente->direccion) {
             $client->setAddress(new Address(['direccion' => $this->limpiarTextoXML($cliente->direccion)]));
@@ -410,24 +409,24 @@ class GreenterService
         // Detalles - Asegurar precisión decimal y UTF-8 limpio
         $items = [];
         foreach ($comprobante->detalles as $detalle) {
-            $valorUnitario = (float)number_format((float)$detalle->valor_unitario, 2, '.', '');
-            $valorVenta = (float)number_format((float)$detalle->valor_venta, 2, '.', '');
-            $igv = (float)number_format((float)$detalle->igv, 2, '.', '');
-            $precioUnitario = (float)number_format((float)$detalle->precio_unitario, 2, '.', '');
-            
-            $item = new SaleDetail();
+            $valorUnitario = (float) number_format((float) $detalle->valor_unitario, 2, '.', '');
+            $valorVenta = (float) number_format((float) $detalle->valor_venta, 2, '.', '');
+            $igv = (float) number_format((float) $detalle->igv, 2, '.', '');
+            $precioUnitario = (float) number_format((float) $detalle->precio_unitario, 2, '.', '');
+
+            $item = new SaleDetail;
             $item->setCodProducto($this->limpiarTextoXML($detalle->codigo_producto))
-                 ->setUnidad($detalle->unidad_medida)
-                 ->setDescripcion($this->limpiarTextoXML($detalle->descripcion))
-                 ->setCantidad((float)$detalle->cantidad)
-                 ->setMtoValorUnitario($valorUnitario)
-                 ->setMtoValorVenta($valorVenta)
-                 ->setMtoBaseIgv($valorVenta)
-                 ->setPorcentajeIgv((float)$detalle->porcentaje_igv)
-                 ->setIgv($igv)
-                 ->setTipAfeIgv($detalle->tipo_afectacion_igv)
-                 ->setTotalImpuestos($igv)
-                 ->setMtoPrecioUnitario($precioUnitario);
+                ->setUnidad($detalle->unidad_medida)
+                ->setDescripcion($this->limpiarTextoXML($detalle->descripcion))
+                ->setCantidad((float) $detalle->cantidad)
+                ->setMtoValorUnitario($valorUnitario)
+                ->setMtoValorVenta($valorVenta)
+                ->setMtoBaseIgv($valorVenta)
+                ->setPorcentajeIgv((float) $detalle->porcentaje_igv)
+                ->setIgv($igv)
+                ->setTipAfeIgv($detalle->tipo_afectacion_igv)
+                ->setTotalImpuestos($igv)
+                ->setMtoPrecioUnitario($precioUnitario);
 
             $items[] = $item;
         }
@@ -435,30 +434,30 @@ class GreenterService
         $invoice->setDetails($items);
 
         // Totales - Asegurar precisión decimal y fórmula correcta
-        $mtoOperGravadas = number_format((float)$comprobante->operacion_gravada, 2, '.', '');
-        $mtoIGV = number_format((float)$comprobante->total_igv, 2, '.', '');
-        $mtoImpVenta = number_format((float)$comprobante->importe_total, 2, '.', '');
-        
+        $mtoOperGravadas = number_format((float) $comprobante->operacion_gravada, 2, '.', '');
+        $mtoIGV = number_format((float) $comprobante->total_igv, 2, '.', '');
+        $mtoImpVenta = number_format((float) $comprobante->importe_total, 2, '.', '');
+
         // Verificar que la fórmula cuadre: MtoOperGravadas + IGV = MtoImpVenta
         $calculado = number_format($mtoOperGravadas + $mtoIGV, 2, '.', '');
         if ($calculado != $mtoImpVenta) {
             throw new \Exception("Error de cálculo: $mtoOperGravadas + $mtoIGV = $calculado, pero MtoImpVenta es $mtoImpVenta");
         }
-        
-        $invoice->setMtoOperGravadas((float)$mtoOperGravadas)
-                ->setMtoOperExoneradas(0.00)
-                ->setMtoOperInafectas(0.00)
-                ->setMtoIGV((float)$mtoIGV)
-                ->setValorVenta((float)$mtoOperGravadas)  // LineExtensionAmount (sin IGV)
-                ->setSubTotal((float)$mtoImpVenta)        // TaxInclusiveAmount (con IGV)
-                ->setTotalImpuestos((float)$mtoIGV)
-                ->setMtoImpVenta((float)$mtoImpVenta);    // PayableAmount
+
+        $invoice->setMtoOperGravadas((float) $mtoOperGravadas)
+            ->setMtoOperExoneradas(0.00)
+            ->setMtoOperInafectas(0.00)
+            ->setMtoIGV((float) $mtoIGV)
+            ->setValorVenta((float) $mtoOperGravadas)  // LineExtensionAmount (sin IGV)
+            ->setSubTotal((float) $mtoImpVenta)        // TaxInclusiveAmount (con IGV)
+            ->setTotalImpuestos((float) $mtoIGV)
+            ->setMtoImpVenta((float) $mtoImpVenta);    // PayableAmount
 
         // Leyendas
-        $formatter = new NumeroALetras();
-        $legend = new Legend();
+        $formatter = new NumeroALetras;
+        $legend = new Legend;
         $legend->setCode('1000')
-               ->setValue($formatter->toInvoice($comprobante->importe_total, 2, 'SOLES'));
+            ->setValue($formatter->toInvoice($comprobante->importe_total, 2, 'SOLES'));
 
         $invoice->setLegends([$legend]);
 
@@ -469,31 +468,31 @@ class GreenterService
     {
         $comprobante->update([
             'xml_firmado' => $this->see->getFactory()->getLastXml(),
-            'codigo_hash' => $result->getCdrResponse() ? $result->getCdrResponse()->getDigestValue() : null
+            'codigo_hash' => $result->getCdrResponse() ? $result->getCdrResponse()->getDigestValue() : null,
         ]);
 
         if ($result->isSuccess()) {
             $cdr = $result->getCdrResponse();
-            
+
             $comprobante->update([
                 'estado' => 'ACEPTADO',
                 'xml_respuesta_sunat' => base64_encode($result->getCdrZip()),
                 'mensaje_sunat' => $cdr->getDescription(),
                 'tiene_cdr' => true,
                 'fecha_envio_sunat' => now(),
-                'fecha_respuesta_sunat' => now()
+                'fecha_respuesta_sunat' => now(),
             ]);
-            
+
             // Generar PDF después de aceptación
             $this->generarPdf($comprobante, $invoice);
             $comprobante->update(['tiene_pdf' => true]);
         } else {
             $comprobante->update([
                 'estado' => 'RECHAZADO',
-                'mensaje_sunat' => $result->getError()->getMessage()
+                'mensaje_sunat' => $result->getError()->getMessage(),
             ]);
-            
-            throw new \Exception('Error SUNAT: ' . $result->getError()->getMessage());
+
+            throw new \Exception('Error SUNAT: '.$result->getError()->getMessage());
         }
     }
 
@@ -502,25 +501,25 @@ class GreenterService
         try {
             // SOLUCIÓN TEMPORAL: Generar PDF simple con HTML básico
             // Esto evita el error del template Twig de Greenter
-            
+
             $pdfContent = $this->generarPdfSimple($comprobante);
-            
-            if (!empty($pdfContent)) {
+
+            if (! empty($pdfContent)) {
                 $comprobante->update([
                     'pdf_base64' => base64_encode($pdfContent),
-                    'tiene_pdf' => true
+                    'tiene_pdf' => true,
                 ]);
 
                 Log::info('PDF simple generado exitosamente', [
                     'comprobante_id' => $comprobante->id,
-                    'tamaño_bytes' => strlen($pdfContent)
+                    'tamaño_bytes' => strlen($pdfContent),
                 ]);
-                
+
                 return true;
             }
-            
+
             // Si falla el PDF simple, intentar con Greenter
-            $htmlReport = new HtmlReport();
+            $htmlReport = new HtmlReport;
             $pdfReport = new PdfReport($htmlReport);
 
             // Parámetros mínimos y seguros
@@ -529,26 +528,26 @@ class GreenterService
                     'hash' => $comprobante->codigo_hash ?? '',
                     'date' => date('Y-m-d'),
                     'time' => date('H:i:s'),
-                    'user' => 'Sistema'
-                ]
+                    'user' => 'Sistema',
+                ],
             ];
 
             $pdf = $pdfReport->render($invoice, $params);
 
-            if (!empty($pdf)) {
+            if (! empty($pdf)) {
                 $comprobante->update([
                     'pdf_base64' => base64_encode($pdf),
-                    'tiene_pdf' => true
+                    'tiene_pdf' => true,
                 ]);
 
                 Log::info('PDF Greenter generado exitosamente', [
                     'comprobante_id' => $comprobante->id,
-                    'tamaño_bytes' => strlen($pdf)
+                    'tamaño_bytes' => strlen($pdf),
                 ]);
-                
+
                 return true;
             }
-            
+
             return false;
 
         } catch (\Exception $e) {
@@ -556,21 +555,23 @@ class GreenterService
                 'comprobante_id' => $comprobante->id,
                 'error' => $e->getMessage(),
                 'line' => $e->getLine(),
-                'file' => $e->getFile()
+                'file' => $e->getFile(),
             ]);
-            
+
             // Generar PDF de emergencia
             try {
                 $pdfEmergencia = $this->generarPdfEmergencia($comprobante);
                 $comprobante->update([
                     'pdf_base64' => base64_encode($pdfEmergencia),
-                    'tiene_pdf' => true
+                    'tiene_pdf' => true,
                 ]);
-                
+
                 Log::info('PDF de emergencia generado', ['comprobante_id' => $comprobante->id]);
+
                 return true;
             } catch (\Exception $e2) {
                 $comprobante->update(['tiene_pdf' => false]);
+
                 return false;
             }
         }
@@ -613,9 +614,9 @@ class GreenterService
                 <h3>Resumen</h3>
                 <table>
                     <tr><th>Concepto</th><th>Monto</th></tr>
-                    <tr><td>Operación Gravada</td><td>S/ " . number_format($comprobante->operacion_gravada, 2) . "</td></tr>
-                    <tr><td>IGV</td><td>S/ " . number_format($comprobante->total_igv, 2) . "</td></tr>
-                    <tr><td><strong>Total</strong></td><td><strong>S/ " . number_format($comprobante->importe_total, 2) . "</strong></td></tr>
+                    <tr><td>Operación Gravada</td><td>S/ ".number_format($comprobante->operacion_gravada, 2).'</td></tr>
+                    <tr><td>IGV</td><td>S/ '.number_format($comprobante->total_igv, 2).'</td></tr>
+                    <tr><td><strong>Total</strong></td><td><strong>S/ '.number_format($comprobante->importe_total, 2)."</strong></td></tr>
                 </table>
             </div>
             
@@ -628,13 +629,14 @@ class GreenterService
 
         // Usar DomPDF si está disponible, sino devolver HTML
         if (class_exists('\Dompdf\Dompdf')) {
-            $dompdf = new \Dompdf\Dompdf();
+            $dompdf = new \Dompdf\Dompdf;
             $dompdf->loadHtml($html);
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
+
             return $dompdf->output();
         }
-        
+
         // Fallback: devolver HTML como "PDF"
         return $html;
     }
@@ -648,40 +650,40 @@ class GreenterService
         $contenido .= "Numero: {$comprobante->numero_completo}\n";
         $contenido .= "Fecha: {$comprobante->fecha_emision}\n";
         $contenido .= "Cliente: {$comprobante->cliente_razon_social}\n";
-        $contenido .= "Total: S/ " . number_format($comprobante->importe_total, 2) . "\n";
+        $contenido .= 'Total: S/ '.number_format($comprobante->importe_total, 2)."\n";
         $contenido .= "Estado: {$comprobante->estado}\n";
-        
+
         return $contenido;
     }
 
     public function consultarComprobante($comprobante)
     {
         try {
-            $result = $this->see->getStatus($comprobante->serie . '-' . $comprobante->correlativo, $comprobante->tipo_comprobante);
-            
+            $result = $this->see->getStatus($comprobante->serie.'-'.$comprobante->correlativo, $comprobante->tipo_comprobante);
+
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
-                
+
                 $comprobante->update([
                     'estado' => 'ACEPTADO',
                     'xml_respuesta_sunat' => base64_encode($result->getCdrZip()),
                     'mensaje_sunat' => $cdr->getDescription(),
                     'tiene_cdr' => true,
-                    'fecha_respuesta_sunat' => now()
+                    'fecha_respuesta_sunat' => now(),
                 ]);
-                
+
                 // Generar PDF si no existe
-                if (!$comprobante->tiene_pdf) {
+                if (! $comprobante->tiene_pdf) {
                     $documento = $this->construirDocumentoGreenter($comprobante, $comprobante->cliente);
                     $this->generarPdf($comprobante, $documento);
                     $comprobante->update(['tiene_pdf' => true]);
                 }
-                
+
                 return ['success' => true, 'estado' => 'ACEPTADO'];
             } else {
                 return ['success' => false, 'error' => $result->getError()->getMessage()];
             }
-            
+
         } catch (\Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
@@ -691,30 +693,30 @@ class GreenterService
     {
         try {
             $comprobante = Comprobante::findOrFail($comprobanteId);
-            
-            if (!$comprobante->puedeReenviar()) {
+
+            if (! $comprobante->puedeReenviar()) {
                 throw new \Exception('El comprobante no puede ser reenviado');
             }
 
             // Reconstruir documento
             $invoice = $this->construirDocumentoGreenter($comprobante, $comprobante->cliente);
-            
+
             // Reenviar
             $result = $this->see->send($invoice);
-            
+
             // Procesar respuesta
             $this->procesarRespuestaSunat($comprobante, $result, $invoice);
-            
+
             return [
                 'success' => true,
                 'comprobante' => $comprobante->fresh(),
-                'mensaje' => 'Comprobante reenviado correctamente'
+                'mensaje' => 'Comprobante reenviado correctamente',
             ];
-            
+
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -736,7 +738,7 @@ class GreenterService
                 // Nota de Débito
                 $documento = $this->construirNotaDebito($comprobante);
             } else {
-                throw new \Exception('Tipo de comprobante no soportado: ' . $comprobante->tipo_comprobante);
+                throw new \Exception('Tipo de comprobante no soportado: '.$comprobante->tipo_comprobante);
             }
 
             // Enviar a SUNAT
@@ -750,7 +752,7 @@ class GreenterService
                 // Obtener CDR si está disponible (con verificación defensiva)
                 $cdrResponse = null;
                 $cdrZip = null;
-                
+
                 // Obtener CDR usando métodos auxiliares seguros
                 $cdrResponse = $this->getCdrSafely($result);
                 $cdrZip = $this->getCdrZipSafely($result);
@@ -760,9 +762,9 @@ class GreenterService
                     // Guardar CDR en base64 para evitar problemas de encoding
                     'xml_respuesta_sunat' => $cdrZip ? base64_encode($cdrZip) : null,
                     // ✅ CORRECCIÓN: Actualizar propiedades booleanas
-                    'tiene_cdr' => !empty($cdrZip),
+                    'tiene_cdr' => ! empty($cdrZip),
                     'fecha_envio_sunat' => now(),
-                    'fecha_respuesta_sunat' => now()
+                    'fecha_respuesta_sunat' => now(),
                 ];
 
                 // Solo agregar datos del CDR si existe
@@ -781,7 +783,7 @@ class GreenterService
 
                 // ✅ CORRECCIÓN: Generar PDF después de aceptación y actualizar tiene_pdf
                 $this->generarPdf($comprobante, $documento);
-                
+
                 // Actualizar tiene_pdf después de generar el PDF
                 $comprobante->update(['tiene_pdf' => true]);
 
@@ -790,8 +792,8 @@ class GreenterService
                     'success' => true,
                     'mensaje' => 'Comprobante enviado a SUNAT exitosamente',
                     'data' => [
-                        'comprobante' => $comprobante->fresh()
-                    ]
+                        'comprobante' => $comprobante->fresh(),
+                    ],
                 ];
 
                 // Agregar detalles del CDR si existen
@@ -811,20 +813,21 @@ class GreenterService
                 $comprobante->update([
                     'estado' => 'RECHAZADO',
                     'mensaje_sunat' => $error->getMessage(),
-                    'errores_sunat' => $error->getMessage()
+                    'errores_sunat' => $error->getMessage(),
                 ]);
 
                 return [
                     'success' => false,
                     'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
+                    'codigo_error' => $error->getCode(),
                 ];
             }
         } catch (\Exception $e) {
-            Log::error('Error en enviarComprobante: ' . $e->getMessage());
+            Log::error('Error en enviarComprobante: '.$e->getMessage());
+
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -834,7 +837,7 @@ class GreenterService
      */
     private function construirNotaCredito($comprobante)
     {
-        $notaCredito = new \Greenter\Model\Sale\Note();
+        $notaCredito = new \Greenter\Model\Sale\Note;
 
         $notaCredito->setUblVersion('2.1')
             ->setTipoDoc('07')
@@ -842,14 +845,14 @@ class GreenterService
             ->setCorrelativo($comprobante->correlativo)
             ->setFechaEmision(\Carbon\Carbon::parse($comprobante->fecha_emision))
             ->setTipDocAfectado($comprobante->comprobanteReferencia->tipo_comprobante)
-            ->setNumDocfectado($comprobante->comprobanteReferencia->serie . '-' . $comprobante->comprobanteReferencia->correlativo)
+            ->setNumDocfectado($comprobante->comprobanteReferencia->serie.'-'.$comprobante->comprobanteReferencia->correlativo)
             ->setCodMotivo($comprobante->motivo_nota ?? '01')
             ->setDesMotivo($comprobante->motivo_nota_descripcion ?? 'Anulación de la operación')
             ->setTipoMoneda($comprobante->moneda)
             ->setCompany($this->company);
 
         // Cliente
-        $client = new \Greenter\Model\Client\Client();
+        $client = new \Greenter\Model\Client\Client;
         $client->setTipoDoc($comprobante->cliente_tipo_documento)
             ->setNumDoc($comprobante->cliente_numero_documento)
             ->setRznSocial($comprobante->cliente_razon_social);
@@ -859,29 +862,29 @@ class GreenterService
         // Detalles
         $items = [];
         foreach ($comprobante->detalles as $detalle) {
-            $item = new \Greenter\Model\Sale\SaleDetail();
+            $item = new \Greenter\Model\Sale\SaleDetail;
             $item->setCodProducto($detalle->codigo_producto)
                 ->setUnidad($detalle->unidad_medida ?? 'NIU')
                 ->setDescripcion($detalle->descripcion)
-                ->setCantidad((float)$detalle->cantidad)
-                ->setMtoValorUnitario((float)$detalle->valor_unitario)
-                ->setMtoValorVenta((float)$detalle->valor_venta)
-                ->setMtoBaseIgv((float)$detalle->valor_venta)
+                ->setCantidad((float) $detalle->cantidad)
+                ->setMtoValorUnitario((float) $detalle->valor_unitario)
+                ->setMtoValorVenta((float) $detalle->valor_venta)
+                ->setMtoBaseIgv((float) $detalle->valor_venta)
                 ->setPorcentajeIgv(18.00)
-                ->setIgv((float)$detalle->igv)
+                ->setIgv((float) $detalle->igv)
                 ->setTipAfeIgv($detalle->tipo_afectacion_igv)
-                ->setTotalImpuestos((float)$detalle->igv)
-                ->setMtoPrecioUnitario((float)$detalle->precio_unitario);
+                ->setTotalImpuestos((float) $detalle->igv)
+                ->setMtoPrecioUnitario((float) $detalle->precio_unitario);
             $items[] = $item;
         }
 
         $notaCredito->setDetails($items);
 
         // Totales
-        $notaCredito->setMtoOperGravadas((float)$comprobante->operacion_gravada)
-            ->setMtoIGV((float)$comprobante->total_igv)
-            ->setTotalImpuestos((float)$comprobante->total_igv)
-            ->setMtoImpVenta((float)$comprobante->importe_total);
+        $notaCredito->setMtoOperGravadas((float) $comprobante->operacion_gravada)
+            ->setMtoIGV((float) $comprobante->total_igv)
+            ->setTotalImpuestos((float) $comprobante->total_igv)
+            ->setMtoImpVenta((float) $comprobante->importe_total);
 
         return $notaCredito;
     }
@@ -891,7 +894,7 @@ class GreenterService
      */
     private function construirNotaDebito($comprobante)
     {
-        $notaDebito = new \Greenter\Model\Sale\Note();
+        $notaDebito = new \Greenter\Model\Sale\Note;
 
         $notaDebito->setUblVersion('2.1')
             ->setTipoDoc('08')
@@ -899,14 +902,14 @@ class GreenterService
             ->setCorrelativo($comprobante->correlativo)
             ->setFechaEmision(\Carbon\Carbon::parse($comprobante->fecha_emision))
             ->setTipDocAfectado($comprobante->comprobanteReferencia->tipo_comprobante)
-            ->setNumDocfectado($comprobante->comprobanteReferencia->serie . '-' . $comprobante->comprobanteReferencia->correlativo)
+            ->setNumDocfectado($comprobante->comprobanteReferencia->serie.'-'.$comprobante->comprobanteReferencia->correlativo)
             ->setCodMotivo($comprobante->motivo_nota ?? '01')
             ->setDesMotivo($comprobante->motivo_nota_descripcion ?? 'Intereses por mora')
             ->setTipoMoneda($comprobante->moneda)
             ->setCompany($this->company);
 
         // Cliente
-        $client = new \Greenter\Model\Client\Client();
+        $client = new \Greenter\Model\Client\Client;
         $client->setTipoDoc($comprobante->cliente_tipo_documento)
             ->setNumDoc($comprobante->cliente_numero_documento)
             ->setRznSocial($comprobante->cliente_razon_social);
@@ -916,29 +919,29 @@ class GreenterService
         // Detalles
         $items = [];
         foreach ($comprobante->detalles as $detalle) {
-            $item = new \Greenter\Model\Sale\SaleDetail();
+            $item = new \Greenter\Model\Sale\SaleDetail;
             $item->setCodProducto($detalle->codigo_producto ?? 'SERV001')
                 ->setUnidad($detalle->unidad_medida ?? 'NIU')
                 ->setDescripcion($detalle->descripcion)
-                ->setCantidad((float)$detalle->cantidad)
-                ->setMtoValorUnitario((float)$detalle->valor_unitario)
-                ->setMtoValorVenta((float)$detalle->valor_venta)
-                ->setMtoBaseIgv((float)$detalle->valor_venta)
+                ->setCantidad((float) $detalle->cantidad)
+                ->setMtoValorUnitario((float) $detalle->valor_unitario)
+                ->setMtoValorVenta((float) $detalle->valor_venta)
+                ->setMtoBaseIgv((float) $detalle->valor_venta)
                 ->setPorcentajeIgv(18.00)
-                ->setIgv((float)$detalle->igv)
+                ->setIgv((float) $detalle->igv)
                 ->setTipAfeIgv($detalle->tipo_afectacion_igv)
-                ->setTotalImpuestos((float)$detalle->igv)
-                ->setMtoPrecioUnitario((float)$detalle->precio_unitario);
+                ->setTotalImpuestos((float) $detalle->igv)
+                ->setMtoPrecioUnitario((float) $detalle->precio_unitario);
             $items[] = $item;
         }
 
         $notaDebito->setDetails($items);
 
         // Totales
-        $notaDebito->setMtoOperGravadas((float)$comprobante->operacion_gravada)
-            ->setMtoIGV((float)$comprobante->total_igv)
-            ->setTotalImpuestos((float)$comprobante->total_igv)
-            ->setMtoImpVenta((float)$comprobante->importe_total);
+        $notaDebito->setMtoOperGravadas((float) $comprobante->operacion_gravada)
+            ->setMtoIGV((float) $comprobante->total_igv)
+            ->setTotalImpuestos((float) $comprobante->total_igv)
+            ->setMtoImpVenta((float) $comprobante->importe_total);
 
         return $notaDebito;
     }
@@ -980,7 +983,7 @@ class GreenterService
                 'xml_respuesta_sunat' => base64_encode($result->getCdrZip()),
                 'tiene_xml' => true,
                 'tiene_pdf' => false,  // Se generará después
-                'tiene_cdr' => true
+                'tiene_cdr' => true,
             ]);
 
             // Log de respuesta exitosa
@@ -989,9 +992,9 @@ class GreenterService
                 $cdrResponseString = $cdrResponse ? json_encode([
                     'code' => $cdrResponse->getCode(),
                     'description' => $cdrResponse->getDescription(),
-                    'notes' => $cdrResponse->getNotes()
+                    'notes' => $cdrResponse->getNotes(),
                 ]) : null;
-                
+
                 SunatLog::logRespuesta(
                     $comprobante->id,
                     'ACEPTADO',
@@ -1006,7 +1009,7 @@ class GreenterService
 
             Log::info('Factura aceptada por SUNAT', [
                 'comprobante_id' => $comprobante->id,
-                'ticket' => $ticket
+                'ticket' => $ticket,
             ]);
 
         } else {
@@ -1030,7 +1033,7 @@ class GreenterService
                 'codigo_hash' => $hashFirma,   // Para el PDF
                 'tiene_xml' => true,
                 'tiene_pdf' => false,
-                'tiene_cdr' => false
+                'tiene_cdr' => false,
             ]);
 
             // Log de respuesta con error
@@ -1039,9 +1042,9 @@ class GreenterService
                 $cdrResponseString = $cdrResponse ? json_encode([
                     'code' => $cdrResponse->getCode(),
                     'description' => $cdrResponse->getDescription(),
-                    'notes' => $cdrResponse->getNotes()
+                    'notes' => $cdrResponse->getNotes(),
                 ]) : null;
-                
+
                 SunatLog::logRespuesta(
                     $comprobante->id,
                     'RECHAZADO',
@@ -1059,7 +1062,7 @@ class GreenterService
                 'ticket' => $ticket,
                 'errores' => $errores,
                 'codigos_error' => $codigosError,
-                'informacion_errores' => $informacionErrores
+                'informacion_errores' => $informacionErrores,
             ]);
         }
     }
@@ -1075,9 +1078,9 @@ class GreenterService
                 return hash('sha256', $xml);
             }
         } catch (\Exception $e) {
-            Log::warning('Error generando hash de firma: ' . $e->getMessage());
+            Log::warning('Error generando hash de firma: '.$e->getMessage());
         }
-        
+
         return null;
     }
 
@@ -1087,22 +1090,22 @@ class GreenterService
     private function extraerCodigosError($mensajeError)
     {
         $codigos = [];
-        
+
         // Buscar patrones como "0100", "0101", etc.
         if (preg_match_all('/\b(\d{4})\b/', $mensajeError, $matches)) {
             $codigos = array_unique($matches[1]);
         }
-        
+
         // Buscar patrones como "soap:Server.0100"
         if (preg_match_all('/\.(\d{4})/', $mensajeError, $matches)) {
             $codigos = array_merge($codigos, array_unique($matches[1]));
         }
-        
+
         // Buscar patrones como "error: 0100"
         if (preg_match_all('/error:\s*(\d{4})/', $mensajeError, $matches)) {
             $codigos = array_merge($codigos, array_unique($matches[1]));
         }
-        
+
         return array_unique($codigos);
     }
 
@@ -1112,11 +1115,11 @@ class GreenterService
     private function obtenerInformacionErrores($codigosError)
     {
         $informacion = [];
-        
+
         foreach ($codigosError as $codigo) {
             $informacion[] = SunatErrorCode::obtenerInformacionError($codigo);
         }
-        
+
         return $informacion;
     }
 
@@ -1158,7 +1161,7 @@ class GreenterService
             }
 
             // Crear objeto Summary
-            $summary = new \Greenter\Model\Summary\Summary();
+            $summary = new \Greenter\Model\Summary\Summary;
 
             $fechaGeneracion = \Carbon\Carbon::parse($fecha);
             $correlativo = \App\Models\Resumen::whereDate('fecha_resumen', $fechaGeneracion)->count() + 1;
@@ -1171,17 +1174,17 @@ class GreenterService
             // Agregar detalles
             $detalles = [];
             foreach ($comprobantes as $index => $comprobante) {
-                $detalle = new \Greenter\Model\Summary\SummaryDetail();
+                $detalle = new \Greenter\Model\Summary\SummaryDetail;
                 $detalle->setTipoDoc($comprobante->tipo_comprobante)
-                    ->setSerieNro($comprobante->serie . '-' . $comprobante->correlativo)
+                    ->setSerieNro($comprobante->serie.'-'.$comprobante->correlativo)
                     ->setEstado('1') // 1 = Agregar, 2 = Modificar, 3 = Anular
                     ->setClienteTipo($comprobante->cliente_tipo_documento)
                     ->setClienteNro($comprobante->cliente_numero_documento)
-                    ->setTotal((float)$comprobante->importe_total)
-                    ->setMtoOperGravadas((float)$comprobante->operacion_gravada)
+                    ->setTotal((float) $comprobante->importe_total)
+                    ->setMtoOperGravadas((float) $comprobante->operacion_gravada)
                     ->setMtoOperExoneradas(0.00)
                     ->setMtoOperInafectas(0.00)
-                    ->setMtoIGV((float)$comprobante->total_igv)
+                    ->setMtoIGV((float) $comprobante->total_igv)
                     ->setMtoISC(0.00);
 
                 // Establecer moneda y otros tributos usando métodos auxiliares seguros
@@ -1198,7 +1201,7 @@ class GreenterService
 
             if ($result->isSuccess()) {
                 $ticket = null;
-                
+
                 // Obtener ticket usando método auxiliar seguro
                 $ticket = $this->getTicketSafely($result);
 
@@ -1209,24 +1212,26 @@ class GreenterService
                         'fecha' => $fecha,
                         'cantidad_comprobantes' => count($comprobantesIds),
                         'ticket' => $ticket,
-                        'xml' => $this->see->getFactory()->getLastXml()
-                    ]
+                        'xml' => $this->see->getFactory()->getLastXml(),
+                    ],
                 ];
             } else {
                 $error = $result->getError();
+
                 return [
                     'success' => false,
                     'message' => 'Error al enviar resumen diario a SUNAT',
                     'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
+                    'codigo_error' => $error->getCode(),
                 ];
             }
         } catch (\Exception $e) {
-            Log::error('Error en generarResumenDiario: ' . $e->getMessage());
+            Log::error('Error en generarResumenDiario: '.$e->getMessage());
+
             return [
                 'success' => false,
                 'message' => 'Error al generar resumen diario',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1245,7 +1250,7 @@ class GreenterService
             }
 
             // Crear objeto Voided (Comunicación de Baja)
-            $voided = new \Greenter\Model\Voided\Voided();
+            $voided = new \Greenter\Model\Voided\Voided;
 
             $fechaGeneracion = now();
             $correlativo = \App\Models\Baja::whereDate('fecha_baja', $fechaGeneracion)->count() + 1;
@@ -1258,7 +1263,7 @@ class GreenterService
             // Agregar detalles de comprobantes a dar de baja
             $detalles = [];
             foreach ($comprobantes as $comprobante) {
-                $detalle = new \Greenter\Model\Voided\VoidedDetail();
+                $detalle = new \Greenter\Model\Voided\VoidedDetail;
                 $detalle->setTipoDoc($comprobante->tipo_comprobante)
                     ->setSerie($comprobante->serie)
                     ->setCorrelativo($comprobante->correlativo)
@@ -1274,14 +1279,14 @@ class GreenterService
 
             if ($result->isSuccess()) {
                 $ticket = null;
-                
+
                 // Obtener ticket usando método auxiliar seguro
                 $ticket = $this->getTicketSafely($result);
 
                 // Actualizar estado de comprobantes
                 Comprobante::whereIn('id', $comprobantesIds)->update([
                     'estado' => 'EN_PROCESO_BAJA',
-                    'ticket_baja' => $ticket
+                    'ticket_baja' => $ticket,
                 ]);
 
                 return [
@@ -1291,24 +1296,26 @@ class GreenterService
                         'cantidad_comprobantes' => count($comprobantesIds),
                         'motivo' => $motivo,
                         'ticket' => $ticket,
-                        'xml' => $this->see->getFactory()->getLastXml()
-                    ]
+                        'xml' => $this->see->getFactory()->getLastXml(),
+                    ],
                 ];
             } else {
                 $error = $result->getError();
+
                 return [
                     'success' => false,
                     'message' => 'Error al enviar comunicación de baja a SUNAT',
                     'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
+                    'codigo_error' => $error->getCode(),
                 ];
             }
         } catch (\Exception $e) {
-            Log::error('Error en enviarComunicacionBaja: ' . $e->getMessage());
+            Log::error('Error en enviarComunicacionBaja: '.$e->getMessage());
+
             return [
                 'success' => false,
                 'message' => 'Error al enviar comunicación de baja',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1350,8 +1357,8 @@ class GreenterService
                         'estado' => $estado,
                         'codigo_sunat' => $codigo,
                         'mensaje_sunat' => $cdr->getDescription(),
-                        'xml_cdr' => $result->getCdrZip()
-                    ]
+                        'xml_cdr' => $result->getCdrZip(),
+                    ],
                 ];
             } else {
                 $error = $result->getError();
@@ -1364,8 +1371,8 @@ class GreenterService
                             'ticket' => $ticket,
                             'estado' => 'EN_PROCESO',
                             'codigo_sunat' => '98',
-                            'mensaje_sunat' => 'El documento está siendo procesado'
-                        ]
+                            'mensaje_sunat' => 'El documento está siendo procesado',
+                        ],
                     ];
                 }
 
@@ -1373,15 +1380,16 @@ class GreenterService
                     'success' => false,
                     'message' => 'Error al consultar ticket en SUNAT',
                     'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
+                    'codigo_error' => $error->getCode(),
                 ];
             }
         } catch (\Exception $e) {
-            Log::error('Error en consultarTicket: ' . $e->getMessage());
+            Log::error('Error en consultarTicket: '.$e->getMessage());
+
             return [
                 'success' => false,
                 'message' => 'Error al consultar ticket',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1394,12 +1402,12 @@ class GreenterService
         try {
             // Implementar validación de certificado
             $certPath = config('services.greenter.cert_path');
-            
-            if (!file_exists($certPath)) {
+
+            if (! file_exists($certPath)) {
                 return [
                     'success' => false,
                     'message' => 'Certificado no encontrado',
-                    'error' => 'Archivo de certificado no existe'
+                    'error' => 'Archivo de certificado no existe',
                 ];
             }
 
@@ -1410,14 +1418,14 @@ class GreenterService
                 'data' => [
                     'archivo' => basename($certPath),
                     'tamaño' => filesize($certPath),
-                    'fecha_modificacion' => date('Y-m-d H:i:s', filemtime($certPath))
-                ]
+                    'fecha_modificacion' => date('Y-m-d H:i:s', filemtime($certPath)),
+                ],
             ];
         } catch (\Exception $e) {
             return [
                 'success' => false,
                 'message' => 'Error al validar certificado',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1435,14 +1443,14 @@ class GreenterService
                     'servicio_activo' => true,
                     'ultima_verificacion' => now()->format('Y-m-d H:i:s'),
                     'endpoint' => config('services.greenter.endpoint', 'beta'),
-                    'tiempo_respuesta_ms' => rand(100, 500)
-                ]
+                    'tiempo_respuesta_ms' => rand(100, 500),
+                ],
             ];
         } catch (\Exception $e) {
             return [
                 'success' => false,
                 'message' => 'Error al verificar estado del servicio',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1461,6 +1469,7 @@ class GreenterService
         } catch (\Exception $e) {
             // Ignorar errores de métodos no disponibles
         }
+
         return null;
     }
 
@@ -1478,6 +1487,7 @@ class GreenterService
         } catch (\Exception $e) {
             // Ignorar errores de métodos no disponibles
         }
+
         return null;
     }
 
@@ -1497,6 +1507,7 @@ class GreenterService
         } catch (\Exception $e) {
             // Ignorar errores de métodos no disponibles
         }
+
         return null;
     }
 
@@ -1536,7 +1547,7 @@ class GreenterService
      * Generar comprobante SIN enviarlo a SUNAT
      * Solo genera XML y lo firma digitalmente
      *
-     * @param array $datosComprobante Datos del comprobante a generar
+     * @param  array  $datosComprobante  Datos del comprobante a generar
      * @return array Resultado con éxito/error y datos del comprobante
      */
     public function generarComprobanteLocal($datosComprobante)
@@ -1555,7 +1566,7 @@ class GreenterService
                     ->where('activo', true)
                     ->first();
 
-                if (!$serie) {
+                if (! $serie) {
                     throw new \Exception("No hay series configuradas para el tipo de comprobante {$tipoComprobante}");
                 }
             } else {
@@ -1563,7 +1574,7 @@ class GreenterService
                     ->where('tipo_comprobante', $tipoComprobante)
                     ->first();
 
-                if (!$serie) {
+                if (! $serie) {
                     throw new \Exception("Serie {$datosComprobante['serie']} no encontrada");
                 }
             }
@@ -1593,7 +1604,7 @@ class GreenterService
             ]);
 
             // Crear detalles del comprobante
-            if (!empty($datosComprobante['detalles']) && is_array($datosComprobante['detalles'])) {
+            if (! empty($datosComprobante['detalles']) && is_array($datosComprobante['detalles'])) {
                 foreach ($datosComprobante['detalles'] as $index => $detalle) {
                     $comprobante->detalles()->create([
                         'item' => $index + 1,
@@ -1609,18 +1620,18 @@ class GreenterService
                         'porcentaje_igv' => 18.00,
                         'igv' => $detalle['igv'] ?? 0,
                         'tipo_afectacion_igv' => $detalle['tipo_afectacion_igv'] ?? '10',
-                        'importe_total' => $detalle['total'] ?? 0
+                        'importe_total' => $detalle['total'] ?? 0,
                     ]);
                 }
             }
 
             // Obtener cliente para construir documento
             $cliente = null;
-            if (!empty($datosComprobante['cliente_id'])) {
+            if (! empty($datosComprobante['cliente_id'])) {
                 $cliente = Cliente::find($datosComprobante['cliente_id']);
             }
 
-            if (!$cliente) {
+            if (! $cliente) {
                 // Crear cliente temporal con los datos proporcionados
                 $cliente = new Cliente([
                     'tipo_documento' => $datosComprobante['cliente_tipo_documento'] ?? '6',
@@ -1637,7 +1648,7 @@ class GreenterService
             $xml = $this->see->getFactory()->getLastXml();
 
             // Si no se generó XML aún, forzar generación
-            if (!$xml) {
+            if (! $xml) {
                 $this->see->getXmlSigned($invoice);
                 $xml = $this->see->getFactory()->getLastXml();
             }
@@ -1657,7 +1668,7 @@ class GreenterService
             Log::info('Comprobante generado localmente (sin enviar a SUNAT)', [
                 'comprobante_id' => $comprobante->id,
                 'numero_completo' => $comprobante->numero_completo,
-                'estado' => 'GENERADO'
+                'estado' => 'GENERADO',
             ]);
 
             return [
@@ -1671,19 +1682,19 @@ class GreenterService
                     'tiene_xml' => true,
                     'tiene_pdf' => false,
                     'tiene_cdr' => false,
-                ]
+                ],
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error generando comprobante local: ' . $e->getMessage(), [
+            Log::error('Error generando comprobante local: '.$e->getMessage(), [
                 'datos' => $datosComprobante,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Error al generar comprobante',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1692,7 +1703,7 @@ class GreenterService
      * Enviar comprobante existente a SUNAT
      * El comprobante ya debe tener XML generado
      *
-     * @param int $comprobanteId ID del comprobante
+     * @param  int  $comprobanteId  ID del comprobante
      * @return array Resultado del envío
      */
     public function enviarComprobanteASunat($comprobanteId, $userId = null, $ipOrigen = null)
@@ -1716,7 +1727,7 @@ class GreenterService
             // Actualizar estado a ENVIADO
             $comprobante->update([
                 'estado' => 'ENVIADO',
-                'fecha_envio_sunat' => now()
+                'fecha_envio_sunat' => now(),
             ]);
 
             // Log del envío a SUNAT
@@ -1739,21 +1750,21 @@ class GreenterService
 
             // Actualizar flags
             $comprobante->update([
-                'tiene_xml' => !empty($comprobante->xml_firmado),
-                'tiene_pdf' => !empty($comprobante->pdf_base64),
-                'tiene_cdr' => !empty($comprobante->xml_respuesta_sunat)
+                'tiene_xml' => ! empty($comprobante->xml_firmado),
+                'tiene_pdf' => ! empty($comprobante->pdf_base64),
+                'tiene_cdr' => ! empty($comprobante->xml_respuesta_sunat),
             ]);
 
             return [
                 'success' => true,
                 'comprobante' => $comprobante->fresh(),
-                'mensaje' => 'Comprobante enviado correctamente a SUNAT'
+                'mensaje' => 'Comprobante enviado correctamente a SUNAT',
             ];
 
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -1779,7 +1790,7 @@ class GreenterService
             // Actualizar estado a ENVIADO
             $comprobante->update([
                 'estado' => 'ENVIADO',
-                'fecha_envio_sunat' => now()
+                'fecha_envio_sunat' => now(),
             ]);
 
             // Enviar a SUNAT
@@ -1789,16 +1800,16 @@ class GreenterService
             if ($result->isSuccess()) {
                 $cdr = null;
                 $cdrZip = null;
-                
+
                 try {
                     // Usar reflexión para evitar errores de linting con métodos opcionales
                     $reflection = new \ReflectionClass($result);
-                    
+
                     if ($reflection->hasMethod('getCdrResponse')) {
                         $method = $reflection->getMethod('getCdrResponse');
                         $cdr = $method->invoke($result);
                     }
-                    
+
                     if ($reflection->hasMethod('getCdrZip')) {
                         $method = $reflection->getMethod('getCdrZip');
                         $cdrZip = $method->invoke($result);
@@ -1813,18 +1824,18 @@ class GreenterService
                     'mensaje_sunat' => $cdr ? $cdr->getDescription() : 'Aceptado',
                     'codigo_sunat' => $cdr ? $cdr->getCode() : '0',
                     'fecha_respuesta_sunat' => now(),
-                    'tiene_cdr' => !empty($cdrZip)
+                    'tiene_cdr' => ! empty($cdrZip),
                 ]);
 
                 // Generar PDF después de ser aceptado
                 $this->generarPdf($comprobante->fresh(), $invoice);
-                
+
                 // Actualizar tiene_pdf después de generar el PDF
                 $comprobante->update(['tiene_pdf' => true]);
 
                 Log::info('Comprobante enviado y aceptado por SUNAT', [
                     'comprobante_id' => $comprobante->id,
-                    'numero_completo' => $comprobante->numero_completo
+                    'numero_completo' => $comprobante->numero_completo,
                 ]);
 
                 return [
@@ -1836,7 +1847,7 @@ class GreenterService
                         'mensaje_sunat' => $cdr ? $cdr->getDescription() : 'Aceptado',
                         'tiene_cdr' => true,
                         'tiene_pdf' => true,
-                    ]
+                    ],
                 ];
             } else {
                 $error = $result->getError();
@@ -1850,7 +1861,7 @@ class GreenterService
 
                 Log::error('Comprobante rechazado por SUNAT', [
                     'comprobante_id' => $comprobante->id,
-                    'error' => $error->getMessage()
+                    'error' => $error->getMessage(),
                 ]);
 
                 return [
@@ -1860,20 +1871,19 @@ class GreenterService
                     'codigo_error' => $error->getCode(),
                     'data' => [
                         'estado' => 'RECHAZADO',
-                        'mensaje_sunat' => $error->getMessage()
-                    ]
+                        'mensaje_sunat' => $error->getMessage(),
+                    ],
                 ];
             }
 
         } catch (\Exception $e) {
-            Log::error('Error enviando comprobante a SUNAT: ' . $e->getMessage());
+            Log::error('Error enviando comprobante a SUNAT: '.$e->getMessage());
 
             return [
                 'success' => false,
                 'message' => 'Error al enviar a SUNAT',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
-
 }
