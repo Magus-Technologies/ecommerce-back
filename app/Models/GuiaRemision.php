@@ -73,6 +73,20 @@ class GuiaRemision extends Model
         // Otros (opcionales)
         'observaciones',
         'estado_logistico',
+
+        // SUNAT
+        'estado',
+        'xml_firmado',
+        'xml_respuesta_sunat',
+        'mensaje_sunat',
+        'errores_sunat',
+        'codigo_hash',
+        'tiene_xml',
+        'tiene_pdf',
+        'tiene_cdr',
+        'fecha_aceptacion',
+        'nota_sunat',
+        'pdf_base64',
     ];
 
     protected $casts = [

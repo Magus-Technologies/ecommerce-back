@@ -169,6 +169,111 @@ class ClientesController extends Controller
         }
     }
 
+    /**
+     * Crear un nuevo cliente
+     * POST /api/clientes
+     */
+    public function store(Request $request): JsonResponse
+    {
+        try {
+            $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+                'tipo_documento' => 'required|in:1,4,6,7,0',
+                'numero_documento' => 'required|string|max:20|unique:clientes,numero_documento',
+                'nombres' => 'nullable|string|max:255',
+                'apellidos' => 'nullable|string|max:255',
+                'nombre_completo' => 'nullable|string|max:255',
+                'razon_social' => 'nullable|string|max:255',
+                'nombre_comercial' => 'nullable|string|max:255',
+                'email' => 'nullable|email|max:255',
+                'telefono' => 'nullable|string|max:20',
+                'direccion' => 'nullable|string|max:500',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Datos de validación incorrectos',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            // Determinar razon_social según los datos proporcionados
+            $razonSocial = null;
+
+            if ($request->filled('razon_social')) {
+                $razonSocial = $request->razon_social;
+            } elseif ($request->filled('nombre_completo')) {
+                $razonSocial = $request->nombre_completo;
+            } elseif ($request->filled('nombres') && $request->filled('apellidos')) {
+                $razonSocial = $request->nombres . ' ' . $request->apellidos;
+            } elseif ($request->filled('nombres')) {
+                $razonSocial = $request->nombres;
+            } else {
+                $razonSocial = 'Cliente';
+            }
+
+            // Determinar nombre_comercial
+            $nombreComercial = null;
+            if ($request->filled('nombre_comercial')) {
+                $nombreComercial = $request->nombre_comercial;
+            } elseif ($request->filled('nombre_completo')) {
+                $nombreComercial = $request->nombre_completo;
+            } else {
+                $nombreComercial = $razonSocial;
+            }
+
+            // Crear cliente
+            $cliente = \App\Models\Cliente::create([
+                'tipo_documento' => $request->tipo_documento,
+                'numero_documento' => $request->numero_documento,
+                'razon_social' => $razonSocial,
+                'nombre_comercial' => $nombreComercial,
+                'direccion' => $request->direccion ?? 'Sin dirección',
+                'email' => $request->email,
+                'telefono' => $request->telefono,
+                'activo' => true,
+                'user_id' => \Illuminate\Support\Facades\Auth::id(),
+            ]);
+
+            // Preparar respuesta en el formato esperado
+            $nombres = null;
+            $apellidos = null;
+
+            // Intentar separar nombres y apellidos si es DNI
+            if ($cliente->tipo_documento === '1') {
+                $partesNombre = explode(' ', $razonSocial, 2);
+                if (count($partesNombre) === 2) {
+                    $nombres = $partesNombre[0];
+                    $apellidos = $partesNombre[1];
+                } else {
+                    $nombres = $razonSocial;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id_cliente' => $cliente->id,
+                    'numero_documento' => $cliente->numero_documento,
+                    'nombre_completo' => $cliente->nombre_completo,
+                    'nombres' => $nombres,
+                    'apellidos' => $apellidos,
+                    'email' => $cliente->email,
+                    'telefono' => $cliente->telefono,
+                    'direccion' => $cliente->direccion,
+                    'estado' => $cliente->activo,
+                ],
+                'message' => 'Cliente registrado exitosamente'
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al registrar cliente: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function update(Request $request, $id): JsonResponse
     {
         try {
@@ -614,39 +719,69 @@ public function deleteFoto(Request $request): JsonResponse
             $resultado = null;
 
             // 1. Buscar PRIMERO en 'user_clientes' (usuarios registrados - tiene datos completos)
-            $userCliente = UserCliente::select('numero_documento', 'nombres', 'apellidos', 'email', 'telefono')
+            $userCliente = UserCliente::select('id', 'numero_documento', 'nombres', 'apellidos', 'email', 'telefono', 'estado')
                 ->where('numero_documento', $numeroDocumento)
                 ->where('estado', true)
                 ->first();
 
             if ($userCliente) {
+                // Obtener dirección predeterminada
+                $direccionPredeterminada = $userCliente->direccionPredeterminada;
+                $direccionCompleta = $direccionPredeterminada
+                    ? $direccionPredeterminada->direccion_completa
+                    : null;
+
                 // Cliente encontrado en user_clientes
                 $resultado = [
-                    'numero_documento' => $userCliente->numero_documento ?? null,
-                    'nombres' => $userCliente->nombres ?? null,
-                    'apellidos' => $userCliente->apellidos ?? null,
-                    'email' => $userCliente->email ?? null,
-                    'telefono' => $userCliente->telefono ?? null,
-                    'direccion' => null
+                    'id_cliente' => $userCliente->id,
+                    'numero_documento' => $userCliente->numero_documento,
+                    'nombre_completo' => $userCliente->nombres . ' ' . $userCliente->apellidos,
+                    'nombres' => $userCliente->nombres,
+                    'apellidos' => $userCliente->apellidos,
+                    'email' => $userCliente->email,
+                    'telefono' => $userCliente->telefono,
+                    'direccion' => $direccionCompleta,
+                    'estado' => $userCliente->estado
                 ];
             }
 
             // 2. Si no se encuentra, buscar en 'clientes' (facturación - solo para empresas/RUC)
             if (!$resultado) {
-                $clienteFacturacion = \App\Models\Cliente::select('numero_documento', 'email', 'telefono', 'direccion')
+                $clienteFacturacion = \App\Models\Cliente::select('id', 'tipo_documento', 'numero_documento', 'razon_social', 'nombre_comercial', 'email', 'telefono', 'direccion', 'activo')
                     ->where('numero_documento', $numeroDocumento)
                     ->where('activo', true)
                     ->first();
 
                 if ($clienteFacturacion) {
+                    // Determinar nombre completo
+                    $nombreCompleto = $clienteFacturacion->nombre_comercial ?: $clienteFacturacion->razon_social;
+
+                    // Intentar separar nombres y apellidos si es DNI (tipo_documento = 1)
+                    $nombres = null;
+                    $apellidos = null;
+
+                    if ($clienteFacturacion->tipo_documento === '1') {
+                        // Es DNI, intentar parsear razon_social
+                        $partesNombre = explode(' ', $nombreCompleto, 2);
+                        if (count($partesNombre) === 2) {
+                            $nombres = $partesNombre[0];
+                            $apellidos = $partesNombre[1];
+                        } else {
+                            $nombres = $nombreCompleto;
+                        }
+                    }
+
                     // Cliente encontrado en tabla clientes (facturación)
                     $resultado = [
-                        'numero_documento' => $clienteFacturacion->numero_documento ?? null,
-                        'nombres' => null,
-                        'apellidos' => null,
-                        'email' => $clienteFacturacion->email ?? null,
-                        'telefono' => $clienteFacturacion->telefono ?? null,
-                        'direccion' => $clienteFacturacion->direccion ?? null
+                        'id_cliente' => $clienteFacturacion->id,
+                        'numero_documento' => $clienteFacturacion->numero_documento,
+                        'nombre_completo' => $nombreCompleto,
+                        'nombres' => $nombres,
+                        'apellidos' => $apellidos,
+                        'email' => $clienteFacturacion->email,
+                        'telefono' => $clienteFacturacion->telefono,
+                        'direccion' => $clienteFacturacion->direccion,
+                        'estado' => $clienteFacturacion->activo
                     ];
                 }
             }
@@ -655,7 +790,8 @@ public function deleteFoto(Request $request): JsonResponse
             if ($resultado) {
                 return response()->json([
                     'success' => true,
-                    'data' => [$resultado] // Envuelto en array para consistencia con el frontend
+                    'data' => [$resultado], // Envuelto en array para consistencia con el frontend
+                    'message' => 'Cliente encontrado'
                 ]);
             }
 

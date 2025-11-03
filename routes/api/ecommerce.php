@@ -108,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware('permission:clientes.edit')->group(function () {
+        Route::post('/clientes', [ClientesController::class, 'store']);
         Route::put('/clientes/{id}', [ClientesController::class, 'update']);
         Route::patch('/clientes/{id}/toggle-estado', [ClientesController::class, 'toggleEstado']);
     });
