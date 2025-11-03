@@ -131,21 +131,28 @@ class GuiaRemisionService
             $xml = $this->see->getXmlSigned($despatch);
 
             // Guardar XML en la guía
-            $guia->update([
+            $updateResult1 = $guia->update([
                 'xml_firmado' => base64_encode($xml),
                 'tiene_xml' => true
             ]);
 
             Log::info('XML de guía generado correctamente', [
                 'guia_id' => $guia->id,
-                'xml_length' => strlen($xml)
+                'xml_length' => strlen($xml),
+                'update_success' => $updateResult1
             ]);
 
             // NOTA: El envío a SUNAT requiere credenciales OAuth2
             // Por ahora solo generamos el XML
-            $guia->update([
+            $updateResult2 = $guia->update([
                 'estado' => 'XML_GENERADO',
                 'mensaje_sunat' => 'XML generado correctamente. Requiere credenciales OAuth2 para enviar a SUNAT.'
+            ]);
+
+            Log::info('Estado de guía actualizado', [
+                'guia_id' => $guia->id,
+                'nuevo_estado' => 'XML_GENERADO',
+                'update_success' => $updateResult2
             ]);
 
             // Generar PDF
@@ -327,43 +334,70 @@ class GuiaRemisionService
                 $despatch = $this->construirDocumentoGreenter($guia);
             }
 
-            $htmlReport = new HtmlReport();
-            $pdfReport = new PdfReport($htmlReport);
+            // Intentar con el PDF de Greenter
+            try {
+                $htmlReport = new HtmlReport();
+                $pdfReport = new PdfReport($htmlReport);
 
-            // Parámetros adicionales para el PDF
-            $params = [
-                'system' => [
-                    'hash' => $guia->codigo_hash,
-                ]
-            ];
+                // Parámetros adicionales para el PDF
+                $params = [
+                    'system' => [
+                        'hash' => $guia->codigo_hash ?? '',
+                        'date' => date('Y-m-d'),
+                        'time' => date('H:i:s'),
+                    ]
+                ];
 
-            // Agregar logo si existe
-            $logoPath = public_path('logo-empresa.png');
-            if (file_exists($logoPath) && is_readable($logoPath)) {
-                try {
-                    $logoContent = file_get_contents($logoPath);
-                    if ($logoContent !== false) {
-                        $params['system']['logo'] = $logoContent;
-                        Log::info('Logo de empresa agregado al PDF de guía', ['guia_id' => $guia->id]);
+                // Agregar logo si existe
+                $logoPath = public_path('logo-empresa.png');
+                if (file_exists($logoPath) && is_readable($logoPath)) {
+                    try {
+                        $logoContent = file_get_contents($logoPath);
+                        if ($logoContent !== false) {
+                            $params['system']['logo'] = $logoContent;
+                            Log::info('Logo de empresa agregado al PDF de guía', ['guia_id' => $guia->id]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning('Error al leer logo de empresa para guía', [
+                            'path' => $logoPath,
+                            'error' => $e->getMessage()
+                        ]);
                     }
-                } catch (\Exception $e) {
-                    Log::warning('Error al leer logo de empresa para guía', [
-                        'path' => $logoPath,
-                        'error' => $e->getMessage()
-                    ]);
                 }
+
+                $pdf = $pdfReport->render($despatch, $params);
+
+                $guia->update([
+                    'pdf_base64' => base64_encode($pdf),
+                    'tiene_pdf' => true
+                ]);
+
+                Log::info('PDF de guía generado exitosamente con Greenter', [
+                    'guia_id' => $guia->id,
+                    'tamaño_bytes' => strlen($pdf)
+                ]);
+
+                return;
+
+            } catch (\Exception $e) {
+                Log::warning('Error con PDF de Greenter, usando PDF simple', [
+                    'guia_id' => $guia->id,
+                    'error' => $e->getMessage()
+                ]);
+
+                // Fallback: Generar PDF simple
+                $pdfSimple = $this->generarPdfSimple($guia);
+
+                $guia->update([
+                    'pdf_base64' => base64_encode($pdfSimple),
+                    'tiene_pdf' => true
+                ]);
+
+                Log::info('PDF simple de guía generado exitosamente', [
+                    'guia_id' => $guia->id,
+                    'tamaño_bytes' => strlen($pdfSimple)
+                ]);
             }
-
-            $pdf = $pdfReport->render($despatch, $params);
-
-            $guia->update([
-                'pdf_base64' => base64_encode($pdf)
-            ]);
-
-            Log::info('PDF de guía generado exitosamente', [
-                'guia_id' => $guia->id,
-                'tamaño_bytes' => strlen($pdf)
-            ]);
 
         } catch (\Exception $e) {
             Log::error('Error generando PDF de guía', [
@@ -371,7 +405,93 @@ class GuiaRemisionService
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+
+            $guia->update(['tiene_pdf' => false]);
         }
+    }
+
+    /**
+     * Generar PDF simple HTML para guía
+     */
+    private function generarPdfSimple($guia)
+    {
+        $html = "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <title>Guía de Remisión {$guia->serie}-{$guia->correlativo}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                .content { margin: 20px 0; }
+                .footer { margin-top: 30px; font-size: 12px; color: #666; }
+                table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+            </style>
+        </head>
+        <body>
+            <div class='header'>
+                <h1>GUÍA DE REMISIÓN ELECTRÓNICA</h1>
+                <h2>{$guia->serie}-" . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . "</h2>
+            </div>
+
+            <div class='content'>
+                <p><strong>Fecha Emisión:</strong> {$guia->fecha_emision}</p>
+                <p><strong>Fecha Traslado:</strong> {$guia->fecha_inicio_traslado}</p>
+                <p><strong>Tipo:</strong> {$guia->tipo_guia}</p>
+                <p><strong>Estado:</strong> {$guia->estado}</p>
+
+                <h3>Detalles de Transporte</h3>
+                <table>
+                    <tr><th>Concepto</th><th>Información</th></tr>
+                    <tr><td>Punto de Partida</td><td>{$guia->punto_partida_direccion}</td></tr>
+                    <tr><td>Punto de Llegada</td><td>{$guia->punto_llegada_direccion}</td></tr>
+                    <tr><td>Modalidad</td><td>{$guia->modalidad_traslado}</td></tr>
+                    <tr><td>Motivo</td><td>{$guia->motivo_traslado}</td></tr>
+                </table>
+
+                <h3>Destinatario</h3>
+                <p><strong>Nombre:</strong> {$guia->destinatario_razon_social}</p>
+                <p><strong>Documento:</strong> {$guia->destinatario_numero_documento}</p>
+
+                <h3>Detalles de Mercadería</h3>
+                <table>
+                    <tr>
+                        <th>Cantidad</th>
+                        <th>Descripción</th>
+                    </tr>";
+
+        foreach ($guia->detalles as $detalle) {
+            $html .= "<tr>
+                        <td>{$detalle->cantidad}</td>
+                        <td>{$detalle->descripcion}</td>
+                      </tr>";
+        }
+
+        $html .= "
+                </table>
+            </div>
+
+            <div class='footer'>
+                <p>Guía de Remisión Electrónica generada automáticamente</p>
+                <p>Hash: {$guia->codigo_hash}</p>
+            </div>
+        </body>
+        </html>";
+
+        // Si DomPDF está disponible, usarlo
+        if (class_exists('\Dompdf\Dompdf')) {
+            $dompdf = new \Dompdf\Dompdf();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            return $dompdf->output();
+        }
+
+        // Fallback: devolver HTML
+        return $html;
     }
 
     /**
