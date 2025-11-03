@@ -132,3 +132,6 @@ Route::post('/resend-verification', [\App\Http\Controllers\EmailVerificationCont
 Route::post('/forgot-password', [\App\Http\Controllers\PasswordResetController::class, 'forgotPassword']);
 Route::post('/reset-password', [\App\Http\Controllers\PasswordResetController::class, 'resetPassword']);
 Route::post('/verify-reset-token', [\App\Http\Controllers\PasswordResetController::class, 'verifyResetToken']);
+// COMPROBANTES PÚBLICOS (para WhatsApp)
+// ============================================
+Route::get('/venta/comprobante/pdf/{ventaId}/{numeroCompleto}', [\App\Http\Controllers\VentasController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');

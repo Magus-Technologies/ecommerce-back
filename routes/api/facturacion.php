@@ -49,9 +49,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}/historial-sunat', [VentasController::class, 'historialSunat']);
         Route::get('/{id}/whatsapp-datos', [VentasController::class, 'obtenerDatosWhatsApp']);
         Route::get('/{id}/email-datos', [VentasController::class, 'obtenerDatosEmail']);
+        Route::get('/{id}/url-publica', [VentasController::class, 'generarUrlPublica']);
 
         Route::post('/', [VentasController::class, 'store'])->middleware('permission:ventas.create');
         Route::post('/ecommerce', [VentasController::class, 'crearVentaEcommerce'])->middleware('permission:ventas.create');
+        Route::put('/{id}', [VentasController::class, 'update'])->middleware('permission:ventas.edit');
         Route::post('/{id}/facturar', [VentasController::class, 'facturar'])->middleware('permission:ventas.facturar');
         Route::post('/{id}/enviar-sunat', [VentasController::class, 'enviarSunat'])->middleware('permission:ventas.facturar');
         Route::post('/{id}/reenviar-sunat', [VentasController::class, 'reenviarSunat'])->middleware('permission:ventas.facturar');
@@ -154,12 +156,24 @@ Route::middleware('auth:sanctum')->group(function () {
     // GUÍAS DE REMISIÓN
     // ============================================
     Route::prefix('guias-remision')->middleware('permission:facturacion.guias_remision.ver')->group(function () {
+        // Obtener tipos de guía
+        Route::get('/tipos', [GuiasRemisionController::class, 'tipos']);
+
+        // Listar y estadísticas
         Route::get('/', [GuiasRemisionController::class, 'index']);
         Route::get('/estadisticas/resumen', [GuiasRemisionController::class, 'estadisticas']);
+
+        // Ver detalle y descargar XML
         Route::get('/{id}', [GuiasRemisionController::class, 'show'])->middleware('permission:facturacion.guias_remision.show');
         Route::get('/{id}/xml', [GuiasRemisionController::class, 'descargarXml']);
 
+        // Crear guías por tipo
         Route::post('/', [GuiasRemisionController::class, 'store'])->middleware('permission:facturacion.guias_remision.create');
+        Route::post('/remitente', [GuiasRemisionController::class, 'storeRemitente'])->middleware('permission:facturacion.guias_remision.create');
+        Route::post('/transportista', [GuiasRemisionController::class, 'storeTransportista'])->middleware('permission:facturacion.guias_remision.create');
+        Route::post('/traslado-interno', [GuiasRemisionController::class, 'storeInterno'])->middleware('permission:facturacion.guias_remision.create');
+
+        // Enviar a SUNAT
         Route::post('/{id}/enviar-sunat', [GuiasRemisionController::class, 'enviarSunat'])->middleware('permission:facturacion.guias_remision.edit');
     });
 

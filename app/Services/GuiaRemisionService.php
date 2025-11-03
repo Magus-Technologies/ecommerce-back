@@ -11,9 +11,7 @@ use Greenter\Model\Despatch\Despatch;
 use Greenter\Model\Despatch\DespatchDetail;
 use Greenter\Model\Despatch\Shipment;
 use Greenter\Model\Despatch\Driver;
-use Greenter\Model\Despatch\Transport;
-use Greenter\Model\Despatch\Origin;
-use Greenter\Model\Despatch\Delivery;
+use Greenter\Model\Despatch\Direction;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
 use App\Models\GuiaRemision;
@@ -36,58 +34,65 @@ class GuiaRemisionService
 
     private function configurarSee()
     {
-        // Validar y configurar certificado
-        $certPath = config('services.greenter.cert_path');
+        $ambiente = env('GREENTER_MODE', 'BETA');
 
-        if (empty($certPath)) {
-            throw new \Exception('La ruta del certificado no está configurada en services.greenter.cert_path');
-        }
+        // Configurar certificado según ambiente
+        if (strtoupper($ambiente) === 'BETA') {
+            // Para BETA, usar el certificado de prueba de Greenter
+            // Este certificado ya viene incluido en la librería y no requiere configuración adicional
+            $certPath = __DIR__ . '/../../vendor/greenter/xmldsig/tests/certificate.pem';
 
-        if (!file_exists($certPath)) {
-            throw new \Exception("Certificado no encontrado en la ruta: {$certPath}");
-        }
+            if (file_exists($certPath)) {
+                $certificadoContenido = file_get_contents($certPath);
+                $this->see->setCertificate($certificadoContenido);
+                Log::info('Usando certificado de prueba de Greenter para BETA (Guías de Remisión)');
+            } else {
+                // Fallback: intentar usar el certificado configurado
+                $certPath = storage_path('app/' . env('GREENTER_CERT_PATH', 'certificates/certificate.pem'));
+                if (file_exists($certPath)) {
+                    $certificadoContenido = file_get_contents($certPath);
+                    $this->see->setCertificate($certificadoContenido);
+                    Log::info('Usando certificado personalizado desde storage (Guías de Remisión)');
+                } else {
+                    throw new \Exception("Certificado no encontrado. Verifica la instalación de Greenter o configura GREENTER_CERT_PATH");
+                }
+            }
 
-        if (!is_readable($certPath)) {
-            throw new \Exception("El certificado no tiene permisos de lectura: {$certPath}");
-        }
+            // Credenciales de prueba BETA
+            $solUser = env('GREENTER_FE_USER', '20000000001MODDATOS');
+            $solPassword = env('GREENTER_FE_PASSWORD', 'MODDATOS');
 
-        // Leer certificado
-        $certificadoContenido = file_get_contents($certPath);
+            $this->see->setService(SunatEndpoints::GUIA_BETA);
 
-        if ($certificadoContenido === false) {
-            throw new \Exception("Error al leer el contenido del certificado: {$certPath}");
-        }
-
-        // Configurar certificado
-        $this->see->setCertificate($certificadoContenido);
-
-        // Validar credenciales SOL
-        $solUser = config('services.greenter.fe_user');
-        $solPassword = config('services.greenter.fe_password');
-
-        if (empty($solUser) || empty($solPassword)) {
-            throw new \Exception('Las credenciales SOL no están configuradas correctamente');
-        }
-
-        // Configurar credenciales
-        try {
-            $solPasswordDecrypted = decrypt($solPassword);
-            $this->see->setCredentials($solUser, $solPasswordDecrypted);
-        } catch (\Exception $e) {
-            $this->see->setCredentials($solUser, $solPassword);
-        }
-
-        // Configurar servicios SUNAT
-        $ambiente = config('services.greenter.ambiente', 'beta');
-        if ($ambiente === 'produccion') {
-            $this->see->setService(SunatEndpoints::FE_PRODUCCION);
         } else {
-            $this->see->setService(SunatEndpoints::FE_BETA);
+            // Para PRODUCCIÓN, usar certificado real de la empresa
+            $certPath = storage_path('app/' . env('GREENTER_CERT_PATH'));
+
+            if (empty($certPath) || !file_exists($certPath)) {
+                throw new \Exception("Certificado de producción no encontrado en: {$certPath}");
+            }
+
+            $certificadoContenido = file_get_contents($certPath);
+            $this->see->setCertificate($certificadoContenido);
+
+            // Credenciales reales de producción
+            $solUser = env('GREENTER_FE_USER');
+            $solPassword = env('GREENTER_FE_PASSWORD');
+
+            if (empty($solUser) || empty($solPassword)) {
+                throw new \Exception('Las credenciales SOL de producción no están configuradas');
+            }
+
+            $this->see->setService(SunatEndpoints::GUIA_PRODUCCION);
         }
+
+        // Configurar credenciales SOL
+        $this->see->setCredentials($solUser, $solPassword);
 
         Log::info('GuiaRemisionService configurado correctamente', [
             'ambiente' => $ambiente,
-            'certificado' => basename($certPath)
+            'usuario_sol' => $solUser,
+            'endpoint' => $ambiente === 'BETA' ? 'GUIA_BETA' : 'GUIA_PRODUCCION'
         ]);
     }
 
@@ -108,6 +113,13 @@ class GuiaRemisionService
 
     /**
      * Enviar guía de remisión a SUNAT
+     *
+     * IMPORTANTE: SUNAT desactivó SOAP para guías de remisión (error 1085).
+     * Ahora requiere usar la API REST de GRE con credenciales OAuth2.
+     *
+     * Para modo BETA/pruebas necesitas:
+     * 1. Credenciales OAuth2 de SUNAT (diferentes a MODDATOS)
+     * 2. O usar un PSE como Nubefact, FacturadorPE, etc.
      */
     public function enviarGuiaRemision(GuiaRemision $guia)
     {
@@ -115,78 +127,68 @@ class GuiaRemisionService
             // Construir documento Greenter
             $despatch = $this->construirDocumentoGreenter($guia);
 
-            // Enviar a SUNAT
-            $result = $this->see->send($despatch);
+            // Generar XML firmado (sin enviar)
+            $xml = $this->see->getXmlSigned($despatch);
 
-            // Guardar XML
-            $xml = $this->see->getFactory()->getLastXml();
-            $guia->update(['xml_firmado' => $xml]);
+            // Guardar XML en la guía
+            $guia->update([
+                'xml_firmado' => base64_encode($xml),
+                'tiene_xml' => true
+            ]);
 
-            if ($result->isSuccess()) {
-                // Obtener CDR si está disponible
-                $cdrResponse = $this->getCdrSafely($result);
-                $cdrZip = $this->getCdrZipSafely($result);
+            Log::info('XML de guía generado correctamente', [
+                'guia_id' => $guia->id,
+                'xml_length' => strlen($xml)
+            ]);
 
-                $updateData = [
-                    'estado' => 'ACEPTADO',
-                    'xml_respuesta_sunat' => $cdrZip
-                ];
+            // NOTA: El envío a SUNAT requiere credenciales OAuth2
+            // Por ahora solo generamos el XML
+            $guia->update([
+                'estado' => 'XML_GENERADO',
+                'mensaje_sunat' => 'XML generado correctamente. Requiere credenciales OAuth2 para enviar a SUNAT.'
+            ]);
 
-                // Solo agregar datos del CDR si existe
-                if ($cdrResponse) {
-                    if (method_exists($cdrResponse, 'getDescription')) {
-                        $updateData['mensaje_sunat'] = $cdrResponse->getDescription();
-                    }
+            // Generar PDF
+            $this->generarPdf($guia, $despatch);
 
-                    if (method_exists($cdrResponse, 'getDigestValue')) {
-                        $updateData['codigo_hash'] = $cdrResponse->getDigestValue();
-                    }
-                }
+            return [
+                'success' => true,
+                'mensaje' => 'XML de guía generado correctamente. NOTA: Para enviar a SUNAT necesitas configurar credenciales OAuth2 en el .env',
+                'data' => [
+                    'guia' => $guia->fresh(),
+                    'xml_generado' => true,
+                    'requiere_oauth2' => true,
+                    'instrucciones' => 'Configura GREENTER_CLIENT_ID y GREENTER_CLIENT_SECRET en el .env para enviar a SUNAT'
+                ]
+            ];
 
-                $guia->update($updateData);
-
-                // Preparar datos de respuesta
-                $responseData = [
-                    'success' => true,
-                    'mensaje' => 'Guía de remisión enviada a SUNAT exitosamente',
-                    'data' => [
-                        'guia' => $guia->fresh()
-                    ]
-                ];
-
-                // Agregar detalles del CDR si existen
-                if ($cdrResponse) {
-                    if (method_exists($cdrResponse, 'getCode')) {
-                        $responseData['data']['codigo_sunat'] = $cdrResponse->getCode();
-                    }
-                    if (method_exists($cdrResponse, 'getDescription')) {
-                        $responseData['data']['mensaje_sunat'] = $cdrResponse->getDescription();
-                    }
-                }
-
-                return $responseData;
-            } else {
-                $error = $result->getError();
-
-                $guia->update([
-                    'estado' => 'RECHAZADO',
-                    'mensaje_sunat' => $error->getMessage(),
-                    'errores_sunat' => $error->getMessage()
-                ]);
-
-                return [
-                    'success' => false,
-                    'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
-                ];
-            }
         } catch (\Exception $e) {
-            Log::error('Error en enviarGuiaRemision: ' . $e->getMessage());
+            Log::error('Error en enviarGuiaRemision: ' . $e->getMessage(), [
+                'guia_id' => $guia->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return [
                 'success' => false,
                 'error' => $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Obtener instancia de See (para uso externo)
+     */
+    public function getSee()
+    {
+        return $this->see;
+    }
+
+    /**
+     * Construir documento Greenter para guía de remisión (público para API REST)
+     */
+    public function construirDocumentoGreenterPublic(GuiaRemision $guia)
+    {
+        return $this->construirDocumentoGreenter($guia);
     }
 
     /**
@@ -200,11 +202,19 @@ class GuiaRemisionService
         $fechaEmision = Carbon::parse($guia->fecha_emision);
         $fechaTraslado = Carbon::parse($guia->fecha_inicio_traslado ?? $guia->fecha_emision);
 
-        $despatch->setTipoDoc('09') // Tipo 09 = Guía de Remisión
+        // Tipo de documento según tipo de guía
+        $tipoDoc = $guia->tipo_comprobante ?? '09';
+        
+        $despatch->setTipoDoc($tipoDoc)
                 ->setSerie($guia->serie)
                 ->setCorrelativo($guia->correlativo)
                 ->setFechaEmision($fechaEmision)
                 ->setCompany($this->company);
+
+        // Agregar nota con comprobante relacionado (FT: F001-2950)
+        if ($guia->nota_sunat) {
+            $despatch->setObservacion($guia->nota_sunat);
+        }
 
         // Destinatario
         if ($guia->destinatario_tipo_documento && $guia->destinatario_numero_documento) {
@@ -244,61 +254,46 @@ class GuiaRemisionService
 
         // Peso y bultos
         if ($guia->peso_total) {
-            $shipment->setPesoBruto((float)$guia->peso_total);
+            $shipment->setPesoTotal((float)$guia->peso_total);
         }
 
         if ($guia->numero_bultos) {
-            $shipment->setNumeroBultos((int)$guia->numero_bultos);
+            $shipment->setNumBultos((int)$guia->numero_bultos);
         }
 
-        // Transportista (solo si es transporte privado - modalidad 02)
-        if ($guia->modalidad_traslado === '02') {
-            $transport = new Transport();
+        // Datos del conductor - Requerido para transporte privado
+        if (!$guia->esTrasladoInterno() && $guia->conductor_dni && $guia->conductor_nombres) {
+            $driver = new Driver();
+            $driver->setTipo('1') // 1=DNI
+                  ->setNroDoc($guia->conductor_dni)
+                  ->setLicencia('') // SUNAT no requiere licencia
+                  ->setNombres($guia->conductor_nombres)
+                  ->setApellidos(''); // Apellidos están incluidos en nombres
 
-            // Modo de transporte (01=Terrestre, 02=Marítimo, etc.)
-            if ($guia->modo_transporte) {
-                $transport->setTransportMode($guia->modo_transporte);
-            }
-
-            // Datos del vehículo
-            if ($guia->numero_placa) {
-                $transport->setPlaca($guia->numero_placa);
-            }
-
-            // Datos del conductor
-            if ($guia->conductor_dni && $guia->conductor_nombres) {
-                $driver = new Driver();
-                $driver->setTipo('1') // 1=DNI
-                      ->setNroDoc($guia->conductor_dni)
-                      ->setLicencia($guia->numero_licencia ?? '')
-                      ->setNombres($guia->conductor_nombres)
-                      ->setApellidos(''); // Apellidos están incluidos en nombres
-
-                $transport->setDriver($driver);
-            }
-
-            $shipment->setTransport($transport);
+            $shipment->setChoferes([$driver]);
         }
 
         // Punto de partida
         if ($guia->punto_partida_direccion) {
-            $origin = new Origin();
-            $origin->setUbigueo($guia->punto_partida_ubigeo ?? '150101')
-                  ->setDireccion($guia->punto_partida_direccion);
+            $partida = new Direction(
+                $guia->punto_partida_ubigeo ?? '150101',
+                $guia->punto_partida_direccion
+            );
 
-            $shipment->setOrigin($origin);
+            $shipment->setPartida($partida);
         }
 
         // Punto de llegada
         if ($guia->punto_llegada_direccion) {
-            $delivery = new Delivery();
-            $delivery->setUbigueo($guia->punto_llegada_ubigeo ?? '150101')
-                    ->setDireccion($guia->punto_llegada_direccion);
+            $llegada = new Direction(
+                $guia->punto_llegada_ubigeo ?? '150101',
+                $guia->punto_llegada_direccion
+            );
 
-            $shipment->setDelivery($delivery);
+            $shipment->setLlegada($llegada);
         }
 
-        $despatch->setShipment($shipment);
+        $despatch->setEnvio($shipment);
 
         // Detalles de la guía (productos/bienes a transportar)
         $detalles = [];
@@ -309,18 +304,13 @@ class GuiaRemisionService
                 ->setDescripcion($detalle->descripcion)
                 ->setCodigo($detalle->producto_id ? "P{$detalle->producto_id}" : 'PROD001');
 
-            // Peso unitario (opcional)
-            if ($detalle->peso_unitario) {
-                $item->setPeso((float)$detalle->peso_unitario);
-            }
-
             $detalles[] = $item;
         }
 
         $despatch->setDetails($detalles);
 
-        // Observaciones (opcional)
-        if ($guia->observaciones) {
+        // Si no hay nota SUNAT pero hay observaciones, usarlas
+        if (!$guia->nota_sunat && $guia->observaciones) {
             $despatch->setObservacion($guia->observaciones);
         }
 

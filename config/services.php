@@ -58,4 +58,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'apiperu' => [
+        'token' => env('APIPERU_TOKEN'),
+        'url' => env('APIPERU_URL', 'https://apiperu.dev/api'),
+    ],
+
 ];

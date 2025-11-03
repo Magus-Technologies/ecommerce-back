@@ -69,13 +69,14 @@ class ProcessAutomaticInvoicing implements ShouldQueue
             // 6. Enviar a SUNAT en segundo plano
             SendInvoiceToSunat::dispatch($comprobante->id, $event->cliente->id, request()->ip());
 
-            // 7. Enviar notificación al cliente
-            SendInvoiceNotification::dispatch($comprobante->id, $event->cliente->email);
+            // 7. NO ENVIAR notificación automáticamente - El usuario debe hacerlo manualmente
+            // SendInvoiceNotification::dispatch($comprobante->id, $event->cliente->email);
 
-            Log::info("Facturación automática completada", [
+            Log::info("Facturación automática completada (sin envío de email)", [
                 'comprobante_id' => $comprobante->id,
                 'serie' => $comprobante->serie,
-                'correlativo' => $comprobante->correlativo
+                'correlativo' => $comprobante->correlativo,
+                'nota' => 'Email NO enviado automáticamente - Usuario debe usar POST /api/comprobantes/{id}/email'
             ]);
 
         } catch (\Exception $e) {

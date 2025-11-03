@@ -2,65 +2,105 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Storage;
+use App\Models\EmpresaInfo;
+use Illuminate\Support\Facades\Log;
 
 class CompanyDataProvider
 {
     /**
-     * Obtener información completa de la empresa
+     * Obtener información completa de la empresa desde la BD
      */
     public function getCompanyInfo(): array
     {
+        try {
+            $empresa = EmpresaInfo::first();
+
+            if (!$empresa) {
+                Log::warning('No se encontró información de empresa en la BD');
+                return $this->getDefaultCompanyInfo();
+            }
+
+            return [
+                'ruc' => $empresa->ruc ?? '00000000000',
+                'razon_social' => $empresa->razon_social ?? $empresa->nombre_empresa ?? 'EMPRESA NO CONFIGURADA',
+                'nombre_comercial' => $empresa->nombre_empresa ?? $empresa->razon_social ?? 'Empresa',
+                'direccion_fiscal' => $empresa->direccion ?? 'Dirección no configurada',
+                'distrito' => $empresa->distrito ?? null,
+                'provincia' => $empresa->provincia ?? null,
+                'departamento' => $empresa->departamento ?? null,
+                'ubigeo' => $empresa->ubigeo ?? null,
+                'telefono' => $empresa->telefono ?? $empresa->celular ?? null,
+                'email' => $empresa->email ?? null,
+                'web' => $empresa->website ?? null,
+                'logo_path' => $this->getLogoPath($empresa->logo),
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener información de empresa desde BD', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->getDefaultCompanyInfo();
+        }
+    }
+
+    /**
+     * Valores por defecto si no hay datos en BD
+     */
+    private function getDefaultCompanyInfo(): array
+    {
         return [
-            'ruc' => config('empresa.ruc', env('EMPRESA_RUC', '20123456789')),
-            'razon_social' => config('empresa.razon_social', env('EMPRESA_RAZON_SOCIAL', 'MI EMPRESA SAC')),
-            'nombre_comercial' => config('empresa.nombre_comercial', env('EMPRESA_NOMBRE_COMERCIAL', 'MI EMPRESA')),
-            'direccion_fiscal' => config('empresa.direccion', env('EMPRESA_DIRECCION', 'Av. Principal 123, Lima, Perú')),
-            'distrito' => config('empresa.distrito', env('EMPRESA_DISTRITO', 'Lima')),
-            'provincia' => config('empresa.provincia', env('EMPRESA_PROVINCIA', 'Lima')),
-            'departamento' => config('empresa.departamento', env('EMPRESA_DEPARTAMENTO', 'Lima')),
-            'telefono' => config('empresa.telefono', env('EMPRESA_TELEFONO', '+51 1 234-5678')),
-            'email' => config('empresa.email', env('EMPRESA_EMAIL', 'contacto@miempresa.com')),
-            'web' => config('empresa.web', env('EMPRESA_WEB', 'www.miempresa.com')),
-            'logo_path' => $this->getLogoPath()
+            'ruc' => '20123456789',
+            'razon_social' => 'MI EMPRESA SAC',
+            'nombre_comercial' => 'MI EMPRESA',
+            'direccion_fiscal' => 'Av. Principal 123, Lima, Perú',
+            'distrito' => 'Lima',
+            'provincia' => 'Lima',
+            'departamento' => 'Lima',
+            'telefono' => '+51 1 234-5678',
+            'email' => 'contacto@miempresa.com',
+            'web' => 'www.miempresa.com',
+            'logo_path' => null,
         ];
     }
 
     /**
      * Obtener ruta del logo de la empresa
      */
-    public function getLogoPath(): ?string
+    public function getLogoPath(?string $logoFromDb = null): ?string
     {
-        // Rutas a verificar en orden de prioridad
+        // Si hay logo en BD, intentar usarlo primero
+        if ($logoFromDb) {
+            $dbPath = public_path($logoFromDb);
+            if (file_exists($dbPath)) {
+                Log::info('Logo encontrado desde BD: ' . $dbPath);
+                return $dbPath;
+            }
+            
+            // También intentar con storage
+            $storagePath = storage_path('app/public/' . $logoFromDb);
+            if (file_exists($storagePath)) {
+                Log::info('Logo encontrado en storage: ' . $storagePath);
+                return $storagePath;
+            }
+        }
+
+        // Rutas alternativas
         $possiblePaths = [
-            // Ruta específica mencionada por el usuario
             public_path('assets/images/logo/logo3.png'),
-            
-            // Rutas de configuración
-            public_path(config('empresa.logo_path', env('EMPRESA_LOGO_PATH', 'images/logo-empresa.png'))),
-            
-            // Rutas alternativas comunes
             public_path('assets/images/logo.png'),
-            public_path('assets/images/logo/logo.png'),
             public_path('images/logo.png'),
-            public_path('images/logo3.png'),
-            public_path('assets/logo.png'),
             storage_path('app/public/logo.png'),
-            storage_path('app/public/images/logo.png'),
-            storage_path('app/public/assets/images/logo/logo3.png')
         ];
-        
+
         foreach ($possiblePaths as $path) {
             if (file_exists($path)) {
-                \Log::info('Logo encontrado en: ' . $path);
+                Log::info('Logo encontrado en ruta alternativa: ' . $path);
                 return $path;
             }
         }
-        
-        \Log::warning('Logo no encontrado en ninguna ruta', [
-            'rutas_verificadas' => $possiblePaths
-        ]);
-        
+
+        Log::warning('Logo no encontrado');
         return null;
     }
 
@@ -69,12 +109,33 @@ class CompanyDataProvider
      */
     public function getContactInfo(): array
     {
-        return [
-            'telefono' => config('empresa.telefono', env('EMPRESA_TELEFONO')),
-            'email' => config('empresa.email', env('EMPRESA_EMAIL')),
-            'web' => config('empresa.web', env('EMPRESA_WEB')),
-            'whatsapp' => config('empresa.whatsapp', env('EMPRESA_WHATSAPP'))
-        ];
+        try {
+            $empresa = EmpresaInfo::first();
+            
+            if (!$empresa) {
+                return [
+                    'telefono' => null,
+                    'email' => null,
+                    'web' => null,
+                    'whatsapp' => null,
+                ];
+            }
+
+            return [
+                'telefono' => $empresa->telefono ?? $empresa->celular,
+                'email' => $empresa->email,
+                'web' => $empresa->website,
+                'whatsapp' => $empresa->whatsapp,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Error al obtener contacto de empresa', ['error' => $e->getMessage()]);
+            return [
+                'telefono' => null,
+                'email' => null,
+                'web' => null,
+                'whatsapp' => null,
+            ];
+        }
     }
 
     /**
@@ -100,7 +161,7 @@ class CompanyDataProvider
         return [
             'complete' => empty($missing),
             'missing' => $missing,
-            'has_logo' => !is_null($companyInfo['logo_path'])
+            'has_logo' => ! is_null($companyInfo['logo_path']),
         ];
     }
 }

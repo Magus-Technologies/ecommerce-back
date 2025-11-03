@@ -58,6 +58,9 @@ class FacturacionPermissionsSeeder extends Seeder
             'facturacion.guias_remision.show' => 'Ver detalle de guía',
             'facturacion.guias_remision.create' => 'Crear guías de remisión',
             'facturacion.guias_remision.edit' => 'Enviar guías a SUNAT',
+            'facturacion.guias_remision.delete' => 'Anular guías de remisión',
+            'facturacion.guias_remision.pdf' => 'Generar PDF de guías',
+            'facturacion.guias_remision.xml' => 'Descargar XML de guías',
 
             // CERTIFICADOS
             'facturacion.certificados.ver' => 'Ver certificados digitales',
@@ -199,6 +202,9 @@ class FacturacionPermissionsSeeder extends Seeder
                 'facturacion.facturas.create',
                 'facturacion.series.ver',
                 'facturacion.reportes.ver',
+                'facturacion.guias_remision.ver',
+                'facturacion.guias_remision.show',
+                'facturacion.guias_remision.create',
             ]);
             $this->command->info('✅ Permisos asignados a Vendedor');
         }

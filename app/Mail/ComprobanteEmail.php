@@ -43,21 +43,14 @@ class ComprobanteEmail extends Mailable
         // Adjuntar PDF si existe
         if ($this->comprobante->pdf_base64) {
             $pdfContent = base64_decode($this->comprobante->pdf_base64);
-            $filename = strtolower($tipoDoc) . '-' . $this->comprobante->serie . '-' . $this->comprobante->correlativo . '.pdf';
+            $filename = strtolower($tipoDoc) . '-' . $this->comprobante->serie . '-' . str_pad($this->comprobante->correlativo, 8, '0', STR_PAD_LEFT) . '.pdf';
 
             $email->attachData($pdfContent, $filename, [
                 'mime' => 'application/pdf',
             ]);
         }
 
-        // Adjuntar XML si existe
-        if ($this->comprobante->xml_firmado) {
-            $filename = strtolower($tipoDoc) . '-' . $this->comprobante->serie . '-' . $this->comprobante->correlativo . '.xml';
-
-            $email->attachData($this->comprobante->xml_firmado, $filename, [
-                'mime' => 'application/xml',
-            ]);
-        }
+        // NO adjuntar XML - Solo PDF para el cliente
 
         return $email;
     }
