@@ -115,7 +115,7 @@ class UserHorario extends Model
 
         if ($excepcion) {
             if ($excepcion->es_descanso) {
-                Log::info("Excepción: Es descanso");
+                // Log::info("Excepción: Es descanso");
                 return false;
             }
             
@@ -124,7 +124,7 @@ class UserHorario extends Model
             $horaFinExcepcion = self::extraerHora($excepcion->hora_fin);
             
             $disponible = $hora >= $horaInicioExcepcion && $hora <= $horaFinExcepcion;
-            Log::info("Excepción encontrada: {$horaInicioExcepcion} - {$horaFinExcepcion}, Disponible: " . ($disponible ? 'SÍ' : 'NO'));
+            // Log::info("Excepción encontrada: {$horaInicioExcepcion} - {$horaFinExcepcion}, Disponible: " . ($disponible ? 'SÍ' : 'NO'));
             return $disponible;
         }
 
@@ -136,7 +136,7 @@ class UserHorario extends Model
             ->whereNull('fecha_especial')
             ->get();
 
-        Log::info("Horarios encontrados para {$diaSemana}: " . $horarios->count());
+        // Log::info("Horarios encontrados para {$diaSemana}: " . $horarios->count());
 
         foreach ($horarios as $horario) {
             // ← CAMBIO: Extraer solo la hora de los campos
@@ -153,7 +153,7 @@ class UserHorario extends Model
             }
         }
 
-        Log::info("No está disponible en ningún horario");
+        // Log::info("No está disponible en ningún horario");
         return false;
     }
 
