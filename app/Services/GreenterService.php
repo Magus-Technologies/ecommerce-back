@@ -27,7 +27,10 @@ class GreenterService
     private $company;
 
     public function __construct()
+
     {
+            putenv('OPENSSL_CONF=/etc/pki/tls/openssl.cnf');
+
         $this->see = new See();
         $this->configurarSee();
         $this->configurarEmpresa();
