@@ -5,6 +5,7 @@ use App\Http\Controllers\Cliente\MisDocumentosController;
 use App\Http\Controllers\ClientesController;
 use App\Http\Controllers\ComprasController;
 use App\Http\Controllers\CotizacionesController;
+use App\Http\Controllers\FavoritoController;
 use App\Http\Controllers\PedidosController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/remove/{producto_id}', [CartController::class, 'remove']);
         Route::delete('/clear', [CartController::class, 'clear']);
         Route::post('/sync', [CartController::class, 'sync']);
+    });
+
+    // ============================================
+    // FAVORITOS
+    // ============================================
+    Route::prefix('favoritos')->group(function () {
+        Route::get('/', [FavoritoController::class, 'index']);
+        Route::post('/', [FavoritoController::class, 'store']);
+        Route::delete('/{productoId}', [FavoritoController::class, 'destroy']);
     });
 
     // ============================================
