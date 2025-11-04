@@ -106,20 +106,39 @@ class PasoEnvioController extends Controller
 
             $data = $request->only(['orden', 'titulo', 'descripcion', 'activo']);
 
-            // Manejar la imagen si se proporciona (sin validación estricta)
-            if ($request->hasFile('imagen')) {
+            // Manejar la imagen si se proporciona - usando $_FILES directamente
+            if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
                 try {
-                    $imagen = $request->file('imagen');
+                    $tmpName = $_FILES['imagen']['tmp_name'];
+                    $originalName = $_FILES['imagen']['name'];
                     
-                    // Guardar directamente sin validar isValid() para evitar el warning
-                    $extension = $imagen->getClientOriginalExtension();
+                    // Obtener extensión
+                    $extension = pathinfo($originalName, PATHINFO_EXTENSION);
                     $filename = 'paso_' . time() . '_' . uniqid() . '.' . $extension;
-                    $imagenPath = $imagen->storeAs('pasos-envio', $filename, 'public');
-                    $data['imagen'] = $imagenPath;
+                    $destinationPath = public_path('storage/pasos-envio');
+                    
+                    // Crear directorio si no existe
+                    if (!file_exists($destinationPath)) {
+                        mkdir($destinationPath, 0777, true);
+                    }
+                    
+                    // Leer contenido y escribir directamente (evita problemas con tmp)
+                    $content = file_get_contents($tmpName);
+                    $fullPath = $destinationPath . '/' . $filename;
+                    
+                    if (file_put_contents($fullPath, $content)) {
+                        $data['imagen'] = 'pasos-envio/' . $filename;
+                        \Log::info('Imagen guardada exitosamente: ' . $filename);
+                    } else {
+                        \Log::error('No se pudo escribir el archivo');
+                    }
+                    
                 } catch (\Exception $e) {
                     // Continuar sin imagen si falla
-                    \Log::warning('Error al subir imagen: ' . $e->getMessage());
+                    \Log::error('Error al subir imagen: ' . $e->getMessage());
                 }
+            } elseif (isset($_FILES['imagen'])) {
+                \Log::error('Error en upload de imagen. Error code: ' . $_FILES['imagen']['error']);
             }
 
             $paso = PasoEnvio::create($data);
@@ -203,25 +222,47 @@ class PasoEnvioController extends Controller
 
             $data = $request->only(['orden', 'titulo', 'descripcion', 'activo']);
 
-            // Manejar la imagen si se proporciona (sin validación estricta)
-            if ($request->hasFile('imagen')) {
+            // Manejar la imagen si se proporciona - usando $_FILES directamente
+            if (isset($_FILES['imagen']) && $_FILES['imagen']['error'] === UPLOAD_ERR_OK) {
                 try {
-                    $imagen = $request->file('imagen');
+                    $tmpName = $_FILES['imagen']['tmp_name'];
+                    $originalName = $_FILES['imagen']['name'];
                     
                     // Eliminar imagen anterior si existe
                     if ($paso->imagen) {
-                        Storage::disk('public')->delete($paso->imagen);
+                        $oldImagePath = public_path('storage/' . $paso->imagen);
+                        if (file_exists($oldImagePath)) {
+                            unlink($oldImagePath);
+                        }
                     }
-
-                    // Guardar directamente sin validar isValid() para evitar el warning
-                    $extension = $imagen->getClientOriginalExtension();
+                    
+                    // Obtener extensión
+                    $extension = pathinfo($originalName, PATHINFO_EXTENSION);
                     $filename = 'paso_' . time() . '_' . uniqid() . '.' . $extension;
-                    $imagenPath = $imagen->storeAs('pasos-envio', $filename, 'public');
-                    $data['imagen'] = $imagenPath;
+                    $destinationPath = public_path('storage/pasos-envio');
+                    
+                    // Crear directorio si no existe
+                    if (!file_exists($destinationPath)) {
+                        mkdir($destinationPath, 0777, true);
+                    }
+                    
+                    // Leer contenido y escribir directamente (evita problemas con tmp)
+                    $content = file_get_contents($tmpName);
+                    $fullPath = $destinationPath . '/' . $filename;
+                    
+                    if (file_put_contents($fullPath, $content)) {
+                        $data['imagen'] = 'pasos-envio/' . $filename;
+                        \Log::info('Imagen actualizada exitosamente: ' . $filename);
+                    } else {
+                        \Log::error('No se pudo escribir el archivo');
+                    }
+                    
                 } catch (\Exception $e) {
                     // Continuar sin imagen si falla
-                    \Log::warning('Error al subir imagen: ' . $e->getMessage());
+                    \Log::error('Error al actualizar imagen: ' . $e->getMessage());
                 }
+            } elseif (isset($_FILES['imagen'])) {
+                \Log::error('Error en upload de imagen. Error code: ' . $_FILES['imagen']['error']);
             }
 
             $paso->update($data);
