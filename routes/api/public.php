@@ -114,6 +114,11 @@ Route::get('/formas-envio/activas', [FormaEnvioController::class, 'activas']);
 Route::get('/tipos-pago/activos', [TipoPagoController::class, 'activos']);
 
 // ============================================
+// PASOS DE ENVÍO
+// ============================================
+Route::get('/pasos-envio', [\App\Http\Controllers\PasoEnvioController::class, 'index']);
+
+// ============================================
 // RECOMPENSAS PÚBLICAS
 // ============================================
 Route::get('/publico/recompensas/popups-activos', [RecompensaNotificacionController::class, 'popupsActivosPublico']);

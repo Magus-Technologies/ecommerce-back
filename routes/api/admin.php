@@ -86,4 +86,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/empresa-info', [EmpresaInfoController::class, 'store']);
         Route::put('/empresa-info/{id}', [EmpresaInfoController::class, 'update']);
     });
+
+    // ============================================
+    // PASOS DE ENVÍO (ADMIN)
+    // ============================================
+    Route::middleware('permission:pasos_envio.edit')->group(function () {
+        Route::get('/admin/pasos-envio', [\App\Http\Controllers\PasoEnvioController::class, 'indexAdmin']);
+        Route::post('/admin/pasos-envio', [\App\Http\Controllers\PasoEnvioController::class, 'store']);
+        Route::get('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'show']);
+        Route::post('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'update']);
+        Route::delete('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'destroy']);
+        Route::delete('/admin/pasos-envio/{id}/imagen', [\App\Http\Controllers\PasoEnvioController::class, 'deleteImage']);
+    });
 });
