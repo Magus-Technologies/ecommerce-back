@@ -1,10 +1,11 @@
 <?php
 
+use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\BannersController;
-use App\Http\Controllers\BannersPromocionalesController;
 use App\Http\Controllers\BannerFlashSalesController;
 use App\Http\Controllers\BannerOfertaController;
+use App\Http\Controllers\BannersController;
+use App\Http\Controllers\BannersPromocionalesController;
 use App\Http\Controllers\CategoriasController;
 use App\Http\Controllers\CuponesController;
 use App\Http\Controllers\DocumentTypeController;
@@ -15,20 +16,19 @@ use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\OfertasController;
 use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\ReclamosController;
-use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 use App\Http\Controllers\ReniecController;
 use App\Http\Controllers\TipoPagoController;
 use App\Http\Controllers\UbigeoController;
 use Illuminate\Support\Facades\Route;
 
 /*
-|--------------------------------------------------------------------------
-| Rutas Públicas
-|--------------------------------------------------------------------------
-|
-| Endpoints accesibles sin autenticación
-|
-*/
+ * |--------------------------------------------------------------------------
+ * | Rutas Públicas
+ * |--------------------------------------------------------------------------
+ * |
+ * | Endpoints accesibles sin autenticación
+ * |
+ */
 
 // ============================================
 // AUTENTICACIÓN
@@ -83,7 +83,6 @@ Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSi
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
 Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
-Route::get('/banners-ofertas/activo', [BannersController::class, 'bannerOfertaActivo']);
 Route::get('/banners-flash-sales/activos', [BannersController::class, 'bannersFlashSalesActivos']);
 
 // ============================================
