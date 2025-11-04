@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando servidor Laravel con configuracion personalizada...
+php -c php-dev.ini artisan serve
