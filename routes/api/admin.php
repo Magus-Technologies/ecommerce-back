@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaInfoController;
 use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserRegistrationController;
 use App\Http\Controllers\UsuariosController;
+use App\Http\Controllers\TipoPagoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,6 +27,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AdminController::class, 'user']);
     Route::get('/refresh-permissions', [AdminController::class, 'refreshPermissions']);
     Route::post('/logout', [AdminController::class, 'logout']);
+
+    // ============================================
+    // DASHBOARD ESTADÍSTICAS
+    // ============================================
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/estadisticas', [DashboardController::class, 'estadisticasDashboard']);
+        Route::get('/producto-del-mes', [DashboardController::class, 'productoDelMes']);
+        Route::get('/categorias-vendidas', [DashboardController::class, 'categoriasVendidas']);
+        Route::get('/pedidos-por-dia', [DashboardController::class, 'pedidosPorDia']);
+        Route::get('/ventas-mensuales', [DashboardController::class, 'ventasMensuales']);
+    });
 
     // ============================================
     // USUARIOS
@@ -85,5 +98,34 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:empresa_info.edit')->group(function () {
         Route::post('/empresa-info', [EmpresaInfoController::class, 'store']);
         Route::put('/empresa-info/{id}', [EmpresaInfoController::class, 'update']);
+    });
+
+    // ============================================
+    // PASOS DE ENVÍO (ADMIN)
+    // ============================================
+    Route::middleware('permission:pasos_envio.edit')->group(function () {
+        Route::get('/admin/pasos-envio', [\App\Http\Controllers\PasoEnvioController::class, 'indexAdmin']);
+        Route::post('/admin/pasos-envio', [\App\Http\Controllers\PasoEnvioController::class, 'store']);
+        Route::get('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'show']);
+        Route::post('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'update']);
+        Route::delete('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'destroy']);
+        Route::delete('/admin/pasos-envio/{id}/imagen', [\App\Http\Controllers\PasoEnvioController::class, 'deleteImage']);
+    });
+      // Rutas de Tipos de Pago protegidas con permisos
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/tipos-pago', [TipoPagoController::class, 'index']);
+    });
+
+    Route::middleware('permission:configuracion.create')->group(function () {
+        Route::post('/tipos-pago', [TipoPagoController::class, 'store']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/tipos-pago/{id}', [TipoPagoController::class, 'update']);
+        Route::patch('/tipos-pago/{id}/toggle-estado', [TipoPagoController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:configuracion.delete')->group(function () {
+        Route::delete('/tipos-pago/{id}', [TipoPagoController::class, 'destroy']);
     });
 });
