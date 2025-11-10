@@ -3,6 +3,16 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
+// Configurar directorio temporal para uploads (Herd)
+$tmpDir = getenv('USERPROFILE') . '\.config\herd\tmp';
+if (!is_dir($tmpDir)) {
+    mkdir($tmpDir, 0777, true);
+}
+ini_set('upload_tmp_dir', $tmpDir);
+putenv('TMPDIR=' . $tmpDir);
+putenv('TEMP=' . $tmpDir);
+putenv('TMP=' . $tmpDir);
+
 define('LARAVEL_START', microtime(true));
 
 // Determine if the application is in maintenance mode...
