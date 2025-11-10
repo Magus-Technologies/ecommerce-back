@@ -46,4 +46,13 @@ class VentaDetalle extends Model
     {
         return $this->belongsTo(Producto::class);
     }
+
+    /**
+     * Métodos de pago asignados a este producto
+     * (solo se usa en pagos mixtos con distribución por producto)
+     */
+    public function metodosPago()
+    {
+        return $this->hasMany(VentaDetalleMetodoPago::class);
+    }
 }
