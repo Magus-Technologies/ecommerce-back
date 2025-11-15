@@ -811,4 +811,165 @@ class ComprobantesController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Buscar comprobante por número completo
+     * Endpoint: GET /api/comprobantes/buscar?numero={numero_completo}
+     */
+    public function buscar(Request $request)
+    {
+        try {
+            $request->validate([
+                'numero' => 'required|string',
+            ]);
+
+            $numeroCompleto = $request->numero;
+
+            // Buscar el comprobante por número completo o por serie-correlativo
+            $comprobante = Comprobante::with(['cliente', 'detalles.producto'])
+                ->where(function ($query) use ($numeroCompleto) {
+                    $query->where('numero_completo', $numeroCompleto);
+                    
+                    // También buscar por serie-correlativo separado
+                    if (strpos($numeroCompleto, '-') !== false) {
+                        $partes = explode('-', $numeroCompleto);
+                        if (count($partes) === 2) {
+                            $query->orWhere(function ($q) use ($partes) {
+                                $q->where('serie', $partes[0])
+                                  ->where('correlativo', ltrim($partes[1], '0'));
+                            });
+                        }
+                    }
+                })
+                ->first();
+
+            if (!$comprobante) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "No se encontró el comprobante {$numeroCompleto}",
+                    'data' => null,
+                ], 404);
+            }
+
+            // Verificar si tiene notas de crédito o débito asociadas
+            $tieneNotaCredito = \App\Models\NotaCredito::where('venta_id', $comprobante->venta_id)
+                ->where('serie_comprobante_ref', $comprobante->serie)
+                ->where('numero_comprobante_ref', $comprobante->correlativo)
+                ->exists();
+
+            $tieneNotaDebito = \App\Models\NotaDebito::where('venta_id', $comprobante->venta_id)
+                ->where('serie_comprobante_ref', $comprobante->serie)
+                ->where('numero_comprobante_ref', $comprobante->correlativo)
+                ->exists();
+
+            // Obtener IDs de las notas si existen
+            $notaCreditoId = null;
+            $notaDebitoId = null;
+
+            if ($tieneNotaCredito) {
+                $notaCredito = \App\Models\NotaCredito::where('venta_id', $comprobante->venta_id)
+                    ->where('serie_comprobante_ref', $comprobante->serie)
+                    ->where('numero_comprobante_ref', $comprobante->correlativo)
+                    ->first();
+                $notaCreditoId = $notaCredito ? $notaCredito->id : null;
+            }
+
+            if ($tieneNotaDebito) {
+                $notaDebito = \App\Models\NotaDebito::where('venta_id', $comprobante->venta_id)
+                    ->where('serie_comprobante_ref', $comprobante->serie)
+                    ->where('numero_comprobante_ref', $comprobante->correlativo)
+                    ->first();
+                $notaDebitoId = $notaDebito ? $notaDebito->id : null;
+            }
+
+            // Determinar si puede ser anulado
+            $puedeAnular = $comprobante->estado === 'ACEPTADO' && !$tieneNotaCredito;
+
+            // Preparar respuesta
+            $data = [
+                'id' => $comprobante->id,
+                'venta_id' => $comprobante->venta_id,
+                'serie' => $comprobante->serie,
+                'correlativo' => $comprobante->correlativo,
+                'numero_completo' => $comprobante->serie . '-' . str_pad($comprobante->correlativo, 4, '0', STR_PAD_LEFT),
+                'tipo_comprobante' => $comprobante->tipo_comprobante,
+                'tipo_comprobante_nombre' => $this->getTipoComprobanteName($comprobante->tipo_comprobante),
+                'fecha_emision' => $comprobante->fecha_emision,
+                'hora_emision' => $comprobante->hora_emision ?? null,
+                'moneda' => $comprobante->moneda,
+                'subtotal' => number_format($comprobante->operacion_gravada ?? 0, 2, '.', ''),
+                'total_igv' => number_format($comprobante->total_igv ?? 0, 2, '.', ''),
+                'total' => number_format($comprobante->importe_total ?? 0, 2, '.', ''),
+                'estado' => $comprobante->estado,
+                'cliente' => $comprobante->cliente ? [
+                    'id' => $comprobante->cliente->id,
+                    'tipo_documento' => $comprobante->cliente->tipo_documento,
+                    'numero_documento' => $comprobante->cliente->numero_documento,
+                    'nombre' => $comprobante->cliente->razon_social,
+                    'direccion' => $comprobante->cliente->direccion,
+                    'email' => $comprobante->cliente->email,
+                    'telefono' => $comprobante->cliente->telefono,
+                ] : null,
+                'detalles' => $comprobante->detalles->map(function ($detalle) {
+                    return [
+                        'id' => $detalle->id,
+                        'producto_id' => $detalle->producto_id,
+                        'descripcion' => $detalle->descripcion ?? ($detalle->producto ? $detalle->producto->nombre : 'Sin descripción'),
+                        'cantidad' => number_format($detalle->cantidad, 2, '.', ''),
+                        'precio_unitario' => number_format($detalle->precio_unitario, 2, '.', ''),
+                        'subtotal' => number_format($detalle->subtotal ?? 0, 2, '.', ''),
+                        'igv' => number_format($detalle->igv ?? 0, 2, '.', ''),
+                        'total' => number_format($detalle->total ?? 0, 2, '.', ''),
+                        'tipo_afectacion_igv' => $detalle->tipo_afectacion_igv ?? '10',
+                    ];
+                }),
+                'tiene_nota_credito' => $tieneNotaCredito,
+                'nota_credito_id' => $notaCreditoId,
+                'tiene_nota_debito' => $tieneNotaDebito,
+                'nota_debito_id' => $notaDebitoId,
+                'puede_anular' => $puedeAnular,
+            ];
+
+            $response = [
+                'success' => true,
+                'data' => $data,
+            ];
+
+            // Agregar warning si ya tiene nota de crédito
+            if ($tieneNotaCredito) {
+                $response['warning'] = 'Este comprobante ya tiene una nota de crédito asociada';
+            }
+
+            return response()->json($response);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parámetro "numero" es requerido',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al buscar comprobante',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener nombre del tipo de comprobante
+     */
+    private function getTipoComprobanteName($tipo)
+    {
+        $tipos = [
+            '01' => 'Factura',
+            '03' => 'Boleta de Venta',
+            '07' => 'Nota de Crédito',
+            '08' => 'Nota de Débito',
+            '09' => 'Guía de Remisión',
+        ];
+
+        return $tipos[$tipo] ?? 'Desconocido';
+    }
 }
