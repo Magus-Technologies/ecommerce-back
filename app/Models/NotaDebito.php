@@ -10,21 +10,29 @@ class NotaDebito extends Model
     use HasFactory;
 
     protected $fillable = [
-        'comprobante_referencia_id',
-        'tipo_nota_debito',
-        'motivo',
-        'descripcion',
         'serie',
         'numero',
-        'numero_completo',
+        'serie_comprobante_ref',
+        'numero_comprobante_ref',
+        'tipo_comprobante_ref',
+        'venta_id',
+        'cliente_id',
         'fecha_emision',
-        'hora_emision',
+        'motivo',
+        'tipo_nota_debito',
         'subtotal',
-        'total_igv',
+        'igv',
         'total',
         'moneda',
         'estado',
-        'user_id'
+        'xml',
+        'cdr',
+        'pdf',
+        'hash',
+        'mensaje_sunat',
+        'codigo_error_sunat',
+        'fecha_envio_sunat',
+        'observaciones'
     ];
 
     protected $casts = [
@@ -38,20 +46,14 @@ class NotaDebito extends Model
     ];
 
     // Relaciones
-    public function comprobanteReferencia()
+    public function venta()
     {
-        return $this->belongsTo(Comprobante::class, 'comprobante_referencia_id');
+        return $this->belongsTo(\App\Models\Venta::class);
     }
 
-    public function comprobante()
+    public function cliente()
     {
-        // Relación con el comprobante generado para esta nota de débito
-        return $this->hasOne(Comprobante::class, 'nota_debito_id');
-    }
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(\App\Models\Cliente::class);
     }
 
     // Scopes
@@ -79,4 +81,28 @@ class NotaDebito extends Model
 
         return $tipos[$this->tipo_nota_debito] ?? 'Desconocido';
     }
+
+    public function getPdfUrlAttribute()
+    {
+        $numeroCompleto = $this->serie . '-' . $this->numero;
+        return url("/api/nota-debito/pdf/{$this->id}/{$numeroCompleto}");
+    }
+
+    public function getXmlUrlAttribute()
+    {
+        $numeroCompleto = $this->serie . '-' . $this->numero;
+        return url("/api/nota-debito/xml/{$this->id}/{$numeroCompleto}");
+    }
+
+    public function getCdrUrlAttribute()
+    {
+        if ($this->cdr) {
+            $numeroCompleto = $this->serie . '-' . $this->numero;
+            return url("/api/nota-debito/cdr/{$this->id}/{$numeroCompleto}");
+        }
+        return null;
+    }
+
+    // Agregar estos atributos al JSON
+    protected $appends = ['pdf_url', 'xml_url', 'cdr_url', 'tipo_nota_debito_nombre'];
 }

@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ============================================
     Route::prefix('comprobantes')->middleware('permission:facturacion.comprobantes.ver')->group(function () {
         Route::get('/', [ComprobantesController::class, 'index']);
+        Route::get('/buscar', [ComprobantesController::class, 'buscar']); // Nuevo endpoint de búsqueda
         Route::get('/estadisticas', [ComprobantesController::class, 'estadisticas']);
         Route::get('/pendientes-envio', [ComprobantesController::class, 'pendientesEnvio']);
         Route::get('/rechazados', [ComprobantesController::class, 'rechazados']);
@@ -135,9 +136,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [NotaCreditoController::class, 'index']);
         Route::get('/estadisticas', [NotaCreditoController::class, 'estadisticas']);
         Route::get('/{id}', [NotaCreditoController::class, 'show'])->middleware('permission:facturacion.notas_credito.show');
+        Route::get('/{id}/pdf', [NotaCreditoController::class, 'descargarPdf'])->middleware('permission:facturacion.notas_credito.show');
+        Route::get('/{id}/xml', [NotaCreditoController::class, 'descargarXml'])->middleware('permission:facturacion.notas_credito.show');
+        Route::get('/{id}/cdr', [NotaCreditoController::class, 'descargarCdr'])->middleware('permission:facturacion.notas_credito.show');
 
         Route::post('/', [NotaCreditoController::class, 'store'])->middleware('permission:facturacion.notas_credito.create');
+        Route::put('/{id}', [NotaCreditoController::class, 'update'])->middleware('permission:facturacion.notas_credito.edit');
+        Route::post('/{id}/generar-xml', [NotaCreditoController::class, 'generarXml'])->middleware('permission:facturacion.notas_credito.edit');
         Route::post('/{id}/enviar-sunat', [NotaCreditoController::class, 'enviarSunat'])->middleware('permission:facturacion.notas_credito.edit');
+        Route::post('/{id}/consultar-sunat', [NotaCreditoController::class, 'consultarSunat'])->middleware('permission:facturacion.notas_credito.edit');
+        Route::post('/{id}/whatsapp', [NotaCreditoController::class, 'enviarWhatsApp'])->middleware('permission:facturacion.notas_credito.edit');
+        Route::post('/{id}/email', [NotaCreditoController::class, 'enviarEmail'])->middleware('permission:facturacion.notas_credito.edit');
     });
 
     // ============================================
@@ -147,9 +156,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [NotaDebitoController::class, 'index']);
         Route::get('/estadisticas', [NotaDebitoController::class, 'estadisticas']);
         Route::get('/{id}', [NotaDebitoController::class, 'show'])->middleware('permission:facturacion.notas_debito.show');
+        Route::get('/{id}/pdf', [NotaDebitoController::class, 'descargarPdf'])->middleware('permission:facturacion.notas_debito.show');
+        Route::get('/{id}/xml', [NotaDebitoController::class, 'descargarXml'])->middleware('permission:facturacion.notas_debito.show');
+        Route::get('/{id}/cdr', [NotaDebitoController::class, 'descargarCdr'])->middleware('permission:facturacion.notas_debito.show');
 
         Route::post('/', [NotaDebitoController::class, 'store'])->middleware('permission:facturacion.notas_debito.create');
+        Route::put('/{id}', [NotaDebitoController::class, 'update'])->middleware('permission:facturacion.notas_debito.edit');
+        Route::post('/{id}/generar-xml', [NotaDebitoController::class, 'generarXml'])->middleware('permission:facturacion.notas_debito.edit');
         Route::post('/{id}/enviar-sunat', [NotaDebitoController::class, 'enviarSunat'])->middleware('permission:facturacion.notas_debito.edit');
+        Route::post('/{id}/consultar-sunat', [NotaDebitoController::class, 'consultarSunat'])->middleware('permission:facturacion.notas_debito.edit');
+        Route::post('/{id}/whatsapp', [NotaDebitoController::class, 'enviarWhatsApp'])->middleware('permission:facturacion.notas_debito.edit');
+        Route::post('/{id}/email', [NotaDebitoController::class, 'enviarEmail'])->middleware('permission:facturacion.notas_debito.edit');
     });
 
     // ============================================
