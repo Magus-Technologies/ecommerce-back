@@ -32,10 +32,10 @@ class RecompensaNotificacionController extends Controller
                     $tokenModel = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
                     if ($tokenModel) {
                         $user = $tokenModel->tokenable;
-                        Log::info('🔐 popupsActivosPublico - Token detectado', [
-                            'user_id' => $user->id,
-                            'user_class' => get_class($user)
-                        ]);
+                        // Log::info('🔐 popupsActivosPublico - Token detectado', [
+                        //     'user_id' => $user->id,
+                        //     'user_class' => get_class($user)
+                        // ]);
                     }
                 } catch (\Exception $e) {
                     Log::warning('⚠️ popupsActivosPublico - Error al procesar token', [
@@ -62,10 +62,10 @@ class RecompensaNotificacionController extends Controller
                 $cliente = \App\Models\UserCliente::find($userClienteId);
 
                 if ($cliente) {
-                    Log::info('✅ popupsActivosPublico - Cliente identificado por ID', [
-                        'user_cliente_id' => $userClienteId,
-                        'cliente_email' => $cliente->email
-                    ]);
+                    // Log::info('✅ popupsActivosPublico - Cliente identificado por ID', [
+                    //     'user_cliente_id' => $userClienteId,
+                    //     'cliente_email' => $cliente->email
+                    // ]);
                 } else {
                     Log::warning('⚠️ popupsActivosPublico - user_cliente_id no válido', [
                         'user_cliente_id' => $userClienteId
@@ -79,10 +79,10 @@ class RecompensaNotificacionController extends Controller
 
                 // BLOQUEAR MOTORIZADOS Y ADMINISTRADORES
                 if ($userClass === 'App\Models\UserMotorizado') {
-                    Log::info('❌ popupsActivosPublico - Bloqueado: Motorizado', [
-                        'user_id' => $user->id,
-                        'user_class' => $userClass
-                    ]);
+                    // Log::info('❌ popupsActivosPublico - Bloqueado: Motorizado', [
+                    //     'user_id' => $user->id,
+                    //     'user_class' => $userClass
+                    // ]);
                     return response()->json([
                         'success' => true,
                         'message' => 'No hay popups disponibles',

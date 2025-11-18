@@ -55,6 +55,14 @@ class Producto extends Model
         return $this->belongsTo(MarcaProducto::class, 'marca_id');
     }
 
+    // Relación con banners de ofertas (many-to-many)
+    public function bannersOferta()
+    {
+        return $this->belongsToMany(BannerOferta::class, 'banner_oferta_producto', 'producto_id', 'banner_oferta_id')
+            ->withPivot('descuento_porcentaje')
+            ->withTimestamps();
+    }
+
     // Scope para productos activos (y no eliminados)
     public function scopeActivos($query)
     {

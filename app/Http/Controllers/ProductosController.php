@@ -340,9 +340,17 @@ class ProductosController extends Controller
 
     public function productosPublicos(Request $request)
     {
-        $query = Producto::with(['categoria.seccion'])  
+        $query = Producto::with(['categoria.seccion'])
             ->where('activo', true)
             ->where('stock', '>', 0);
+
+        // ✅ NUEVO: Excluir productos que están en ofertas activas (para "Recomendado para ti")
+        // Solo aplicar este filtro si NO se está pidiendo explícitamente productos en oferta
+        if (!$request->has('incluir_ofertas') || $request->incluir_ofertas !== 'true') {
+            $query->whereDoesntHave('bannersOferta', function($q) {
+                $q->where('activo', true);
+            });
+        }
 
         // Filtrar por categoría si se proporciona
         if ($request->has('categoria')) {
@@ -601,15 +609,28 @@ class ProductosController extends Controller
         $producto = Producto::with(['categoria', 'marca'])
             ->where('activo', true)
             ->findOrFail($id);
-            
+
+        // ✅ NUEVO: Verificar si el producto está en una oferta activa
+        $oferta = \DB::table('banner_oferta_producto')
+            ->join('banners_ofertas', 'banner_oferta_producto.banner_oferta_id', '=', 'banners_ofertas.id')
+            ->where('banner_oferta_producto.producto_id', $producto->id)
+            ->where('banners_ofertas.activo', true)
+            ->first();
+
+        // ✅ Si tiene oferta activa, calcular precio con descuento
+        if ($oferta) {
+            $producto->descuento_porcentaje = $oferta->descuento_porcentaje;
+            $producto->precio_oferta = $producto->precio_venta - ($producto->precio_venta * $oferta->descuento_porcentaje / 100);
+        }
+
         $detalles = ProductoDetalle::where('producto_id', $id)->first();
-        
+
         $productosRelacionados = Producto::where('categoria_id', $producto->categoria_id)
             ->where('id', '!=', $id)
             ->where('activo', true)
             ->limit(6)
             ->get();
-            
+
         return response()->json([
             'producto' => $producto,
             'detalles' => $detalles,

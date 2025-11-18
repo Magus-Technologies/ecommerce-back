@@ -20,9 +20,9 @@ class CartController extends Controller
         if (!$authenticatedUser) {
             return response()->json([], 200); // Retornar carrito vacío si no está autenticado
         }
-        
-        $query = CartItem::with(['producto:id,nombre,precio_venta,stock,codigo_producto,imagen']);
-        
+
+        $query = CartItem::with(['producto:id,nombre,precio_venta,stock,codigo_producto,imagen,mostrar_igv']);
+
         // Verificar si es un User (admin) o UserCliente (cliente e-commerce)
         if ($authenticatedUser instanceof \App\Models\User) {
             // Usuario del sistema (admin/vendedor)
@@ -33,26 +33,32 @@ class CartController extends Controller
         } else {
             return response()->json(['message' => 'Tipo de usuario no válido.'], 401);
         }
-        
-        
+
         $cartItems = $query->get();
-        
-        // \Log::info('Items encontrados en el carrito:', [
-        //     'count' => $cartItems->count(),
-        //     'items' => $cartItems->toArray()
-        // ]);
 
         $formattedItems = $cartItems->map(function ($item) {
+            // Usar precio guardado en cart_items, si no existe usar el del producto
+            $precioUnitario = $item->precio_unitario > 0 ? (float) $item->precio_unitario : (float) $item->producto->precio_venta;
+            $descuentoPorcentaje = $item->descuento_porcentaje ? (float) $item->descuento_porcentaje : null;
+
+            // Calcular precio con descuento dinámicamente
+            $precioConDescuento = null;
+            if ($descuentoPorcentaje !== null && $descuentoPorcentaje > 0) {
+                $precioConDescuento = $precioUnitario - ($precioUnitario * $descuentoPorcentaje / 100);
+            }
+
             return [
-                'id' => $item->id, // ID del item del carrito
+                'id' => $item->id,
                 'producto_id' => $item->producto->id,
                 'nombre' => $item->producto->nombre,
                 'imagen_url' => $item->producto->imagen ? asset('storage/productos/' . $item->producto->imagen) : null,
-                'precio' => (float) $item->producto->precio_venta,
+                'precio' => $precioUnitario, // Precio original
+                'descuento_porcentaje' => $descuentoPorcentaje,
+                'precio_con_descuento' => $precioConDescuento, // Calculado dinámicamente
                 'cantidad' => (int) $item->cantidad,
                 'stock_disponible' => (int) $item->producto->stock,
                 'codigo_producto' => $item->producto->codigo_producto,
-                'mostrar_igv' => (bool) $item->producto->mostrar_igv,  // <- NUEVA LÍNEA
+                'mostrar_igv' => (bool) $item->producto->mostrar_igv,
             ];
         });
 
@@ -75,20 +81,20 @@ class CartController extends Controller
 
         $authenticatedUser = $request->user();
 
-if (!$authenticatedUser) {
-    return response()->json(['message' => 'Usuario no autenticado.'], 401);
-}
+        if (!$authenticatedUser) {
+            return response()->json(['message' => 'Usuario no autenticado.'], 401);
+        }
 
-$userId = null;
-$userClienteId = null;
+        $userId = null;
+        $userClienteId = null;
 
-if ($authenticatedUser instanceof \App\Models\User) {
-    $userId = $authenticatedUser->id;
-} elseif ($authenticatedUser instanceof \App\Models\UserCliente) {
-    $userClienteId = $authenticatedUser->id;
-} else {
-    return response()->json(['message' => 'Tipo de usuario no válido.'], 401);
-}
+        if ($authenticatedUser instanceof \App\Models\User) {
+            $userId = $authenticatedUser->id;
+        } elseif ($authenticatedUser instanceof \App\Models\UserCliente) {
+            $userClienteId = $authenticatedUser->id;
+        } else {
+            return response()->json(['message' => 'Tipo de usuario no válido.'], 401);
+        }
 
         $producto = Producto::find($request->producto_id);
 
@@ -97,14 +103,26 @@ if ($authenticatedUser instanceof \App\Models\User) {
             return response()->json(['message' => 'Stock insuficiente.'], 409);
         }
 
+        // Verificar si el producto está en una oferta activa
+        $descuentoPorcentaje = null;
+        $oferta = \DB::table('banner_oferta_producto')
+            ->join('banners_ofertas', 'banner_oferta_producto.banner_oferta_id', '=', 'banners_ofertas.id')
+            ->where('banner_oferta_producto.producto_id', $producto->id)
+            ->where('banners_ofertas.activo', true)
+            ->first();
+
+        if ($oferta) {
+            $descuentoPorcentaje = $oferta->descuento_porcentaje;
+        }
+
         $query = CartItem::where('producto_id', $request->producto_id);
-        
+
         if ($userId) {
             $query->where('user_id', $userId);
         } else {
             $query->where('user_cliente_id', $userClienteId);
         }
-        
+
         $cartItem = $query->first();
 
         if ($cartItem) {
@@ -116,12 +134,14 @@ if ($authenticatedUser instanceof \App\Models\User) {
             $cartItem->cantidad = $nuevaCantidad;
             $cartItem->save();
         } else {
-            // Si es un item nuevo, crearlo
+            // Si es un item nuevo, crearlo con precio y descuento
             $cartItem = CartItem::create([
                 'user_id' => $userId,
                 'user_cliente_id' => $userClienteId,
                 'producto_id' => $request->producto_id,
                 'cantidad' => $request->cantidad,
+                'precio_unitario' => $producto->precio_venta,
+                'descuento_porcentaje' => $descuentoPorcentaje,
             ]);
         }
 
@@ -253,11 +273,10 @@ if ($authenticatedUser instanceof \App\Models\User) {
         if (!$authenticatedUser) {
             return response()->json(['message' => 'Usuario no autenticado.'], 401);
         }
-        
-        
+
         $userId = null;
         $userClienteId = null;
-        
+
         if ($authenticatedUser instanceof \App\Models\User) {
             $userId = $authenticatedUser->id;
         } elseif ($authenticatedUser instanceof \App\Models\UserCliente) {
@@ -265,21 +284,33 @@ if ($authenticatedUser instanceof \App\Models\User) {
         } else {
             return response()->json(['message' => 'Usuario no autenticado.'], 401);
         }
-        
+
         $localItems = $request->items;
 
         foreach ($localItems as $localItem) {
             $producto = Producto::find($localItem['producto_id']);
             if (!$producto) continue;
 
+            // Verificar si el producto está en una oferta activa
+            $descuentoPorcentaje = null;
+            $oferta = \DB::table('banner_oferta_producto')
+                ->join('banners_ofertas', 'banner_oferta_producto.banner_oferta_id', '=', 'banners_ofertas.id')
+                ->where('banner_oferta_producto.producto_id', $producto->id)
+                ->where('banners_ofertas.activo', true)
+                ->first();
+
+            if ($oferta) {
+                $descuentoPorcentaje = $oferta->descuento_porcentaje;
+            }
+
             $query = CartItem::where('producto_id', $localItem['producto_id']);
-            
+
             if ($userId) {
                 $query->where('user_id', $userId);
             } else {
                 $query->where('user_cliente_id', $userClienteId);
             }
-            
+
             $cartItem = $query->first();
 
             $cantidadTotal = $localItem['cantidad'] + ($cartItem ? $cartItem->cantidad : 0);
@@ -288,22 +319,23 @@ if ($authenticatedUser instanceof \App\Models\User) {
                 // Si no hay stock suficiente, se ajusta la cantidad al máximo disponible
                 $cantidadTotal = $producto->stock;
             }
-            
+
             if ($cantidadTotal > 0) {
-                 CartItem::updateOrCreate(
+                CartItem::updateOrCreate(
                     [
                         'user_id' => $userId,
                         'user_cliente_id' => $userClienteId,
                         'producto_id' => $localItem['producto_id']
                     ],
                     [
-                        'cantidad' => $cantidadTotal
+                        'cantidad' => $cantidadTotal,
+                        'precio_unitario' => $producto->precio_venta,
+                        'descuento_porcentaje' => $descuentoPorcentaje,
                     ]
                 );
             }
         }
 
-      return $this->index($request); // Devuelve el carrito actualizado y formateado
-
+        return $this->index($request); // Devuelve el carrito actualizado y formateado
     }
 }

@@ -11,11 +11,15 @@ class CartItem extends Model
         'user_id',
         'user_cliente_id',
         'producto_id',
-        'cantidad'
+        'cantidad',
+        'precio_unitario',
+        'descuento_porcentaje'
     ];
 
     protected $casts = [
-        'cantidad' => 'integer'
+        'cantidad' => 'integer',
+        'precio_unitario' => 'decimal:2',
+        'descuento_porcentaje' => 'decimal:2'
     ];
 
     /**

@@ -31,6 +31,17 @@ class BannerFlashSale extends Model
 
     protected $appends = ['imagen_url'];
 
+    /**
+     * ✅ SOLUCIÓN: Serializar fechas sin conversión UTC
+     * Esto mantiene las fechas en hora local (America/Lima)
+     * Laravel por defecto serializa a ISO 8601 UTC, pero necesitamos hora local
+     */
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        // Formato: Y-m-d H:i:s (sin zona horaria, mantiene hora local)
+        return $date->format('Y-m-d H:i:s');
+    }
+
     // Accessors
     public function getImagenUrlAttribute()
     {
