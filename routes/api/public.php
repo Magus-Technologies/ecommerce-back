@@ -139,3 +139,13 @@ Route::post('/verify-reset-token', [\App\Http\Controllers\PasswordResetControlle
 // COMPROBANTES PÚBLICOS (para WhatsApp)
 // ============================================
 Route::get('/venta/comprobante/pdf/{ventaId}/{numeroCompleto}', [\App\Http\Controllers\VentasController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');
+
+// NOTAS DE CRÉDITO Y DÉBITO PÚBLICAS (para WhatsApp)
+// ============================================
+Route::get('/nota-credito/pdf/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaCreditoController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');
+Route::get('/nota-credito/xml/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaCreditoController::class, 'descargarXmlPublico'])->where('numeroCompleto', '.*');
+Route::get('/nota-credito/cdr/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaCreditoController::class, 'descargarCdrPublico'])->where('numeroCompleto', '.*');
+
+Route::get('/nota-debito/pdf/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');
+Route::get('/nota-debito/xml/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarXmlPublico'])->where('numeroCompleto', '.*');
+Route::get('/nota-debito/cdr/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarCdrPublico'])->where('numeroCompleto', '.*');

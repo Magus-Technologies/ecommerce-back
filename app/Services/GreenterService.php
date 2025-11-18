@@ -1891,4 +1891,20 @@ class GreenterService
         }
     }
 
+    /**
+     * Obtener instancia de See (para uso en otros servicios)
+     */
+    public function getSee()
+    {
+        return $this->see;
+    }
+
+    /**
+     * Obtener datos de la empresa (para uso en otros servicios)
+     */
+    public function getCompany()
+    {
+        return $this->company;
+    }
+
 }

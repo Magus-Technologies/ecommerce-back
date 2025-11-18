@@ -26,4 +26,13 @@ class VentaMetodoPago extends Model
     {
         return $this->belongsTo(Venta::class);
     }
+
+    /**
+     * Asignaciones de este método de pago a productos individuales
+     * (permite rastrear qué productos se pagaron con este método)
+     */
+    public function detallesAsignados()
+    {
+        return $this->hasMany(VentaDetalleMetodoPago::class);
+    }
 }
