@@ -83,7 +83,7 @@ Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSi
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
 Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
-Route::get('/banners-flash-sales/activos', [BannersController::class, 'bannersFlashSalesActivos']);
+// Route::get('/banners-flash-sales/activos', [BannersController::class, 'bannersFlashSalesActivos']);
 
 // ============================================
 // OFERTAS PÚBLICAS
