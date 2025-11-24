@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Oferta;
 use App\Models\TipoOferta;
 use App\Models\Cupon;
+use App\Models\CuponUso;
 use App\Models\OfertaProducto;
 use App\Models\Producto;
+use App\Models\UserCliente;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
@@ -201,10 +203,11 @@ class OfertasController extends Controller
             'total' => 'required|numeric|min:0'
         ]);
 
-        $codigo = $request->input('codigo');
+        $codigo = strtoupper(trim($request->input('codigo')));
         $total = $request->input('total', 0);
 
-        $cupon = Cupon::where('codigo', $codigo)
+        // Buscar el cupón (case insensitive)
+        $cupon = Cupon::whereRaw('UPPER(codigo) = ?', [$codigo])
             ->disponibles()
             ->first();
 
@@ -215,11 +218,33 @@ class OfertasController extends Controller
             ]);
         }
 
+        // Verificar si el usuario está autenticado y ya usó el cupón
+        $authenticatedUser = $request->user();
+        $userClienteId = null;
+
+        if ($authenticatedUser) {
+            if ($authenticatedUser instanceof UserCliente) {
+                $userClienteId = $authenticatedUser->id;
+            } elseif ($authenticatedUser instanceof \App\Models\User) {
+                // Si es un User admin, buscar si tiene cliente asociado
+                $userClienteId = null; // Los admins no usan cupones de clientes
+            }
+
+            // Verificar si el cliente ya usó este cupón
+            if ($userClienteId && CuponUso::clienteYaUsoCupon($cupon->id, $userClienteId)) {
+                return response()->json([
+                    'valido' => false,
+                    'mensaje' => 'Ya has utilizado este cupón anteriormente'
+                ]);
+            }
+        }
+
+        // Verificar si el cupón puede usarse (compra mínima, límite de uso, etc.)
         if (!$cupon->puedeUsarse($total)) {
             if ($cupon->compra_minima && $total < $cupon->compra_minima) {
                 return response()->json([
                     'valido' => false,
-                    'mensaje' => "Compra mínima requerida: $" . number_format($cupon->compra_minima, 2)
+                    'mensaje' => "Compra mínima requerida: S/ " . number_format($cupon->compra_minima, 2)
                 ]);
             }
 
@@ -237,11 +262,14 @@ class OfertasController extends Controller
                 'id' => $cupon->id,
                 'codigo' => $cupon->codigo,
                 'titulo' => $cupon->titulo,
+                'descripcion' => $cupon->descripcion,
                 'tipo_descuento' => $cupon->tipo_descuento,
-                'valor_descuento' => $cupon->valor_descuento
+                'valor_descuento' => $cupon->valor_descuento,
+                'compra_minima' => $cupon->compra_minima
             ],
             'descuento' => $descuento,
-            'total_con_descuento' => $total - $descuento
+            'total_con_descuento' => $total - $descuento,
+            'mensaje' => 'Cupón aplicado correctamente'
         ]);
     }
 

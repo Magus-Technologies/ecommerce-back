@@ -8,6 +8,9 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserRegistrationController;
 use App\Http\Controllers\UsuariosController;
 use App\Http\Controllers\TipoPagoController;
+use App\Http\Controllers\ReclamosController;
+use App\Http\Controllers\FormaEnvioController;
+use App\Http\Controllers\MotorizadosController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -111,7 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/admin/pasos-envio/{id}', [\App\Http\Controllers\PasoEnvioController::class, 'destroy']);
         Route::delete('/admin/pasos-envio/{id}/imagen', [\App\Http\Controllers\PasoEnvioController::class, 'deleteImage']);
     });
-      // Rutas de Tipos de Pago protegidas con permisos
+    // Rutas de Tipos de Pago protegidas con permisos
     Route::middleware('permission:configuracion.ver')->group(function () {
         Route::get('/tipos-pago', [TipoPagoController::class, 'index']);
     });
@@ -128,4 +131,67 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:configuracion.delete')->group(function () {
         Route::delete('/tipos-pago/{id}', [TipoPagoController::class, 'destroy']);
     });
+    // Rutas de reclamos para usuarios autenticados
+    Route::prefix('reclamos')->group(function () {
+        Route::get('/mis-reclamos', [ReclamosController::class, 'misReclamos']);
+
+        // Rutas para administradores
+        Route::middleware('permission:reclamos.ver')->group(function () {
+            Route::get('/', [ReclamosController::class, 'index']);
+            Route::get('/estadisticas', [ReclamosController::class, 'estadisticas']);
+            Route::get('/{id}', [ReclamosController::class, 'show'])->middleware('permission:reclamos.show');
+        });
+
+        Route::middleware('permission:reclamos.edit')->group(function () {
+            Route::patch('/{id}/respuesta', [ReclamosController::class, 'actualizarRespuesta']);
+            Route::patch('/{id}/estado', [ReclamosController::class, 'cambiarEstado']);
+        });
+
+        Route::middleware('permission:reclamos.delete')->group(function () {
+            Route::delete('/{id}', [ReclamosController::class, 'destroy']);
+        });
+    });
+    
+    // Rutas de Formas de Envío protegidas con permisos
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/formas-envio', [FormaEnvioController::class, 'index']);
+    });
+
+    Route::middleware('permission:configuracion.create')->group(function () {
+        Route::post('/formas-envio', [FormaEnvioController::class, 'store']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/formas-envio/{id}', [FormaEnvioController::class, 'update']);
+        Route::patch('/formas-envio/{id}/toggle-estado', [FormaEnvioController::class, 'toggleEstado']);
+    });
+
+    Route::middleware('permission:configuracion.delete')->group(function () {
+        Route::delete('/formas-envio/{id}', [FormaEnvioController::class, 'destroy']);
+    });
+        // Rutas de motorizados protegidas con permisos
+    Route::middleware('permission:motorizados.ver')->group(function () {
+        Route::get('/motorizados', [MotorizadosController::class, 'index']);
+        Route::get('/motorizados/categorias-licencia', [MotorizadosController::class, 'getCategoriasLicencia']);
+        Route::get('/motorizados/{id}', [MotorizadosController::class, 'show'])->middleware('permission:motorizados.show');
+    });
+
+    Route::middleware('permission:motorizados.create')->group(function () {
+        Route::post('/motorizados', [MotorizadosController::class, 'store']);
+    });
+
+    Route::middleware('permission:motorizados.edit')->group(function () {
+        Route::post('/motorizados/{id}', [MotorizadosController::class, 'update']);
+        Route::patch('/motorizados/{id}/toggle-estado', [MotorizadosController::class, 'toggleEstado']);
+
+        // Nuevas rutas para gestión de usuarios de motorizados
+        Route::post('/motorizados/{id}/crear-usuario', [MotorizadosController::class, 'crearUsuario']);
+        Route::patch('/motorizados/{id}/toggle-usuario', [MotorizadosController::class, 'toggleUsuario']);
+        Route::post('/motorizados/{id}/resetear-password', [MotorizadosController::class, 'resetearPassword']);
+    });
+
+    Route::middleware('permission:motorizados.delete')->group(function () {
+        Route::delete('/motorizados/{id}', [MotorizadosController::class, 'destroy']);
+    });
+
 });

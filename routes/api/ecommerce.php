@@ -5,6 +5,7 @@ use App\Http\Controllers\Cliente\MisDocumentosController;
 use App\Http\Controllers\ClientesController;
 use App\Http\Controllers\ComprasController;
 use App\Http\Controllers\CotizacionesController;
+use App\Http\Controllers\CuponesController;
 use App\Http\Controllers\FavoritoController;
 use App\Http\Controllers\PedidosController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [FavoritoController::class, 'index']);
         Route::post('/', [FavoritoController::class, 'store']);
         Route::delete('/{productoId}', [FavoritoController::class, 'destroy']);
+    });
+
+    // ============================================
+    // CUPONES DEL USUARIO
+    // ============================================
+    Route::prefix('cupones')->group(function () {
+        Route::get('/disponibles', [CuponesController::class, 'cuponesDisponiblesUsuario']);
+        Route::post('/registrar-uso', [CuponesController::class, 'registrarUsoCupon']);
     });
 
     // ============================================
