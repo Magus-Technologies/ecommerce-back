@@ -47,6 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ============================================
     Route::prefix('cupones')->group(function () {
         Route::get('/disponibles', [CuponesController::class, 'cuponesDisponiblesUsuario']);
+        Route::get('/usados', [CuponesController::class, 'cuponesUsados']);
         Route::post('/registrar-uso', [CuponesController::class, 'registrarUsoCupon']);
     });
 

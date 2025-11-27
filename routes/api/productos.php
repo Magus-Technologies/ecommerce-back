@@ -135,9 +135,11 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // ============================================
-    // CUPONES
+    // CUPONES (ADMIN)
     // ============================================
     Route::middleware('permission:cupones.ver')->group(function () {
-        Route::resource('cupones', CuponesController::class);
+        // Solo las rutas administrativas de cupones (CRUD)
+        // Las rutas de clientes (/disponibles, /usados) están en ecommerce.php
+        Route::resource('cupones', CuponesController::class)->only(['index', 'show', 'store', 'update', 'destroy']);
     });
 });

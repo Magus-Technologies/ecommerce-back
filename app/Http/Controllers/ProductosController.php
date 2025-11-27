@@ -16,7 +16,10 @@ class ProductosController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = Producto::with(['categoria.seccion', 'marca'])->orderBy('nombre');
+            // ✅ CORREGIDO: Ahora solo trae productos NO eliminados
+            $query = Producto::with(['categoria.seccion', 'marca'])
+                ->whereNull('deleted_at')  // Solo productos no eliminados
+                ->orderBy('nombre');
             
             // Filtrar por sección si se proporciona
             if ($request->has('seccion') && $request->seccion !== '') {

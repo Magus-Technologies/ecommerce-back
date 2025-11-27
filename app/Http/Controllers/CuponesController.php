@@ -206,4 +206,49 @@ class CuponesController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Obtener cupones usados por el usuario autenticado
+     */
+    public function cuponesUsados(Request $request)
+    {
+        try {
+            $authenticatedUser = $request->user();
+
+            if (!$authenticatedUser || !($authenticatedUser instanceof UserCliente)) {
+                return response()->json([]);
+            }
+
+            $cuponesUsados = CuponUso::with('cupon')
+                ->where('user_cliente_id', $authenticatedUser->id)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($uso) {
+                    $cupon = $uso->cupon;
+                    return [
+                        'id' => $cupon->id,
+                        'codigo' => $cupon->codigo,
+                        'titulo' => $cupon->titulo,
+                        'descripcion' => $cupon->descripcion,
+                        'tipo_descuento' => $cupon->tipo_descuento,
+                        'valor_descuento' => $cupon->valor_descuento,
+                        'compra_minima' => $cupon->compra_minima,
+                        'fecha_inicio' => $cupon->fecha_inicio,
+                        'fecha_fin' => $cupon->fecha_fin,
+                        'fecha_uso' => $uso->created_at->toDateTimeString(),
+                        'descuento_aplicado' => $uso->descuento_aplicado,
+                    ];
+                });
+
+            return response()->json($cuponesUsados);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener cupones usados: ' . $e->getMessage());
+
+            return response()->json([
+                'error' => 'Error al obtener cupones usados',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
