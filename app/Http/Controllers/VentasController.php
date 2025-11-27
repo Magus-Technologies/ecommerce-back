@@ -1616,7 +1616,7 @@ class VentasController extends Controller
     public function descargarPdf($id)
     {
         try {
-            $venta = Venta::with('comprobante')->findOrFail($id);
+            $venta = Venta::with(['comprobante.cliente', 'comprobante.detalles'])->findOrFail($id);
 
             if (! $venta->comprobante) {
                 return response()->json([
@@ -1625,15 +1625,34 @@ class VentasController extends Controller
                 ], 404);
             }
 
-            if (! $venta->comprobante->pdf_base64) {
+            $comprobante = $venta->comprobante;
+
+            if (! $comprobante->pdf_base64) {
                 return response()->json([
                     'success' => false,
                     'message' => 'El PDF no está disponible para este comprobante',
                 ], 404);
             }
 
-            $pdf = base64_decode($venta->comprobante->pdf_base64);
-            $filename = "comprobante_{$venta->comprobante->numero_completo}.pdf";
+            // Regenerar PDF con el formato correcto antes de descargar
+            try {
+                $pdfService = app(\App\Services\PdfGeneratorService::class);
+                $pdfService->generarPdfSunat($comprobante->fresh());
+                $comprobante = $comprobante->fresh(); // Recargar con PDF actualizado
+
+                \Illuminate\Support\Facades\Log::info('PDF regenerado para descarga', [
+                    'comprobante_id' => $comprobante->id,
+                ]);
+            } catch (\Exception $pdfError) {
+                // Si falla la regeneración, usar el PDF existente
+                \Illuminate\Support\Facades\Log::warning('No se pudo regenerar PDF, usando existente', [
+                    'comprobante_id' => $comprobante->id,
+                    'error' => $pdfError->getMessage(),
+                ]);
+            }
+
+            $pdf = base64_decode($comprobante->pdf_base64);
+            $filename = "comprobante_{$comprobante->numero_completo}.pdf";
 
             return response($pdf, 200, [
                 'Content-Type' => 'application/pdf',
@@ -1861,6 +1880,23 @@ class VentasController extends Controller
             $mensajeTexto = $request->mensaje ?? "Hola {$nombreCliente}, adjunto tu comprobante electrónico {$comprobante->numero_completo}";
 
             try {
+                // Regenerar PDF con el formato correcto antes de enviar por WhatsApp
+                try {
+                    $pdfService = app(\App\Services\PdfGeneratorService::class);
+                    $pdfService->generarPdfSunat($comprobante->fresh());
+                    $comprobante = $comprobante->fresh(); // Recargar con PDF actualizado
+
+                    \Illuminate\Support\Facades\Log::info('PDF regenerado para WhatsApp', [
+                        'comprobante_id' => $comprobante->id,
+                    ]);
+                } catch (\Exception $pdfError) {
+                    // Si falla la regeneración, usar el PDF existente
+                    \Illuminate\Support\Facades\Log::warning('No se pudo regenerar PDF para WhatsApp, usando existente', [
+                        'comprobante_id' => $comprobante->id,
+                        'error' => $pdfError->getMessage(),
+                    ]);
+                }
+
                 // Construir número completo del comprobante
                 $numeroCompleto = $comprobante->numero_completo ??
                     ($comprobante->ruc_emisor . '-' .
@@ -2681,6 +2717,23 @@ class VentasController extends Controller
                     'success' => false,
                     'message' => 'El comprobante no tiene PDF generado',
                 ], 404);
+            }
+
+            // Regenerar PDF con el formato correcto antes de mostrar
+            try {
+                $pdfService = app(\App\Services\PdfGeneratorService::class);
+                $pdfService->generarPdfSunat($comprobante->fresh(['cliente', 'detalles']));
+                $comprobante = $comprobante->fresh(); // Recargar con PDF actualizado
+
+                \Illuminate\Support\Facades\Log::info('PDF regenerado para descarga pública', [
+                    'comprobante_id' => $comprobante->id,
+                ]);
+            } catch (\Exception $pdfError) {
+                // Si falla la regeneración, usar el PDF existente
+                \Illuminate\Support\Facades\Log::warning('No se pudo regenerar PDF público, usando existente', [
+                    'comprobante_id' => $comprobante->id,
+                    'error' => $pdfError->getMessage(),
+                ]);
             }
 
             // Decodificar el PDF
