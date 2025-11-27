@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaInfoController;
 use App\Http\Controllers\HorariosController;
+use App\Http\Controllers\MenuController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserRegistrationController;
 use App\Http\Controllers\UsuariosController;
@@ -30,6 +31,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AdminController::class, 'user']);
     Route::get('/refresh-permissions', [AdminController::class, 'refreshPermissions']);
     Route::post('/logout', [AdminController::class, 'logout']);
+    
+    // ============================================
+    // PERFIL DE USUARIO ADMIN
+    // ============================================
+    Route::post('/user/update-profile', [AdminController::class, 'updateProfile']);
+    Route::post('/user/change-password', [AdminController::class, 'changePassword']);
 
     // ============================================
     // DASHBOARD ESTADÍSTICAS
@@ -192,6 +199,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('permission:motorizados.delete')->group(function () {
         Route::delete('/motorizados/{id}', [MotorizadosController::class, 'destroy']);
+    });
+
+    // ============================================
+    // GESTIÓN DE MENÚS
+    // ============================================
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/menus', [MenuController::class, 'index']);
+        Route::get('/menus/para-select', [MenuController::class, 'menusParaSelect']);
+        Route::get('/menus/{id}', [MenuController::class, 'show']);
+    });
+
+    Route::middleware('permission:configuracion.create')->group(function () {
+        Route::post('/menus', [MenuController::class, 'store']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/menus/{id}', [MenuController::class, 'update']);
+        Route::post('/menus/{id}/toggle-visibilidad', [MenuController::class, 'toggleVisibilidad']);
+        Route::post('/menus/actualizar-orden', [MenuController::class, 'actualizarOrden']);
+    });
+
+    Route::middleware('permission:configuracion.delete')->group(function () {
+        Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
     });
 
 });

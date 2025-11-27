@@ -23,7 +23,7 @@ class Producto extends Model
         'imagen',
         'activo',
         'destacado',
-        'mostrar_igv' 
+        'mostrar_igv'
     ];
 
     protected $casts = [
@@ -58,7 +58,8 @@ class Producto extends Model
     // Relación con banners de ofertas (many-to-many)
     public function bannersOferta()
     {
-        return $this->belongsToMany(BannerOferta::class, 'banner_oferta_producto', 'producto_id', 'banner_oferta_id')
+        return $this
+            ->belongsToMany(BannerOferta::class, 'banner_oferta_producto', 'producto_id', 'banner_oferta_id')
             ->withPivot('descuento_porcentaje')
             ->withTimestamps();
     }
@@ -85,7 +86,8 @@ class Producto extends Model
     public function scopeBuscar($query, $termino)
     {
         return $query->where(function ($q) use ($termino) {
-            $q->where('nombre', 'like', "%{$termino}%")
+            $q
+                ->where('nombre', 'like', "%{$termino}%")
                 ->orWhere('codigo_producto', 'like', "%{$termino}%")
                 ->orWhere('descripcion', 'like', "%{$termino}%");
         });
@@ -143,6 +145,7 @@ class Producto extends Model
             }
         });
     }
+
     public function detalles()
     {
         return $this->hasOne(ProductoDetalle::class);

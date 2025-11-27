@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\EmailVerificationMail;
+use App\Mail\WelcomeEmail;
+use App\Models\EmailTemplate;
 use App\Models\User;
 use App\Models\UserCliente;
 use App\Models\UserMotorizado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\EmailVerificationMail;
-use App\Mail\WelcomeEmail;
 use Illuminate\Support\Facades\Log;
-use App\Models\EmailTemplate;
-
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
@@ -35,7 +34,7 @@ class AdminController extends Controller
         // PASO 1: Intentar login como ADMIN primero
         if (Auth::guard('web')->attempt(['email' => $email, 'password' => $password])) {
             $user = Auth::guard('web')->user();
-            
+
             // Verificar que el usuario esté habilitado
             if (!$user->is_enabled) {
                 Auth::guard('web')->logout();
@@ -82,7 +81,6 @@ class AdminController extends Controller
                     'requires_verification' => true
                 ], 403);
             }
-
 
             $token = $cliente->createToken('cliente_token')->plainTextToken;
 
@@ -162,15 +160,15 @@ class AdminController extends Controller
         ], 401);
     }
 
-  public function checkEmail(Request $request)
+    public function checkEmail(Request $request)
     {
         $request->validate([
             'email' => 'required|email'
         ]);
 
         $emailExists = UserCliente::where('email', $request->email)->exists() ||
-                      User::where('email', $request->email)->exists() ||
-                      \App\Models\Motorizado::where('correo', $request->email)->exists();
+            User::where('email', $request->email)->exists() ||
+            \App\Models\Motorizado::where('correo', $request->email)->exists();
 
         return response()->json([
             'exists' => $emailExists,
@@ -195,10 +193,9 @@ class AdminController extends Controller
         ]);
     }
 
+    /** Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA */
+
     /**
-     * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
-     */
-        /**
      * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
      */
     public function register(Request $request)
@@ -223,7 +220,6 @@ class AdminController extends Controller
             'numero_documento' => 'required|string|max:20|unique:user_clientes,numero_documento',
             'fecha_nacimiento' => 'nullable|date|before:today',
             'genero' => 'nullable|in:masculino,femenino,otro',
-            
             // Datos de dirección (opcional)
             'direccion_completa' => 'nullable|string',
             'ubigeo' => 'nullable|string|exists:ubigeo_inei,id_ubigeo'
@@ -244,7 +240,7 @@ class AdminController extends Controller
         // Convertir ubigeo a string si viene como número
         $ubigeoOriginal = $request->ubigeo;
         $ubigeo = $request->ubigeo ? (string) $request->ubigeo : null;
-        
+
         Log::debug('AuthController@register - Procesando ubigeo', [
             'ubigeo_original' => $ubigeoOriginal,
             'ubigeo_converted' => $ubigeo,
@@ -254,10 +250,9 @@ class AdminController extends Controller
         Log::info('AuthController@register - Iniciando transacción para crear cliente');
 
         try {
-            
             $verificationToken = Str::random(60);
-            $verificationCode = strtoupper(Str::random(6)); // Generar código de 6 caracteres
-            
+            $verificationCode = strtoupper(Str::random(6));  // Generar código de 6 caracteres
+
             Log::info('AuthController@register - Token de verificación generado', [
                 'token_length' => strlen($verificationToken),
                 'token_preview' => substr($verificationToken, 0, 10) . '...'
@@ -288,9 +283,9 @@ class AdminController extends Controller
                 'numero_documento' => $request->numero_documento,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
-                'estado' => false, // INACTIVO hasta verificar
+                'estado' => false,  // INACTIVO hasta verificar
                 'verification_token' => $verificationToken,
-                'verification_code' => $verificationCode // NUEVO
+                'verification_code' => $verificationCode  // NUEVO
             ]);
 
             Log::info('AuthController@register - Cliente creado exitosamente', [
@@ -298,7 +293,7 @@ class AdminController extends Controller
                 'cliente_email' => $cliente->email,
                 'cliente_estado' => $cliente->estado,
                 'nombre_completo' => $cliente->nombre_completo,
-                'verification_code' => $cliente->verification_code // <-- aquí lo agregas
+                'verification_code' => $cliente->verification_code  // <-- aquí lo agregas
             ]);
 
             // Crear dirección si se proporciona
@@ -336,7 +331,6 @@ class AdminController extends Controller
             $appUrl = env('APP_URL', 'http://localhost:8000');
             $verificationUrl = rtrim($appUrl, '/') . "/api/verify-email-link?token={$verificationToken}&email=" . urlencode($cliente->email);
 
-            
             Log::info('AuthController@register - URL de verificación generada', [
                 'frontend_url' => $frontendUrl,
                 'verification_url' => $verificationUrl,
@@ -385,7 +379,6 @@ class AdminController extends Controller
             ]);
 
             return response()->json($responseData, 201);
-
         } catch (\Exception $e) {
             Log::error('AuthController@register - Error durante el registro', [
                 'error_message' => $e->getMessage(),
@@ -411,6 +404,10 @@ class AdminController extends Controller
 
         // Verificar si es un usuario admin o cliente
         if ($user instanceof User) {
+            // Cargar perfil si existe
+            $user->load('profile');
+            $profile = $user->profile;
+
             // Usuario admin
             return response()->json([
                 'status' => 'success',
@@ -419,8 +416,12 @@ class AdminController extends Controller
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'telefono' => $profile->phone ?? null,
+                    'avatar' => $profile && $profile->avatar_url ? asset('storage/' . $profile->avatar_url) : null,
                     'roles' => $user->getRoleNames(),
                     'permissions' => $user->getAllPermissions()->pluck('name'),
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at
                 ],
             ]);
         } elseif ($user instanceof UserCliente) {
@@ -488,16 +489,207 @@ class AdminController extends Controller
     public function refreshPermissions(Request $request)
     {
         $user = $request->user();
-        
+
         if (!$user instanceof User) {
             return response()->json(['message' => 'Solo usuarios admin pueden refrescar permisos'], 403);
         }
-        
+
         $user->load('roles.permissions');
 
         return response()->json([
             'status' => 'success',
             'permissions' => $user->getAllPermissions()->pluck('name')
         ]);
+    }
+
+    /**
+     * Actualizar perfil del usuario admin autenticado
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        // Solo usuarios admin pueden actualizar su perfil aquí
+        if (!$user instanceof User) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Solo usuarios administradores pueden usar este endpoint'
+            ], 403);
+        }
+
+        Log::info('AdminController@updateProfile - Iniciando actualización de perfil', [
+            'user_id' => $user->id,
+            'request_data' => $request->except(['avatar'])
+        ]);
+
+        // Validar datos
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'telefono' => 'nullable|string|max:20',
+            'direccion' => 'nullable|string|max:500',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        try {
+            // Actualizar datos básicos del usuario
+            $user->name = $request->name;
+            $user->email = $request->email;
+            $user->save();
+
+            Log::info('AdminController@updateProfile - Datos básicos actualizados', [
+                'user_id' => $user->id
+            ]);
+
+            // Obtener o crear perfil
+            $profile = $user->profile;
+            if (!$profile) {
+                $profile = new \App\Models\UserProfile();
+                $profile->user_id = $user->id;
+
+                Log::info('AdminController@updateProfile - Creando nuevo perfil', [
+                    'user_id' => $user->id
+                ]);
+            }
+
+            // Actualizar datos del perfil
+            $profile->phone = $request->telefono;
+
+            // Manejar la carga de avatar
+            if ($request->hasFile('avatar')) {
+                Log::info('AdminController@updateProfile - Procesando avatar', [
+                    'user_id' => $user->id,
+                    'file_name' => $request->file('avatar')->getClientOriginalName()
+                ]);
+
+                $file = $request->file('avatar');
+                $fileName = 'avatar_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+
+                // Guardar directamente en public/avatars (sin storage)
+                $destinationPath = public_path('avatars');
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0755, true);
+                }
+
+                // Eliminar avatar anterior si existe
+                if ($profile->avatar_url) {
+                    $oldFile = public_path($profile->avatar_url);
+                    if (file_exists($oldFile)) {
+                        unlink($oldFile);
+                        Log::info('AdminController@updateProfile - Avatar anterior eliminado');
+                    }
+                }
+
+                $file->move($destinationPath, $fileName);
+                $profile->avatar_url = 'avatars/' . $fileName;
+
+                Log::info('AdminController@updateProfile - Avatar guardado', [
+                    'path' => $profile->avatar_url
+                ]);
+            }
+
+            $profile->save();
+
+            Log::info('AdminController@updateProfile - Perfil actualizado exitosamente', [
+                'user_id' => $user->id,
+                'profile_id' => $profile->id
+            ]);
+
+            // Recargar usuario con perfil
+            $user->load('profile');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Perfil actualizado correctamente',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'telefono' => $profile->phone,
+                    'avatar' => $profile->avatar_url ? asset($profile->avatar_url) : null,
+                    'roles' => $user->getRoleNames(),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('AdminController@updateProfile - Error al actualizar perfil', [
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'user_id' => $user->id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar perfil: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Cambiar contraseña del usuario admin autenticado
+     */
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+
+        // Solo usuarios admin pueden cambiar su contraseña aquí
+        if (!$user instanceof User) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Solo usuarios administradores pueden usar este endpoint'
+            ], 403);
+        }
+
+        Log::info('AdminController@changePassword - Iniciando cambio de contraseña', [
+            'user_id' => $user->id
+        ]);
+
+        // Validar datos
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|string|min:8|confirmed'
+        ]);
+
+        try {
+            // Verificar contraseña actual
+            if (!Hash::check($request->current_password, $user->password)) {
+                Log::warning('AdminController@changePassword - Contraseña actual incorrecta', [
+                    'user_id' => $user->id
+                ]);
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'La contraseña actual es incorrecta'
+                ], 422);
+            }
+
+            // Actualizar contraseña
+            $user->password = Hash::make($request->new_password);
+            $user->save();
+
+            Log::info('AdminController@changePassword - Contraseña actualizada exitosamente', [
+                'user_id' => $user->id
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Contraseña actualizada correctamente'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('AdminController@changePassword - Error al cambiar contraseña', [
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'user_id' => $user->id
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al cambiar contraseña: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -13,6 +13,7 @@ use App\Http\Controllers\EmpresaInfoController;
 use App\Http\Controllers\FormaEnvioController;
 use App\Http\Controllers\HorariosController;
 use App\Http\Controllers\MarcaProductoController;
+use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OfertasController;
 use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\ReclamosController;
@@ -110,6 +111,7 @@ Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibl
 // FORMAS DE ENVÍO Y TIPOS DE PAGO
 // ============================================
 Route::get('/formas-envio/activas', [FormaEnvioController::class, 'activas']);
+Route::post('/formas-envio/calcular-costo', [FormaEnvioController::class, 'calcularCosto']);
 Route::get('/tipos-pago/activos', [TipoPagoController::class, 'activos']);
 
 // ============================================
@@ -149,3 +151,8 @@ Route::get('/nota-credito/cdr/{notaId}/{numeroCompleto}', [\App\Http\Controllers
 Route::get('/nota-debito/pdf/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');
 Route::get('/nota-debito/xml/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarXmlPublico'])->where('numeroCompleto', '.*');
 Route::get('/nota-debito/cdr/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarCdrPublico'])->where('numeroCompleto', '.*');
+
+// ============================================
+// MENÚS PÚBLICOS
+// ============================================
+Route::get('/menus/publicos', [MenuController::class, 'menusPublicos']);
