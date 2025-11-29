@@ -82,6 +82,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/pedir', [CotizacionesController::class, 'pedirCotizacion']);
     });
 
+    // ============================================
+    // COTIZACIONES - ADMIN (Solo rutas exclusivas de administración)
+    // ============================================
     Route::prefix('cotizaciones')->middleware('permission:cotizaciones.ver')->group(function () {
         Route::get('/', [CotizacionesController::class, 'index']);
         Route::get('/estadisticas', [CotizacionesController::class, 'estadisticas']);
@@ -90,8 +93,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']);
         Route::delete('/{id}', [CotizacionesController::class, 'destroy']);
 
-        Route::post('/ecommerce', [CotizacionesController::class, 'crearCotizacionEcommerce'])->middleware('permission:cotizaciones.create');
-        Route::post('/{id}/convertir-compra', [CotizacionesController::class, 'convertirACompra'])->middleware('permission:cotizaciones.convertir');
+        // ✅ ELIMINADAS las rutas duplicadas que ya están en el grupo de clientes (líneas 78, 81)
+        // Route::post('/ecommerce', ...) - Ya existe en línea 78 sin permisos
+        // Route::post('/{id}/convertir-compra', ...) - Ya existe en línea 81 sin permisos
+
         Route::patch('/{id}/estado', [CotizacionesController::class, 'cambiarEstado'])->middleware('permission:cotizaciones.edit');
     });
 
