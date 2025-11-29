@@ -112,7 +112,8 @@ class ProductosController extends Controller
             }
 
             $producto = Producto::create($data);
-            $producto->load('categoria');
+            // ✅ CORREGIDO: Cargar tanto categoría como marca
+            $producto->load(['categoria', 'marca']);
 
             // Agregar URL completa de imagen para la respuesta
             if ($producto->imagen) {
@@ -138,7 +139,8 @@ class ProductosController extends Controller
     public function show($id)
     {
         try {
-            $producto = Producto::with('categoria')->findOrFail($id);
+            // ✅ CORREGIDO: Cargar tanto categoría como marca
+            $producto = Producto::with(['categoria', 'marca'])->findOrFail($id);
 
             if ($producto->imagen) {
                 $producto->imagen_url = asset('storage/productos/' . $producto->imagen);
