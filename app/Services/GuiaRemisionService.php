@@ -2,113 +2,135 @@
 
 namespace App\Services;
 
-use Greenter\See;
-use Greenter\Ws\Services\SunatEndpoints;
+use App\Models\GuiaRemision;
+use Carbon\Carbon;
 use Greenter\Model\Client\Client;
-use Greenter\Model\Company\Company;
 use Greenter\Model\Company\Address;
+use Greenter\Model\Company\Company;
 use Greenter\Model\Despatch\Despatch;
 use Greenter\Model\Despatch\DespatchDetail;
-use Greenter\Model\Despatch\Shipment;
-use Greenter\Model\Despatch\Driver;
 use Greenter\Model\Despatch\Direction;
+use Greenter\Model\Despatch\Driver;
+use Greenter\Model\Despatch\Shipment;
 use Greenter\Report\HtmlReport;
 use Greenter\Report\PdfReport;
-use App\Models\GuiaRemision;
-use App\Models\GuiaRemisionDetalle;
-use App\Models\SunatLog;
-use Carbon\Carbon;
+use Greenter\See;
+use Greenter\Ws\Services\SunatEndpoints;
 use Illuminate\Support\Facades\Log;
 
 class GuiaRemisionService
 {
     private $see;
+
     private $company;
 
     public function __construct()
     {
-        $this->see = new See();
+        $this->see = new See;
         $this->configurarSee();
         $this->configurarEmpresa();
     }
 
     private function configurarSee()
     {
-        $ambiente = env('GREENTER_MODE', 'BETA');
+        // Usar certificado PEM de producción
+        $pemPath = storage_path('app/certificates/certificado.pem');
 
-        // Configurar certificado según ambiente
-        if (strtoupper($ambiente) === 'BETA') {
-            // Para BETA, usar el certificado de prueba de Greenter
-            // Este certificado ya viene incluido en la librería y no requiere configuración adicional
-            $certPath = __DIR__ . '/../../vendor/greenter/xmldsig/tests/certificate.pem';
-
-            if (file_exists($certPath)) {
-                $certificadoContenido = file_get_contents($certPath);
-                $this->see->setCertificate($certificadoContenido);
-                Log::info('Usando certificado de prueba de Greenter para BETA (Guías de Remisión)');
-            } else {
-                // Fallback: intentar usar el certificado configurado
-                $certPath = storage_path('app/' . env('GREENTER_CERT_PATH', 'certificates/certificate.pem'));
-                if (file_exists($certPath)) {
-                    $certificadoContenido = file_get_contents($certPath);
-                    $this->see->setCertificate($certificadoContenido);
-                    Log::info('Usando certificado personalizado desde storage (Guías de Remisión)');
-                } else {
-                    throw new \Exception("Certificado no encontrado. Verifica la instalación de Greenter o configura GREENTER_CERT_PATH");
-                }
-            }
-
-            // Credenciales de prueba BETA
-            $solUser = env('GREENTER_FE_USER', '20000000001MODDATOS');
-            $solPassword = env('GREENTER_FE_PASSWORD', 'MODDATOS');
-
-            $this->see->setService(SunatEndpoints::GUIA_BETA);
-
-        } else {
-            // Para PRODUCCIÓN, usar certificado real de la empresa
-            $certPath = storage_path('app/' . env('GREENTER_CERT_PATH'));
-
-            if (empty($certPath) || !file_exists($certPath)) {
-                throw new \Exception("Certificado de producción no encontrado en: {$certPath}");
-            }
-
-            $certificadoContenido = file_get_contents($certPath);
-            $this->see->setCertificate($certificadoContenido);
-
-            // Credenciales reales de producción
-            $solUser = env('GREENTER_FE_USER');
-            $solPassword = env('GREENTER_FE_PASSWORD');
-
-            if (empty($solUser) || empty($solPassword)) {
-                throw new \Exception('Las credenciales SOL de producción no están configuradas');
-            }
-
-            $this->see->setService(SunatEndpoints::GUIA_PRODUCCION);
+        if (! file_exists($pemPath)) {
+            throw new \Exception("Certificado PEM no encontrado en: {$pemPath}");
         }
+
+        $certificadoContenido = file_get_contents($pemPath);
+
+        if (empty($certificadoContenido)) {
+            throw new \Exception('El archivo PEM está vacío');
+        }
+
+        $this->see->setCertificate($certificadoContenido);
+
+        // Credenciales de producción desde .env
+        $solUser = env('GREENTER_FE_USER');
+        $solPassword = env('GREENTER_FE_PASSWORD');
+
+        if (empty($solUser) || empty($solPassword)) {
+            throw new \Exception('Las credenciales SOL no están configuradas en .env');
+        }
+
+        // Configurar endpoint de PRODUCCIÓN para guías
+        $this->see->setService(SunatEndpoints::GUIA_PRODUCCION);
 
         // Configurar credenciales SOL
         $this->see->setCredentials($solUser, $solPassword);
 
-        Log::info('GuiaRemisionService configurado correctamente', [
-            'ambiente' => $ambiente,
+        Log::info('GuiaRemisionService configurado para PRODUCCIÓN', [
             'usuario_sol' => $solUser,
-            'endpoint' => $ambiente === 'BETA' ? 'GUIA_BETA' : 'GUIA_PRODUCCION'
+            'endpoint' => 'GUIA_PRODUCCION',
         ]);
     }
 
     private function configurarEmpresa()
     {
-        $this->company = new Company();
-        $this->company->setRuc(config('services.company.ruc'))
-                     ->setRazonSocial(config('services.company.name'))
-                     ->setNombreComercial(config('services.company.name'))
-                     ->setAddress(new Address([
-                         'direccion' => config('services.company.address'),
-                         'distrito' => config('services.company.district'),
-                         'provincia' => config('services.company.province'),
-                         'departamento' => config('services.company.department'),
-                         'ubigueo' => config('services.company.ubigeo', '150101')
-                     ]));
+        $this->company = new Company;
+        $this->company->setRuc(config('empresa.ruc'))
+            ->setRazonSocial(config('empresa.razon_social'))
+            ->setNombreComercial(config('empresa.nombre_comercial'))
+            ->setAddress(new Address([
+                'direccion' => config('empresa.direccion'),
+                'distrito' => config('empresa.distrito'),
+                'provincia' => config('empresa.provincia'),
+                'departamento' => config('empresa.departamento'),
+                'ubigueo' => config('empresa.ubigeo', '150301'),
+            ]));
+    }
+
+    /**
+     * Generar XML firmado de la guía de remisión
+     * También genera el PDF automáticamente
+     */
+    public function generarXml(GuiaRemision $guia)
+    {
+        try {
+            // Construir documento Greenter
+            $despatch = $this->construirDocumentoGreenter($guia);
+
+            // Generar XML firmado
+            $xml = $this->see->getXmlSigned($despatch);
+
+            // Guardar XML en la guía
+            $guia->update([
+                'xml_firmado' => base64_encode($xml),
+                'tiene_xml' => true,
+            ]);
+
+            Log::info('XML de guía generado correctamente', [
+                'guia_id' => $guia->id,
+                'xml_length' => strlen($xml),
+            ]);
+
+            // Generar PDF automáticamente
+            $this->generarPdf($guia, $despatch);
+
+            return [
+                'success' => true,
+                'mensaje' => 'XML y PDF generados correctamente',
+                'data' => [
+                    'guia' => $guia->fresh(),
+                    'xml_generado' => true,
+                    'pdf_generado' => true,
+                ],
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Error generando XML: '.$e->getMessage(), [
+                'guia_id' => $guia->id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
     }
 
     /**
@@ -124,60 +146,45 @@ class GuiaRemisionService
     public function enviarGuiaRemision(GuiaRemision $guia)
     {
         try {
-            // Construir documento Greenter
-            $despatch = $this->construirDocumentoGreenter($guia);
+            // Validar que tenga XML generado
+            if (! $guia->tiene_xml || empty($guia->xml_firmado)) {
+                return [
+                    'success' => false,
+                    'error' => 'Debe generar el XML antes de enviar a SUNAT',
+                ];
+            }
 
-            // Generar XML firmado (sin enviar)
-            $xml = $this->see->getXmlSigned($despatch);
+            // Aquí iría la lógica de envío a SUNAT con OAuth2
+            // Por ahora solo simulamos el envío
 
-            // Guardar XML en la guía
-            $updateResult1 = $guia->update([
-                'xml_firmado' => base64_encode($xml),
-                'tiene_xml' => true
-            ]);
-
-            Log::info('XML de guía generado correctamente', [
+            Log::info('Intentando enviar guía a SUNAT', [
                 'guia_id' => $guia->id,
-                'xml_length' => strlen($xml),
-                'update_success' => $updateResult1
             ]);
 
-            // NOTA: El envío a SUNAT requiere credenciales OAuth2
-            // Por ahora solo generamos el XML
-            $updateResult2 = $guia->update([
-                'estado' => 'XML_GENERADO',
-                'mensaje_sunat' => 'XML generado correctamente. Requiere credenciales OAuth2 para enviar a SUNAT.'
+            // En desarrollo sin OAuth2, dejamos en PENDIENTE
+            // En producción con OAuth2, cambiaría a ACEPTADO o RECHAZADO
+            $guia->update([
+                'mensaje_sunat' => 'Requiere credenciales OAuth2 para enviar a SUNAT. XML ya generado.',
             ]);
-
-            Log::info('Estado de guía actualizado', [
-                'guia_id' => $guia->id,
-                'nuevo_estado' => 'XML_GENERADO',
-                'update_success' => $updateResult2
-            ]);
-
-            // Generar PDF
-            $this->generarPdf($guia, $despatch);
 
             return [
                 'success' => true,
-                'mensaje' => 'XML de guía generado correctamente. NOTA: Para enviar a SUNAT necesitas configurar credenciales OAuth2 en el .env',
+                'mensaje' => 'XML listo para envío. Requiere configurar credenciales OAuth2 en producción.',
                 'data' => [
                     'guia' => $guia->fresh(),
-                    'xml_generado' => true,
                     'requiere_oauth2' => true,
-                    'instrucciones' => 'Configura GREENTER_CLIENT_ID y GREENTER_CLIENT_SECRET en el .env para enviar a SUNAT'
-                ]
+                ],
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error en enviarGuiaRemision: ' . $e->getMessage(), [
+            Log::error('Error enviando guía a SUNAT: '.$e->getMessage(), [
                 'guia_id' => $guia->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -203,20 +210,20 @@ class GuiaRemisionService
      */
     private function construirDocumentoGreenter(GuiaRemision $guia)
     {
-        $despatch = new Despatch();
+        $despatch = new Despatch;
 
         // Datos básicos
         $fechaEmision = Carbon::parse($guia->fecha_emision);
         $fechaTraslado = Carbon::parse($guia->fecha_inicio_traslado ?? $guia->fecha_emision);
 
-        // Tipo de documento según tipo de guía
-        $tipoDoc = $guia->tipo_comprobante ?? '09';
-        
+        // Tipo de documento: 09 = Guía de Remisión Remitente, 31 = Guía de Remisión Transportista
+        $tipoDoc = ($guia->tipo_guia === 'TRANSPORTISTA') ? '31' : '09';
+
         $despatch->setTipoDoc($tipoDoc)
-                ->setSerie($guia->serie)
-                ->setCorrelativo($guia->correlativo)
-                ->setFechaEmision($fechaEmision)
-                ->setCompany($this->company);
+            ->setSerie($guia->serie)
+            ->setCorrelativo($guia->correlativo)
+            ->setFechaEmision($fechaEmision)
+            ->setCompany($this->company);
 
         // Agregar nota con comprobante relacionado (FT: F001-2950)
         if ($guia->nota_sunat) {
@@ -225,15 +232,15 @@ class GuiaRemisionService
 
         // Destinatario
         if ($guia->destinatario_tipo_documento && $guia->destinatario_numero_documento) {
-            $destinatario = new Client();
+            $destinatario = new Client;
             $destinatario->setTipoDoc($guia->destinatario_tipo_documento)
-                        ->setNumDoc($guia->destinatario_numero_documento)
-                        ->setRznSocial($guia->destinatario_razon_social);
+                ->setNumDoc($guia->destinatario_numero_documento)
+                ->setRznSocial($guia->destinatario_razon_social);
 
             if ($guia->destinatario_direccion) {
                 $destinatario->setAddress(new Address([
                     'direccion' => $guia->destinatario_direccion,
-                    'ubigueo' => $guia->destinatario_ubigeo ?? '150101'
+                    'ubigueo' => $guia->destinatario_ubigeo ?? '150101',
                 ]));
             }
 
@@ -242,42 +249,88 @@ class GuiaRemisionService
 
         // Tercero (si es diferente del remitente o destinatario)
         if ($guia->cliente_id && ($guia->cliente_numero_documento != $this->company->getRuc())) {
-            $tercero = new Client();
+            $tercero = new Client;
             $tercero->setTipoDoc($guia->cliente_tipo_documento)
-                   ->setNumDoc($guia->cliente_numero_documento)
-                   ->setRznSocial($guia->cliente_razon_social);
+                ->setNumDoc($guia->cliente_numero_documento)
+                ->setRznSocial($guia->cliente_razon_social);
 
             $despatch->setTercero($tercero);
         }
 
         // Envío (Shipment) - Información del traslado
-        $shipment = new Shipment();
+        $shipment = new Shipment;
 
         // Motivo y modalidad de traslado
         $shipment->setCodTraslado($guia->motivo_traslado ?? '01') // 01=Venta
-                ->setDesTraslado($this->getMotivoTraslado($guia->motivo_traslado ?? '01'))
-                ->setModTraslado($guia->modalidad_traslado ?? '02') // 01=Público, 02=Privado
-                ->setFecTraslado($fechaTraslado);
+            ->setDesTraslado($this->getMotivoTraslado($guia->motivo_traslado ?? '01'))
+            ->setModTraslado($guia->modalidad_traslado ?? '02') // 01=Público, 02=Privado
+            ->setFecTraslado($fechaTraslado);
 
         // Peso y bultos
         if ($guia->peso_total) {
-            $shipment->setPesoTotal((float)$guia->peso_total);
+            $shipment->setPesoTotal((float) $guia->peso_total);
         }
 
         if ($guia->numero_bultos) {
-            $shipment->setNumBultos((int)$guia->numero_bultos);
+            $shipment->setNumBultos((int) $guia->numero_bultos);
         }
 
-        // Datos del conductor - Requerido para transporte privado
-        if (!$guia->esTrasladoInterno() && $guia->conductor_dni && $guia->conductor_nombres) {
-            $driver = new Driver();
-            $driver->setTipo('1') // 1=DNI
-                  ->setNroDoc($guia->conductor_dni)
-                  ->setLicencia('') // SUNAT no requiere licencia
-                  ->setNombres($guia->conductor_nombres)
-                  ->setApellidos(''); // Apellidos están incluidos en nombres
+        // Si es guía de TRANSPORTISTA, agregar datos del transportista y conductor
+        if ($guia->tipo_guia === 'TRANSPORTISTA') {
+            // Datos del transportista
+            if ($guia->transportista_ruc && $guia->transportista_razon_social) {
+                $transportista = new \Greenter\Model\Despatch\TransportCarrier;
+                $transportista->setRuc($guia->transportista_ruc)
+                    ->setRznSocial($guia->transportista_razon_social);
+                
+                if ($guia->transportista_numero_mtc) {
+                    $transportista->setNroMtc($guia->transportista_numero_mtc);
+                }
+                
+                $shipment->setTransportista($transportista);
+            }
 
-            $shipment->setChoferes([$driver]);
+            // Datos del conductor (obligatorio para transportista)
+            if ($guia->conductor_numero_documento && $guia->conductor_nombres) {
+                $driver = new Driver;
+                $driver->setTipo($guia->conductor_tipo_documento ?? '1') // 1=DNI
+                    ->setNroDoc($guia->conductor_numero_documento)
+                    ->setNombres($guia->conductor_nombres)
+                    ->setApellidos($guia->conductor_apellidos ?? '');
+                
+                if ($guia->conductor_licencia) {
+                    $driver->setLicencia($guia->conductor_licencia);
+                }
+                
+                $shipment->setChoferes([$driver]);
+            }
+
+            // Datos del vehículo (obligatorio para transportista)
+            if ($guia->vehiculo_placa_principal) {
+                $vehiculo = new \Greenter\Model\Despatch\Vehicle;
+                $vehiculo->setPlaca($guia->vehiculo_placa_principal);
+                
+                $shipment->setVehiculo($vehiculo);
+                
+                // Vehículo secundario (opcional)
+                if ($guia->vehiculo_placa_secundaria) {
+                    $vehiculoSecundario = new \Greenter\Model\Despatch\Vehicle;
+                    $vehiculoSecundario->setPlaca($guia->vehiculo_placa_secundaria);
+                    $shipment->setVehiculoSec($vehiculoSecundario);
+                }
+            }
+        } else {
+            // Para guía de REMITENTE, usar los datos del conductor si existen
+            if (! $guia->esTrasladoInterno() && $guia->conductor_dni && $guia->conductor_nombres) {
+                $driver = new Driver;
+                $driver->setTipo('1') // 1=DNI
+                    ->setNroDoc($guia->conductor_dni)
+                    ->setLicencia('') // SUNAT no requiere licencia
+                    ->setNombres($guia->conductor_nombres)
+                    ->setApellidos(''); // Apellidos están incluidos en nombres
+
+                $shipment->setChoferes([$driver]);
+            }
         }
 
         // Punto de partida
@@ -305,8 +358,8 @@ class GuiaRemisionService
         // Detalles de la guía (productos/bienes a transportar)
         $detalles = [];
         foreach ($guia->detalles as $detalle) {
-            $item = new DespatchDetail();
-            $item->setCantidad((float)$detalle->cantidad)
+            $item = new DespatchDetail;
+            $item->setCantidad((float) $detalle->cantidad)
                 ->setUnidad($detalle->unidad_medida ?? 'NIU')
                 ->setDescripcion($detalle->descripcion)
                 ->setCodigo($detalle->producto_id ? "P{$detalle->producto_id}" : 'PROD001');
@@ -317,7 +370,7 @@ class GuiaRemisionService
         $despatch->setDetails($detalles);
 
         // Si no hay nota SUNAT pero hay observaciones, usarlas
-        if (!$guia->nota_sunat && $guia->observaciones) {
+        if (! $guia->nota_sunat && $guia->observaciones) {
             $despatch->setObservacion($guia->observaciones);
         }
 
@@ -330,13 +383,13 @@ class GuiaRemisionService
     public function generarPdf(GuiaRemision $guia, $despatch = null)
     {
         try {
-            if (!$despatch) {
+            if (! $despatch) {
                 $despatch = $this->construirDocumentoGreenter($guia);
             }
 
             // Intentar con el PDF de Greenter
             try {
-                $htmlReport = new HtmlReport();
+                $htmlReport = new HtmlReport;
                 $pdfReport = new PdfReport($htmlReport);
 
                 // Parámetros adicionales para el PDF
@@ -345,7 +398,7 @@ class GuiaRemisionService
                         'hash' => $guia->codigo_hash ?? '',
                         'date' => date('Y-m-d'),
                         'time' => date('H:i:s'),
-                    ]
+                    ],
                 ];
 
                 // Agregar logo si existe
@@ -360,7 +413,7 @@ class GuiaRemisionService
                     } catch (\Exception $e) {
                         Log::warning('Error al leer logo de empresa para guía', [
                             'path' => $logoPath,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                     }
                 }
@@ -369,12 +422,12 @@ class GuiaRemisionService
 
                 $guia->update([
                     'pdf_base64' => base64_encode($pdf),
-                    'tiene_pdf' => true
+                    'tiene_pdf' => true,
                 ]);
 
                 Log::info('PDF de guía generado exitosamente con Greenter', [
                     'guia_id' => $guia->id,
-                    'tamaño_bytes' => strlen($pdf)
+                    'tamaño_bytes' => strlen($pdf),
                 ]);
 
                 return;
@@ -382,7 +435,7 @@ class GuiaRemisionService
             } catch (\Exception $e) {
                 Log::warning('Error con PDF de Greenter, usando PDF simple', [
                     'guia_id' => $guia->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
 
                 // Fallback: Generar PDF simple
@@ -390,12 +443,12 @@ class GuiaRemisionService
 
                 $guia->update([
                     'pdf_base64' => base64_encode($pdfSimple),
-                    'tiene_pdf' => true
+                    'tiene_pdf' => true,
                 ]);
 
                 Log::info('PDF simple de guía generado exitosamente', [
                     'guia_id' => $guia->id,
-                    'tamaño_bytes' => strlen($pdfSimple)
+                    'tamaño_bytes' => strlen($pdfSimple),
                 ]);
             }
 
@@ -403,7 +456,7 @@ class GuiaRemisionService
             Log::error('Error generando PDF de guía', [
                 'guia_id' => $guia->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $guia->update(['tiene_pdf' => false]);
@@ -434,7 +487,7 @@ class GuiaRemisionService
         <body>
             <div class='header'>
                 <h1>GUÍA DE REMISIÓN ELECTRÓNICA</h1>
-                <h2>{$guia->serie}-" . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . "</h2>
+                <h2>{$guia->serie}-".str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT)."</h2>
             </div>
 
             <div class='content'>
@@ -483,10 +536,11 @@ class GuiaRemisionService
 
         // Si DomPDF está disponible, usarlo
         if (class_exists('\Dompdf\Dompdf')) {
-            $dompdf = new \Dompdf\Dompdf();
+            $dompdf = new \Dompdf\Dompdf;
             $dompdf->loadHtml($html);
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
+
             return $dompdf->output();
         }
 
@@ -505,7 +559,7 @@ class GuiaRemisionService
             '04' => 'Traslado entre establecimientos de la misma empresa',
             '08' => 'Importación',
             '09' => 'Exportación',
-            '13' => 'Otros'
+            '13' => 'Otros',
         ];
 
         return $motivos[$codigo] ?? 'Otros';
@@ -518,7 +572,7 @@ class GuiaRemisionService
     {
         $modos = [
             '01' => 'Transporte público',
-            '02' => 'Transporte privado'
+            '02' => 'Transporte privado',
         ];
 
         return $modos[$codigo] ?? 'Transporte privado';
@@ -538,6 +592,7 @@ class GuiaRemisionService
         } catch (\Exception $e) {
             // Ignorar errores de métodos no disponibles
         }
+
         return null;
     }
 
@@ -555,6 +610,7 @@ class GuiaRemisionService
         } catch (\Exception $e) {
             // Ignorar errores de métodos no disponibles
         }
+
         return null;
     }
 }

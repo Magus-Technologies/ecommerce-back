@@ -176,13 +176,40 @@ Route::middleware('auth:sanctum')->group(function () {
         // Obtener tipos de guía
         Route::get('/tipos', [GuiasRemisionController::class, 'tipos']);
 
+        // Búsqueda y filtros
+        Route::get('/buscar', [GuiasRemisionController::class, 'buscar']);
+        Route::get('/pendientes-envio', [GuiasRemisionController::class, 'pendientesEnvio']);
+        Route::get('/rechazadas', [GuiasRemisionController::class, 'rechazadas']);
+
         // Listar y estadísticas
         Route::get('/', [GuiasRemisionController::class, 'index']);
         Route::get('/estadisticas/resumen', [GuiasRemisionController::class, 'estadisticas']);
 
-        // Ver detalle y descargar XML
+        // Ver detalle
         Route::get('/{id}', [GuiasRemisionController::class, 'show'])->middleware('permission:facturacion.guias_remision.show');
-        Route::get('/{id}/xml', [GuiasRemisionController::class, 'descargarXml']);
+
+        // XML
+        Route::get('/{id}/xml', [GuiasRemisionController::class, 'verXml']);
+        Route::get('/{id}/ver-xml-archivo', [GuiasRemisionController::class, 'verArchivoXml']);
+
+        // PDF
+        Route::get('/{id}/pdf', [GuiasRemisionController::class, 'verPdf']);
+        Route::get('/{id}/ver-pdf-archivo', [GuiasRemisionController::class, 'verArchivoPdf']);
+        Route::post('/{id}/generar-pdf', [GuiasRemisionController::class, 'generarPdf'])->middleware('permission:facturacion.guias_remision.edit');
+
+        // CDR (descarga)
+        Route::get('/{id}/cdr', [GuiasRemisionController::class, 'descargarCdr']);
+
+        // Validaciones
+        Route::post('/validar-ubigeo', [GuiasRemisionController::class, 'validarUbigeo']);
+        Route::post('/validar-ruc-transportista', [GuiasRemisionController::class, 'validarRucTransportista']);
+        Route::post('/validar-placa', [GuiasRemisionController::class, 'validarPlaca']);
+
+        // Notificaciones
+        Route::get('/{id}/email-datos', [GuiasRemisionController::class, 'obtenerDatosEmail']);
+        Route::post('/{id}/email', [GuiasRemisionController::class, 'enviarEmail'])->middleware('permission:facturacion.guias_remision.edit');
+        Route::get('/{id}/whatsapp-datos', [GuiasRemisionController::class, 'obtenerDatosWhatsApp']);
+        Route::post('/{id}/whatsapp', [GuiasRemisionController::class, 'enviarWhatsApp'])->middleware('permission:facturacion.guias_remision.edit');
 
         // Crear guías por tipo
         Route::post('/', [GuiasRemisionController::class, 'store'])->middleware('permission:facturacion.guias_remision.create');
@@ -190,8 +217,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/transportista', [GuiasRemisionController::class, 'storeTransportista'])->middleware('permission:facturacion.guias_remision.create');
         Route::post('/traslado-interno', [GuiasRemisionController::class, 'storeInterno'])->middleware('permission:facturacion.guias_remision.create');
 
-        // Enviar a SUNAT
+        // Actualizar y operaciones SUNAT
+        Route::put('/{id}', [GuiasRemisionController::class, 'update'])->middleware('permission:facturacion.guias_remision.edit');
+        Route::patch('/{id}/estado-logistico', [GuiasRemisionController::class, 'actualizarEstadoLogistico'])->middleware('permission:facturacion.guias_remision.edit');
+        Route::post('/{id}/generar-xml', [GuiasRemisionController::class, 'generarXml'])->middleware('permission:facturacion.guias_remision.edit');
         Route::post('/{id}/enviar-sunat', [GuiasRemisionController::class, 'enviarSunat'])->middleware('permission:facturacion.guias_remision.edit');
+        Route::post('/{id}/consultar-sunat', [GuiasRemisionController::class, 'consultarSunat'])->middleware('permission:facturacion.guias_remision.edit');
     });
 
     // ============================================

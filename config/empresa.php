@@ -11,21 +11,21 @@ return [
     |
     */
 
-    'ruc' => env('EMPRESA_RUC', '20123456789'),
+    'ruc' => env('EMPRESA_RUC', '10427993120'),
 
-    'razon_social' => env('EMPRESA_RAZON_SOCIAL', 'MI EMPRESA SAC'),
+    'razon_social' => env('EMPRESA_RAZON_SOCIAL', 'AGUADO SIERRA MANUEL HIPOLITO'),
 
-    'nombre_comercial' => env('EMPRESA_NOMBRE_COMERCIAL', 'MI EMPRESA'),
+    'nombre_comercial' => env('EMPRESA_NOMBRE_COMERCIAL', 'MAGUS TEC'),
 
-    'direccion' => env('EMPRESA_DIRECCION', 'Av. Principal 123, Lima, Perú'),
+    'direccion' => env('EMPRESA_DIRECCION', 'Urb. Primavera, Mz A20 Lte. 2 Calle Los Portales'),
 
-    'distrito' => env('EMPRESA_DISTRITO', 'Lima'),
+    'distrito' => env('EMPRESA_DISTRITO', 'Santa Anita'),
 
     'provincia' => env('EMPRESA_PROVINCIA', 'Lima'),
 
     'departamento' => env('EMPRESA_DEPARTAMENTO', 'Lima'),
 
-    'ubigueo' => env('EMPRESA_UBIGUEO', '150101'), // Lima-Lima-Lima
+    'ubigeo' => env('EMPRESA_UBIGEO', '150301'), // Lima-Lima-Santa Anita
 
     /*
     |--------------------------------------------------------------------------
@@ -33,13 +33,13 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'telefono' => env('EMPRESA_TELEFONO', '+51 1 234-5678'),
+    'telefono' => env('EMPRESA_TELEFONO', '+51 972 781 904'),
 
-    'email' => env('EMPRESA_EMAIL', 'contacto@miempresa.com'),
+    'email' => env('EMPRESA_EMAIL', 'manuel.aguado@magustechnologies.com'),
 
-    'web' => env('EMPRESA_WEB', 'www.miempresa.com'),
+    'web' => env('EMPRESA_WEB', 'https://magustechnologies.com'),
 
-    'whatsapp' => env('EMPRESA_WHATSAPP', '+51987654321'),
+    'whatsapp' => env('EMPRESA_WHATSAPP', '+51972781904'),
 
     /*
     |--------------------------------------------------------------------------
