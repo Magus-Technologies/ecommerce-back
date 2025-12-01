@@ -100,7 +100,7 @@ class GreenterService
     private function configurarEmpresa()
     {
         $this->company = new Company;
-        
+
         // Crear dirección con todos los campos requeridos por SUNAT
         $address = new Address;
         $address->setUbigueo(config('empresa.ubigeo', '150301'))
@@ -110,7 +110,7 @@ class GreenterService
             ->setUrbanizacion('-')
             ->setDireccion(config('empresa.direccion', 'AV. PRINCIPAL'))
             ->setCodLocal('0000'); // Código de establecimiento (0000 = principal)
-        
+
         $this->company->setRuc(config('empresa.ruc'))
             ->setRazonSocial(config('empresa.razon_social'))
             ->setNombreComercial(config('empresa.nombre_comercial'))
@@ -482,9 +482,17 @@ class GreenterService
 
     private function procesarRespuestaSunat($comprobante, $result, $invoice)
     {
+        $xmlFirmado = $this->see->getFactory()->getLastXml();
+        $codigoHash = null;
+
+        // Intentar obtener hash del CDR si existe el método
+        if ($result->getCdrResponse() && method_exists($result->getCdrResponse(), 'getDigestValue')) {
+            $codigoHash = $result->getCdrResponse()->getDigestValue();
+        }
+
         $comprobante->update([
-            'xml_firmado' => $this->see->getFactory()->getLastXml(),
-            'codigo_hash' => $result->getCdrResponse() ? $result->getCdrResponse()->getDigestValue() : null,
+            'xml_firmado' => $xmlFirmado,
+            'codigo_hash' => $codigoHash,
         ]);
 
         if ($result->isSuccess()) {
@@ -768,13 +776,44 @@ class GreenterService
             $comprobante->update(['xml_firmado' => $xml]);
 
             if ($result->isSuccess()) {
-                // Obtener CDR si est� disponible (con verificaci�n defensiva)
+                // ✅ CORRECCIÓN: Validar CDR correctamente
                 $cdrResponse = null;
                 $cdrZip = null;
 
-                // Obtener CDR usando m�todos auxiliares seguros
-                $cdrResponse = $this->getCdrSafely($result);
-                $cdrZip = $this->getCdrZipSafely($result);
+                // Obtener CDR de forma segura
+                try {
+                    $cdrResponse = $result->getCdrResponse();
+                    $cdrZip = $result->getCdrZip();
+                } catch (\Exception $e) {
+                    Log::warning('Error al obtener CDR', [
+                        'comprobante_id' => $comprobante->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // ✅ VALIDACIÓN CRÍTICA: Verificar que el CDR sea válido
+                if (! $this->validarCdrReal($cdrResponse, $cdrZip, $comprobante)) {
+                    // CDR inválido o inexistente
+                    $comprobante->update([
+                        'estado' => 'PENDIENTE_VALIDACION',
+                        'mensaje_sunat' => 'Enviado a SUNAT - Pendiente de validación CDR',
+                        'xml_firmado' => $xml,
+                        'tiene_xml' => true,
+                        'tiene_cdr' => false,
+                        'fecha_envio_sunat' => now(),
+                    ]);
+
+                    Log::warning('CDR no válido o inexistente', [
+                        'comprobante_id' => $comprobante->id,
+                        'numero' => $comprobante->numero_completo,
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'error' => 'El comprobante fue enviado pero no se recibió CDR válido. Se requiere consulta de estado.',
+                        'requiere_consulta' => true,
+                    ];
+                }
 
                 $updateData = [
                     'estado' => 'ACEPTADO',
@@ -1922,5 +1961,197 @@ class GreenterService
     public function getCompany()
     {
         return $this->company;
+    }
+
+    /**
+     * ✅ NUEVO: Validar que el CDR sea real y válido
+     */
+    private function validarCdrReal($cdrResponse, $cdrZip, $comprobante)
+    {
+        // 1. Verificar que exista el CDR
+        if (! $cdrResponse || ! $cdrZip) {
+            Log::error('CDR vacío o nulo', [
+                'comprobante_id' => $comprobante->id,
+                'tiene_cdr_response' => ! empty($cdrResponse),
+                'tiene_cdr_zip' => ! empty($cdrZip),
+            ]);
+
+            return false;
+        }
+
+        // 2. Verificar código de respuesta SUNAT
+        try {
+            $codigoRespuesta = $cdrResponse->getCode();
+
+            // Códigos válidos de aceptación:
+            // 0 = Aceptado
+            // 0001 a 0999 = Aceptado con observaciones (warnings)
+            // 4000+ = Rechazado
+
+            if ($codigoRespuesta === '0' || ($codigoRespuesta >= '0001' && $codigoRespuesta <= '0999')) {
+                Log::info('CDR válido con código aceptado', [
+                    'comprobante_id' => $comprobante->id,
+                    'codigo' => $codigoRespuesta,
+                    'descripcion' => $cdrResponse->getDescription(),
+                ]);
+            } else {
+                Log::error('CDR con código de rechazo', [
+                    'comprobante_id' => $comprobante->id,
+                    'codigo' => $codigoRespuesta,
+                    'descripcion' => $cdrResponse->getDescription(),
+                ]);
+
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error('Error al obtener código de respuesta CDR', [
+                'comprobante_id' => $comprobante->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        // 3. Verificar que el CDR tenga hash digest
+        try {
+            $digestValue = $cdrResponse->getDigestValue();
+            if (empty($digestValue)) {
+                Log::error('CDR sin hash digest', [
+                    'comprobante_id' => $comprobante->id,
+                ]);
+
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::warning('No se pudo obtener digest value del CDR', [
+                'comprobante_id' => $comprobante->id,
+                'error' => $e->getMessage(),
+            ]);
+            // No es crítico si no tiene digest, algunos CDR antiguos no lo incluyen
+        }
+
+        // 4. Verificar que el CDR ZIP tenga contenido válido
+        if (strlen($cdrZip) < 100) {
+            Log::error('CDR ZIP demasiado pequeño, posiblemente corrupto', [
+                'comprobante_id' => $comprobante->id,
+                'size' => strlen($cdrZip),
+            ]);
+
+            return false;
+        }
+
+        // 5. Verificar que el CDR tenga notas (opcional pero recomendado)
+        try {
+            $notes = $cdrResponse->getNotes();
+            if (empty($notes)) {
+                Log::info('CDR sin notas adicionales', [
+                    'comprobante_id' => $comprobante->id,
+                ]);
+            }
+        } catch (\Exception $e) {
+            // No crítico
+        }
+
+        return true;
+    }
+
+    /**
+     * ✅ NUEVO: Consultar estado real del comprobante en SUNAT
+     */
+    public function consultarEstadoReal($comprobante)
+    {
+        $this->initializeSee();
+
+        try {
+            Log::info('Consultando estado en SUNAT', [
+                'comprobante_id' => $comprobante->id,
+                'numero' => $comprobante->numero_completo,
+            ]);
+
+            // Consultar estado usando el servicio de SUNAT
+            $result = $this->see->getStatus(
+                $comprobante->serie.'-'.str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT),
+                $comprobante->tipo_comprobante,
+                $comprobante->cliente_numero_documento
+            );
+
+            if ($result->isSuccess()) {
+                $cdrResponse = $result->getCdrResponse();
+                $cdrZip = $result->getCdrZip();
+
+                // Validar el CDR obtenido
+                if ($this->validarCdrReal($cdrResponse, $cdrZip, $comprobante)) {
+                    // CDR válido - Actualizar comprobante
+                    $comprobante->update([
+                        'estado' => 'ACEPTADO',
+                        'xml_respuesta_sunat' => base64_encode($cdrZip),
+                        'mensaje_sunat' => $cdrResponse->getDescription(),
+                        'tiene_cdr' => true,
+                        'fecha_respuesta_sunat' => now(),
+                        'codigo_hash' => $cdrResponse->getDigestValue() ?? $comprobante->codigo_hash,
+                    ]);
+
+                    Log::info('Estado consultado: ACEPTADO', [
+                        'comprobante_id' => $comprobante->id,
+                        'codigo_sunat' => $cdrResponse->getCode(),
+                    ]);
+
+                    return [
+                        'success' => true,
+                        'estado' => 'ACEPTADO',
+                        'mensaje' => $cdrResponse->getDescription(),
+                        'codigo' => $cdrResponse->getCode(),
+                    ];
+                } else {
+                    Log::error('CDR obtenido en consulta no es válido', [
+                        'comprobante_id' => $comprobante->id,
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'error' => 'CDR obtenido no es válido',
+                    ];
+                }
+            } else {
+                $error = $result->getError();
+
+                Log::error('Error al consultar estado en SUNAT', [
+                    'comprobante_id' => $comprobante->id,
+                    'error' => $error->getMessage(),
+                    'codigo' => $error->getCode(),
+                ]);
+
+                // Si el error es que no existe el comprobante
+                if (in_array($error->getCode(), ['2324', '2325', '2326'])) {
+                    $comprobante->update([
+                        'estado' => 'NO_EXISTE_SUNAT',
+                        'mensaje_sunat' => 'El comprobante no existe en SUNAT: '.$error->getMessage(),
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'error' => 'El comprobante no existe en SUNAT',
+                        'codigo_error' => $error->getCode(),
+                    ];
+                }
+
+                return [
+                    'success' => false,
+                    'error' => $error->getMessage(),
+                    'codigo_error' => $error->getCode(),
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error('Excepción al consultar estado', [
+                'comprobante_id' => $comprobante->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Error al consultar estado: '.$e->getMessage(),
+            ];
+        }
     }
 }

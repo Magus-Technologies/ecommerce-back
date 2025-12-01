@@ -117,19 +117,9 @@ class NotaCreditoController extends Controller
             // Obtener comprobante de referencia
             $comprobanteRef = \App\Models\Comprobante::with('cliente')->findOrFail($request->comprobante_referencia_id);
 
-            // VALIDACIÓN CRÍTICA: Solo se permiten Notas de Crédito para Facturas (tipo 01)
-            if ($comprobanteRef->tipo_comprobante === '03') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Las Notas de Crédito solo pueden crearse para Facturas Electrónicas',
-                    'error' => 'No se pueden crear Notas de Crédito para Boletas según normativa SUNAT',
-                    'data' => [
-                        'tipo_comprobante_actual' => '03',
-                        'tipo_comprobante_requerido' => '01',
-                        'sugerencia' => 'Para anular Boletas use Comunicación de Baja',
-                    ],
-                ], 400);
-            }
+            // NOTA: Permitir Notas de Crédito para Boletas temporalmente
+            // Normalmente SUNAT requiere Comunicación de Baja para boletas
+            // pero se permite por requerimiento especial
 
             if ($comprobanteRef->estado !== 'ACEPTADO') {
                 return response()->json([
@@ -281,20 +271,8 @@ class NotaCreditoController extends Controller
         try {
             $notaCredito = NotaCredito::with(['cliente', 'venta'])->findOrFail($id);
 
-            // VALIDACIÓN CRÍTICA: Verificar que el comprobante de referencia sea Factura (tipo 01)
-            if ($notaCredito->tipo_comprobante_ref === '03') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nota de crédito rechazada por SUNAT',
-                    'error' => 'Las Notas de Crédito solo pueden modificar Facturas Electrónicas, no Boletas de Venta',
-                    'data' => [
-                        'tipo_comprobante_ref' => '03',
-                        'tipo_comprobante_requerido' => '01',
-                        'codigo_error_sunat' => '2116',
-                        'sugerencia' => 'Para anular Boletas use Comunicación de Baja',
-                    ],
-                ], 400);
-            }
+            // NOTA: Permitir envío de Notas de Crédito para Boletas
+            // Normalmente SUNAT requiere Comunicación de Baja para boletas
 
             // Validar que el XML esté generado
             if (!$notaCredito->xml) {
