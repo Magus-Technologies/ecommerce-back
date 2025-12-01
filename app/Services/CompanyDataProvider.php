@@ -2,41 +2,52 @@
 
 namespace App\Services;
 
-use App\Models\EmpresaInfo;
 use Illuminate\Support\Facades\Log;
 
 class CompanyDataProvider
 {
     /**
-     * Obtener información completa de la empresa desde la BD
+     * Obtener información completa de la empresa desde config/empresa.php (ENV)
      */
     public function getCompanyInfo(): array
     {
         try {
-            $empresa = EmpresaInfo::first();
+            // Obtener datos desde config/empresa.php que lee del .env
+            $ruc = config('empresa.ruc');
+            $razonSocial = config('empresa.razon_social');
+            $nombreComercial = config('empresa.nombre_comercial');
+            $direccion = config('empresa.direccion');
+            $distrito = config('empresa.distrito');
+            $provincia = config('empresa.provincia');
+            $departamento = config('empresa.departamento');
+            $ubigeo = config('empresa.ubigeo');
+            $telefono = config('empresa.telefono');
+            $email = config('empresa.email');
+            $web = config('empresa.web');
 
-            if (!$empresa) {
-                Log::warning('No se encontró información de empresa en la BD');
+            // Validar que los datos esenciales existan
+            if (empty($ruc) || empty($razonSocial)) {
+                Log::warning('Datos de empresa no configurados en .env, usando valores por defecto');
                 return $this->getDefaultCompanyInfo();
             }
 
             return [
-                'ruc' => $empresa->ruc ?? '00000000000',
-                'razon_social' => $empresa->razon_social ?? $empresa->nombre_empresa ?? 'EMPRESA NO CONFIGURADA',
-                'nombre_comercial' => $empresa->nombre_empresa ?? $empresa->razon_social ?? 'Empresa',
-                'direccion_fiscal' => $empresa->direccion ?? 'Dirección no configurada',
-                'distrito' => $empresa->distrito ?? null,
-                'provincia' => $empresa->provincia ?? null,
-                'departamento' => $empresa->departamento ?? null,
-                'ubigeo' => $empresa->ubigeo ?? null,
-                'telefono' => $empresa->telefono ?? $empresa->celular ?? null,
-                'email' => $empresa->email ?? null,
-                'web' => $empresa->website ?? null,
-                'logo_path' => $this->getLogoPath($empresa->logo),
+                'ruc' => $ruc,
+                'razon_social' => $razonSocial,
+                'nombre_comercial' => $nombreComercial ?? $razonSocial,
+                'direccion_fiscal' => $direccion,
+                'distrito' => $distrito,
+                'provincia' => $provincia,
+                'departamento' => $departamento,
+                'ubigeo' => $ubigeo,
+                'telefono' => $telefono,
+                'email' => $email,
+                'web' => $web,
+                'logo_path' => $this->getLogoPath(),
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error al obtener información de empresa desde BD', [
+            Log::error('Error al obtener información de empresa desde config', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -45,7 +56,7 @@ class CompanyDataProvider
     }
 
     /**
-     * Valores por defecto si no hay datos en BD
+     * Valores por defecto si no hay datos en config
      */
     private function getDefaultCompanyInfo(): array
     {
@@ -57,6 +68,7 @@ class CompanyDataProvider
             'distrito' => 'Lima',
             'provincia' => 'Lima',
             'departamento' => 'Lima',
+            'ubigeo' => '150101',
             'telefono' => '+51 1 234-5678',
             'email' => 'contacto@miempresa.com',
             'web' => 'www.miempresa.com',
@@ -67,65 +79,41 @@ class CompanyDataProvider
     /**
      * Obtener ruta del logo de la empresa
      */
-    public function getLogoPath(?string $logoFromDb = null): ?string
+    public function getLogoPath(): ?string
     {
-        // Si hay logo en BD, intentar usarlo primero
-        if ($logoFromDb) {
-            $dbPath = public_path($logoFromDb);
-            if (file_exists($dbPath)) {
-                Log::info('Logo encontrado desde BD: ' . $dbPath);
-                return $dbPath;
-            }
-            
-            // También intentar con storage
-            $storagePath = storage_path('app/public/' . $logoFromDb);
-            if (file_exists($storagePath)) {
-                Log::info('Logo encontrado en storage: ' . $storagePath);
-                return $storagePath;
-            }
-        }
-
-        // Rutas alternativas
+        // Rutas posibles para el logo (ordenadas por prioridad)
         $possiblePaths = [
+            public_path('imagenes/logo3.png'),
+            public_path('imagenes/logo - Magus.png'),
             public_path('assets/images/logo/logo3.png'),
             public_path('assets/images/logo.png'),
             public_path('images/logo.png'),
             storage_path('app/public/logo.png'),
+            public_path('logo.png'),
         ];
 
         foreach ($possiblePaths as $path) {
             if (file_exists($path)) {
-                Log::info('Logo encontrado en ruta alternativa: ' . $path);
+                Log::info('Logo encontrado: ' . $path);
                 return $path;
             }
         }
 
-        Log::warning('Logo no encontrado');
+        Log::warning('Logo no encontrado en ninguna ruta. Rutas buscadas: ' . implode(', ', $possiblePaths));
         return null;
     }
 
     /**
-     * Obtener información de contacto
+     * Obtener información de contacto desde config
      */
     public function getContactInfo(): array
     {
         try {
-            $empresa = EmpresaInfo::first();
-            
-            if (!$empresa) {
-                return [
-                    'telefono' => null,
-                    'email' => null,
-                    'web' => null,
-                    'whatsapp' => null,
-                ];
-            }
-
             return [
-                'telefono' => $empresa->telefono ?? $empresa->celular,
-                'email' => $empresa->email,
-                'web' => $empresa->website,
-                'whatsapp' => $empresa->whatsapp,
+                'telefono' => config('empresa.telefono'),
+                'email' => config('empresa.email'),
+                'web' => config('empresa.web'),
+                'whatsapp' => config('empresa.whatsapp'),
             ];
         } catch (\Exception $e) {
             Log::error('Error al obtener contacto de empresa', ['error' => $e->getMessage()]);

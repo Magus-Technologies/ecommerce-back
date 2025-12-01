@@ -11,6 +11,19 @@ class GuiaRemision extends Model
 
     protected $table = 'guias_remision';
 
+    // Constantes de estado (consistente con comprobantes y comprobantes_sunat)
+    const ESTADO_PENDIENTE = 'PENDIENTE';
+    const ESTADO_ACEPTADO = 'ACEPTADO';
+    const ESTADO_RECHAZADO = 'RECHAZADO';
+    const ESTADO_ANULADO = 'ANULADO';
+
+    // Estados logísticos (para el seguimiento físico del traslado)
+    const ESTADO_LOGISTICO_PENDIENTE = 'pendiente';
+    const ESTADO_LOGISTICO_EN_TRANSITO = 'en_transito';
+    const ESTADO_LOGISTICO_ENTREGADO = 'entregado';
+    const ESTADO_LOGISTICO_DEVUELTO = 'devuelto';
+    const ESTADO_LOGISTICO_ANULADO = 'anulado';
+
     protected $fillable = [
         // Comprobante
         'tipo_comprobante',
@@ -60,9 +73,16 @@ class GuiaRemision extends Model
         'conductor_nombres',
         // constancia_mtc - ELIMINADO (no se valida en SUNAT)
 
-        // Transportista (solo tipo TRANSPORTISTA)
+        // Transportista (cuando tipo_guia = TRANSPORTISTA)
         'transportista_ruc',
         'transportista_razon_social',
+        'transportista_numero_mtc',
+        'conductor_tipo_documento',
+        'conductor_numero_documento',
+        'conductor_apellidos',
+        'conductor_licencia',
+        'vehiculo_placa_principal',
+        'vehiculo_placa_secundaria',
 
         // Puntos
         'punto_partida_ubigeo',
@@ -135,14 +155,39 @@ class GuiaRemision extends Model
     public function getEstadoNombreAttribute()
     {
         $estados = [
-            'PENDIENTE' => 'Pendiente',
-            'ENVIADO' => 'Enviado',
-            'ACEPTADO' => 'Aceptado',
-            'RECHAZADO' => 'Rechazado',
-            'ANULADO' => 'Anulado',
+            self::ESTADO_PENDIENTE => 'Pendiente',
+            self::ESTADO_ACEPTADO => 'Aceptado',
+            self::ESTADO_RECHAZADO => 'Rechazado',
+            self::ESTADO_ANULADO => 'Anulado',
         ];
 
         return $estados[$this->estado] ?? 'Desconocido';
+    }
+
+    /**
+     * Obtener todos los estados disponibles
+     */
+    public static function getEstados()
+    {
+        return [
+            self::ESTADO_PENDIENTE,
+            self::ESTADO_ACEPTADO,
+            self::ESTADO_RECHAZADO,
+            self::ESTADO_ANULADO,
+        ];
+    }
+
+    /**
+     * Obtener estados con sus nombres
+     */
+    public static function getEstadosConNombres()
+    {
+        return [
+            self::ESTADO_PENDIENTE => 'Pendiente',
+            self::ESTADO_ACEPTADO => 'Aceptado',
+            self::ESTADO_RECHAZADO => 'Rechazado',
+            self::ESTADO_ANULADO => 'Anulado',
+        ];
     }
 
     /**
@@ -174,7 +219,10 @@ class GuiaRemision extends Model
     // Scopes
     public function scopeActivas($query)
     {
-        return $query->whereIn('estado', ['PENDIENTE', 'ENVIADO', 'ACEPTADO']);
+        return $query->whereIn('estado', [
+            self::ESTADO_PENDIENTE,
+            self::ESTADO_ACEPTADO
+        ]);
     }
 
     public function scopePorEstado($query, $estado)
@@ -196,17 +244,47 @@ class GuiaRemision extends Model
     // Métodos de utilidad
     public function puedeEnviar()
     {
-        return $this->estado === 'PENDIENTE';
+        return $this->estado === self::ESTADO_PENDIENTE;
     }
 
     public function puedeReenviar()
     {
-        return in_array($this->estado, ['RECHAZADO', 'PENDIENTE']);
+        return in_array($this->estado, [
+            self::ESTADO_RECHAZADO,
+            self::ESTADO_PENDIENTE
+        ]);
     }
 
     public function puedeAnular()
     {
-        return in_array($this->estado, ['PENDIENTE', 'ACEPTADO']);
+        return in_array($this->estado, [
+            self::ESTADO_PENDIENTE,
+            self::ESTADO_ACEPTADO
+        ]);
+    }
+
+    /**
+     * Verificar si la guía fue aceptada por SUNAT
+     */
+    public function estaAceptada()
+    {
+        return $this->estado === self::ESTADO_ACEPTADO;
+    }
+
+    /**
+     * Verificar si la guía fue rechazada por SUNAT
+     */
+    public function estaRechazada()
+    {
+        return $this->estado === self::ESTADO_RECHAZADO;
+    }
+
+    /**
+     * Verificar si la guía está anulada
+     */
+    public function estaAnulada()
+    {
+        return $this->estado === self::ESTADO_ANULADO;
     }
 
     public function tieneArchivos()

@@ -51,6 +51,7 @@ return [
         'district' => env('COMPANY_DISTRICT'),
         'province' => env('COMPANY_PROVINCE'),
         'department' => env('COMPANY_DEPARTMENT'),
+        'ubigeo' => env('COMPANY_UBIGEO', '150301'),
     ],
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),

@@ -2,15 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\Comprobante;
 use App\Models\NotaCredito;
 use App\Models\NotaDebito;
-use App\Models\Comprobante;
-use Greenter\Model\Sale\Note;
-use Greenter\Model\Sale\SaleDetail;
+use Carbon\Carbon;
 use Greenter\Model\Client\Client;
 use Greenter\Model\Company\Address;
+use Greenter\Model\Sale\Note;
+use Greenter\Model\Sale\SaleDetail;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class NotasService
 {
@@ -31,7 +31,7 @@ class NotasService
 
             // Validar estados permitidos para envío
             $estadosPermitidos = ['pendiente', 'generado', 'rechazado'];
-            if (!in_array($notaCredito->estado, $estadosPermitidos)) {
+            if (! in_array($notaCredito->estado, $estadosPermitidos)) {
                 throw new \Exception("No se puede enviar la nota en estado '{$notaCredito->estado}'. Estados permitidos: pendiente, generado, rechazado");
             }
 
@@ -40,7 +40,7 @@ class NotasService
                 ->where('correlativo', $notaCredito->numero_comprobante_ref)
                 ->first();
 
-            if (!$comprobanteRef) {
+            if (! $comprobanteRef) {
                 throw new \Exception('No se encontró el comprobante de referencia');
             }
 
@@ -55,7 +55,7 @@ class NotasService
 
             // Guardar XML firmado
             $xmlFirmado = $see->getFactory()->getLastXml();
-            
+
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
                 $cdrZip = $result->getCdrZip();
@@ -74,17 +74,17 @@ class NotasService
 
                 Log::info('Nota de crédito enviada exitosamente', [
                     'nota_credito_id' => $notaCredito->id,
-                    'numero' => $notaCredito->serie . '-' . $notaCredito->numero
+                    'numero' => $notaCredito->serie.'-'.$notaCredito->numero,
                 ]);
 
                 return [
                     'success' => true,
                     'message' => 'Nota de crédito enviada a SUNAT exitosamente',
-                    'data' => $notaCredito->fresh()
+                    'data' => $notaCredito->fresh(),
                 ];
             } else {
                 $error = $result->getError();
-                
+
                 $notaCredito->update([
                     'estado' => 'rechazado',
                     'xml' => $xmlFirmado,
@@ -95,14 +95,14 @@ class NotasService
                 Log::error('Nota de crédito rechazada por SUNAT', [
                     'nota_credito_id' => $notaCredito->id,
                     'error' => $error->getMessage(),
-                    'codigo' => $error->getCode()
+                    'codigo' => $error->getCode(),
                 ]);
 
                 return [
                     'success' => false,
                     'message' => 'Nota de crédito rechazada por SUNAT',
                     'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
+                    'codigo_error' => $error->getCode(),
                 ];
             }
 
@@ -110,13 +110,13 @@ class NotasService
             Log::error('Error enviando nota de crédito a SUNAT', [
                 'nota_credito_id' => $notaCreditoId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Error al enviar nota de crédito',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -131,7 +131,7 @@ class NotasService
 
             // Validar estados permitidos para envío
             $estadosPermitidos = ['pendiente', 'generado', 'rechazado'];
-            if (!in_array($notaDebito->estado, $estadosPermitidos)) {
+            if (! in_array($notaDebito->estado, $estadosPermitidos)) {
                 throw new \Exception("No se puede enviar la nota en estado '{$notaDebito->estado}'. Estados permitidos: pendiente, generado, rechazado");
             }
 
@@ -140,7 +140,7 @@ class NotasService
                 ->where('correlativo', $notaDebito->numero_comprobante_ref)
                 ->first();
 
-            if (!$comprobanteRef) {
+            if (! $comprobanteRef) {
                 throw new \Exception('No se encontró el comprobante de referencia');
             }
 
@@ -155,7 +155,7 @@ class NotasService
 
             // Guardar XML firmado
             $xmlFirmado = $see->getFactory()->getLastXml();
-            
+
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
                 $cdrZip = $result->getCdrZip();
@@ -174,17 +174,17 @@ class NotasService
 
                 Log::info('Nota de débito enviada exitosamente', [
                     'nota_debito_id' => $notaDebito->id,
-                    'numero' => $notaDebito->serie . '-' . $notaDebito->numero
+                    'numero' => $notaDebito->serie.'-'.$notaDebito->numero,
                 ]);
 
                 return [
                     'success' => true,
                     'message' => 'Nota de débito enviada a SUNAT exitosamente',
-                    'data' => $notaDebito->fresh()
+                    'data' => $notaDebito->fresh(),
                 ];
             } else {
                 $error = $result->getError();
-                
+
                 $notaDebito->update([
                     'estado' => 'rechazado',
                     'xml' => $xmlFirmado,
@@ -195,14 +195,14 @@ class NotasService
                 Log::error('Nota de débito rechazada por SUNAT', [
                     'nota_debito_id' => $notaDebito->id,
                     'error' => $error->getMessage(),
-                    'codigo' => $error->getCode()
+                    'codigo' => $error->getCode(),
                 ]);
 
                 return [
                     'success' => false,
                     'message' => 'Nota de débito rechazada por SUNAT',
                     'error' => $error->getMessage(),
-                    'codigo_error' => $error->getCode()
+                    'codigo_error' => $error->getCode(),
                 ];
             }
 
@@ -210,13 +210,13 @@ class NotasService
             Log::error('Error enviando nota de débito a SUNAT', [
                 'nota_debito_id' => $notaDebitoId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Error al enviar nota de débito',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -226,7 +226,7 @@ class NotasService
      */
     private function construirNotaCredito(NotaCredito $notaCredito, Comprobante $comprobanteRef)
     {
-        $note = new Note();
+        $note = new Note;
 
         // Datos básicos
         $note->setUblVersion('2.1')
@@ -235,7 +235,7 @@ class NotasService
             ->setCorrelativo($notaCredito->numero)
             ->setFechaEmision(Carbon::parse($notaCredito->fecha_emision))
             ->setTipDocAfectado($comprobanteRef->tipo_comprobante)
-            ->setNumDocfectado($comprobanteRef->serie . '-' . $comprobanteRef->correlativo)
+            ->setNumDocfectado($comprobanteRef->serie.'-'.$comprobanteRef->correlativo)
             ->setCodMotivo($notaCredito->tipo_nota_credito ?? '01')
             ->setDesMotivo($notaCredito->motivo)
             ->setTipoMoneda($notaCredito->moneda ?? 'PEN');
@@ -245,7 +245,7 @@ class NotasService
         $note->setCompany($company);
 
         // Cliente
-        $client = new Client();
+        $client = new Client;
         $client->setTipoDoc($notaCredito->cliente->tipo_documento)
             ->setNumDoc($notaCredito->cliente->numero_documento)
             ->setRznSocial($notaCredito->cliente->razon_social);
@@ -257,7 +257,7 @@ class NotasService
         $note->setClient($client);
 
         // Detalles - Crear un detalle genérico basado en los totales
-        $item = new SaleDetail();
+        $item = new SaleDetail;
         $valorUnitario = $notaCredito->subtotal;
         $igv = $notaCredito->igv;
         $precioUnitario = $notaCredito->total;
@@ -293,7 +293,7 @@ class NotasService
      */
     private function construirNotaDebito(NotaDebito $notaDebito, Comprobante $comprobanteRef)
     {
-        $note = new Note();
+        $note = new Note;
 
         // Datos básicos
         $note->setUblVersion('2.1')
@@ -302,7 +302,7 @@ class NotasService
             ->setCorrelativo($notaDebito->numero)
             ->setFechaEmision(Carbon::parse($notaDebito->fecha_emision))
             ->setTipDocAfectado($comprobanteRef->tipo_comprobante)
-            ->setNumDocfectado($comprobanteRef->serie . '-' . $comprobanteRef->correlativo)
+            ->setNumDocfectado($comprobanteRef->serie.'-'.$comprobanteRef->correlativo)
             ->setCodMotivo($notaDebito->tipo_nota_debito ?? '01')
             ->setDesMotivo($notaDebito->motivo)
             ->setTipoMoneda($notaDebito->moneda ?? 'PEN');
@@ -312,7 +312,7 @@ class NotasService
         $note->setCompany($company);
 
         // Cliente
-        $client = new Client();
+        $client = new Client;
         $client->setTipoDoc($notaDebito->cliente->tipo_documento)
             ->setNumDoc($notaDebito->cliente->numero_documento)
             ->setRznSocial($notaDebito->cliente->razon_social);
@@ -324,7 +324,7 @@ class NotasService
         $note->setClient($client);
 
         // Detalles - Crear un detalle genérico basado en los totales
-        $item = new SaleDetail();
+        $item = new SaleDetail;
         $valorUnitario = $notaDebito->subtotal;
         $igv = $notaDebito->igv;
         $precioUnitario = $notaDebito->total;
@@ -361,19 +361,20 @@ class NotasService
     private function generarPdfNotaCredito(NotaCredito $notaCredito)
     {
         try {
+            // Usar CompanyDataProvider para obtener datos desde .env
+            $companyDataProvider = new \App\Services\CompanyDataProvider;
+            $datosEmpresa = $companyDataProvider->getCompanyInfo();
+
             $html = view('pdf.nota-credito', [
                 'nota' => $notaCredito,
                 'cliente' => $notaCredito->cliente,
-                'empresa' => [
-                    'ruc' => config('services.company.ruc'),
-                    'razon_social' => config('services.company.name'),
-                    'direccion' => config('services.company.address'),
-                ]
+                'empresa' => $datosEmpresa,
+                'datos_empresa' => $datosEmpresa, // Para compatibilidad con el template
             ])->render();
 
             // Usar DomPDF si está disponible
             if (class_exists('\Dompdf\Dompdf')) {
-                $dompdf = new \Dompdf\Dompdf();
+                $dompdf = new \Dompdf\Dompdf;
                 $dompdf->loadHtml($html);
                 $dompdf->setPaper('A4', 'portrait');
                 $dompdf->render();
@@ -384,17 +385,17 @@ class NotasService
             }
 
             $notaCredito->update([
-                'pdf' => base64_encode($pdfContent)
+                'pdf' => base64_encode($pdfContent),
             ]);
 
             Log::info('PDF de nota de crédito generado', [
-                'nota_credito_id' => $notaCredito->id
+                'nota_credito_id' => $notaCredito->id,
             ]);
 
         } catch (\Exception $e) {
             Log::error('Error generando PDF de nota de crédito', [
                 'nota_credito_id' => $notaCredito->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -405,19 +406,20 @@ class NotasService
     private function generarPdfNotaDebito(NotaDebito $notaDebito)
     {
         try {
+            // Usar CompanyDataProvider para obtener datos desde .env
+            $companyDataProvider = new \App\Services\CompanyDataProvider;
+            $datosEmpresa = $companyDataProvider->getCompanyInfo();
+
             $html = view('pdf.nota-debito', [
                 'nota' => $notaDebito,
                 'cliente' => $notaDebito->cliente,
-                'empresa' => [
-                    'ruc' => config('services.company.ruc'),
-                    'razon_social' => config('services.company.name'),
-                    'direccion' => config('services.company.address'),
-                ]
+                'empresa' => $datosEmpresa,
+                'datos_empresa' => $datosEmpresa, // Para compatibilidad con el template
             ])->render();
 
             // Usar DomPDF si está disponible
             if (class_exists('\Dompdf\Dompdf')) {
-                $dompdf = new \Dompdf\Dompdf();
+                $dompdf = new \Dompdf\Dompdf;
                 $dompdf->loadHtml($html);
                 $dompdf->setPaper('A4', 'portrait');
                 $dompdf->render();
@@ -428,17 +430,17 @@ class NotasService
             }
 
             $notaDebito->update([
-                'pdf' => base64_encode($pdfContent)
+                'pdf' => base64_encode($pdfContent),
             ]);
 
             Log::info('PDF de nota de débito generado', [
-                'nota_debito_id' => $notaDebito->id
+                'nota_debito_id' => $notaDebito->id,
             ]);
 
         } catch (\Exception $e) {
             Log::error('Error generando PDF de nota de débito', [
                 'nota_debito_id' => $notaDebito->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -460,7 +462,7 @@ class NotasService
                 ->where('correlativo', $notaCredito->numero_comprobante_ref)
                 ->first();
 
-            if (!$comprobanteRef) {
+            if (! $comprobanteRef) {
                 throw new \Exception('No se encontró el comprobante de referencia');
             }
 
@@ -485,26 +487,26 @@ class NotasService
 
             Log::info('XML de nota de crédito generado', [
                 'nota_credito_id' => $notaCredito->id,
-                'numero' => $notaCredito->serie . '-' . $notaCredito->numero
+                'numero' => $notaCredito->serie.'-'.$notaCredito->numero,
             ]);
 
             return [
                 'success' => true,
                 'message' => 'XML generado exitosamente',
-                'data' => $notaCredito->fresh()
+                'data' => $notaCredito->fresh(),
             ];
 
         } catch (\Exception $e) {
             Log::error('Error generando XML de nota de crédito', [
                 'nota_credito_id' => $notaCreditoId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Error al generar XML',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }
@@ -526,7 +528,7 @@ class NotasService
                 ->where('correlativo', $notaDebito->numero_comprobante_ref)
                 ->first();
 
-            if (!$comprobanteRef) {
+            if (! $comprobanteRef) {
                 throw new \Exception('No se encontró el comprobante de referencia');
             }
 
@@ -551,26 +553,26 @@ class NotasService
 
             Log::info('XML de nota de débito generado', [
                 'nota_debito_id' => $notaDebito->id,
-                'numero' => $notaDebito->serie . '-' . $notaDebito->numero
+                'numero' => $notaDebito->serie.'-'.$notaDebito->numero,
             ]);
 
             return [
                 'success' => true,
                 'message' => 'XML generado exitosamente',
-                'data' => $notaDebito->fresh()
+                'data' => $notaDebito->fresh(),
             ];
 
         } catch (\Exception $e) {
             Log::error('Error generando XML de nota de débito', [
                 'nota_debito_id' => $notaDebitoId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
                 'success' => false,
                 'message' => 'Error al generar XML',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         }
     }

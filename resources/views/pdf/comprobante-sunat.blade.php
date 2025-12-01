@@ -4,132 +4,185 @@
     <meta charset="UTF-8">
     <title>{{ $tipo_comprobante }} {{ $numero_completo }}</title>
     <style>
-        /* CSS optimizado para DomPDF - Sin gradientes ni sombras */
+        /* CSS optimizado para DomPDF - Diseño formal y profesional */
         @page {
-            margin: 15mm 10mm;
+            margin: 10mm 10mm;
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Arial', sans-serif;
             font-size: 9px;
             margin: 0;
             padding: 0;
-            line-height: 1.3;
-            color: #333;
+            line-height: 1.4;
+            color: #000;
+            background-color: #f0f0f0;
         }
 
         .header {
-            border-bottom: 2px solid #333;
-            padding-bottom: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #000;
         }
 
         .header table {
             border-collapse: collapse;
+            width: 100%;
         }
 
         .header td {
             border: none;
+            vertical-align: top;
         }
 
-        .comprobante-titulo {
+        .logo-container {
+            width: 180px;
+            padding-right: 15px;
+        }
+
+        .logo-container img {
+            max-width: 160px;
+            max-height: 100px;
+        }
+
+        .empresa-info {
+            width: 300px;
+            padding-right: 15px;
+        }
+
+        .empresa-info h2 {
+            margin: 0 0 3px 0;
+            font-size: 13px;
+            color: #000;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .empresa-info p {
+            margin: 2px 0;
+            font-size: 8.5px;
+            color: #000;
+            line-height: 1.3;
+        }
+
+        .comprobante-box {
+            width: 200px;
             text-align: center;
+            border: 2px solid #000;
+            padding: 10px;
+            background-color: #d9d9d9;
+        }
+
+        .comprobante-box .ruc {
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0 0 8px 0;
+            color: #000;
+        }
+
+        .comprobante-box .tipo {
+            font-size: 13px;
+            font-weight: bold;
+            margin: 0 0 8px 0;
+            color: #000;
+        }
+
+        .comprobante-box .numero {
             font-size: 16px;
             font-weight: bold;
-            margin: 8px 0;
-            padding: 8px;
-            background-color: #4a5568;
-            color: white;
-            clear: both;
+            margin: 0;
+            color: #000;
         }
 
-        .comprobante-titulo .tipo {
-            font-size: 14px;
-            display: block;
-            margin-bottom: 3px;
+        .info-section {
+            margin: 15px 0;
         }
 
-        .comprobante-titulo .numero {
-            font-size: 12px;
-            letter-spacing: 1px;
+        .info-section table {
+            width: 100%;
+            border-collapse: collapse;
         }
 
-        .cliente-section {
-            margin: 8px 0;
-            padding: 8px;
-            background-color: #f5f5f5;
-            border-left: 3px solid #4a5568;
+        .info-box {
+            border: 1px solid #000;
+            padding: 10px;
+            margin-bottom: 10px;
         }
 
-        .cliente-section h3 {
-            margin: 0 0 6px 0;
+        .info-box h3 {
+            margin: 0 0 8px 0;
             font-size: 10px;
             color: #000;
             font-weight: bold;
             text-transform: uppercase;
         }
 
-        .cliente-datos {
+        .info-box p {
+            margin: 3px 0;
+            font-size: 9px;
+            color: #000;
+            line-height: 1.4;
+        }
+
+        .info-box strong {
+            font-weight: bold;
+            display: inline-block;
+            width: 120px;
+        }
+
+        .info-row {
             display: table;
             width: 100%;
         }
 
-        .cliente-col {
+        .info-col {
             display: table-cell;
             width: 50%;
-            vertical-align: top;
             padding-right: 10px;
-        }
-
-        .cliente-col p {
-            margin: 3px 0;
-            line-height: 1.4;
-            font-size: 8px;
         }
 
         .tabla-productos {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 8px;
+            margin: 15px 0;
+            font-size: 8.5px;
         }
 
         .tabla-productos th,
         .tabla-productos td {
-            border: 1px solid #ccc;
-            padding: 4px 3px;
+            border: 1px solid #000;
+            padding: 5px 4px;
             text-align: left;
         }
 
         .tabla-productos thead {
-            background-color: #4a5568;
+            background-color: #c0c0c0;
         }
 
         .tabla-productos th {
-            color: white;
+            color: #000;
             font-weight: bold;
             text-align: center;
-            font-size: 8px;
+            font-size: 8.5px;
+            padding: 6px 4px;
+            text-transform: uppercase;
         }
 
-        .tabla-productos tbody tr:nth-child(even) {
-            background-color: #f9f9f9;
+        .tabla-productos tbody tr {
+            background-color: #fff;
         }
 
         .tabla-productos .text-center { text-align: center; }
         .tabla-productos .text-right { text-align: right; }
 
         .totales-section {
-            margin-top: 10px;
-            overflow: hidden;
+            margin-top: 15px;
         }
 
         .totales {
             float: right;
-            width: 250px;
-            background: white;
-            border: 1px solid #ccc;
-            padding: 8px;
+            width: 280px;
+            border: 1px solid #000;
         }
 
         .totales table {
@@ -139,8 +192,9 @@
         }
 
         .totales td {
-            padding: 4px 6px;
-            border-bottom: 1px solid #eee;
+            padding: 5px 8px;
+            border-bottom: 1px solid #ccc;
+            color: #000;
         }
 
         .totales tr:last-child td {
@@ -150,58 +204,45 @@
         .totales .total-final {
             font-weight: bold;
             font-size: 11px;
-            border-top: 2px solid #333 !important;
-            background-color: #4a5568;
-            color: white;
-            padding: 6px !important;
-        }
-
-        .total-letras {
-            margin-top: 8px;
-            font-size: 8px;
-            font-weight: bold;
-            padding: 6px;
-            background-color: #f5f5f5;
-            border-left: 2px solid #4a5568;
-            text-align: left;
+            border-top: 2px solid #000 !important;
+            background-color: #c0c0c0;
+            padding: 8px !important;
         }
 
         .footer {
-            margin-top: 15px;
-            border-top: 2px solid #333;
+            margin-top: 20px;
+            border-top: 1px solid #000;
             padding-top: 10px;
             font-size: 8px;
             clear: both;
-            overflow: hidden;
         }
 
         .qr-section {
             float: left;
-            width: 100px;
+            width: 120px;
             text-align: center;
             padding: 5px;
-            background: white;
-            border: 1px solid #ccc;
+            border: 1px solid #000;
         }
 
         .qr-section img {
-            max-width: 90px;
-            max-height: 90px;
-            border: 1px solid #ccc;
+            max-width: 110px;
+            max-height: 110px;
         }
 
         .qr-section p {
             margin: 5px 0 0 0;
             font-size: 7px;
-            color: #666;
+            color: #000;
+            font-weight: bold;
         }
 
         .info-legal {
             float: right;
-            width: 320px;
-            background-color: #f5f5f5;
+            width: 380px;
+            background-color: #e8e8e8;
             padding: 8px;
-            border: 1px solid #ccc;
+            border: 1px solid #000;
         }
 
         .info-legal h4 {
@@ -210,18 +251,20 @@
             color: #000;
             font-weight: bold;
             text-transform: uppercase;
-            border-bottom: 1px solid #4a5568;
+            border-bottom: 1px solid #000;
             padding-bottom: 4px;
         }
 
         .info-legal p {
             margin: 4px 0;
             line-height: 1.3;
-            font-size: 7px;
+            font-size: 7.5px;
+            color: #000;
         }
 
         .info-legal strong {
             color: #000;
+            font-weight: bold;
         }
 
         .text-right { text-align: right; }
@@ -231,7 +274,7 @@
         .clearfix { clear: both; }
 
         /* Evitar saltos de página no deseados */
-        .cliente-section,
+        .info-section,
         .tabla-productos,
         .totales-section {
             page-break-inside: avoid;
@@ -247,55 +290,69 @@
 <body>
     <!-- ENCABEZADO CON DATOS EMPRESA -->
     <div class="header">
-        <table style="width: 100%; border: 0;">
+        <table>
             <tr>
-                <td style="width: 100px; vertical-align: top; padding: 0;">
+                <td class="logo-container">
                     @if(!empty($datos_empresa['logo_path']) && file_exists($datos_empresa['logo_path']))
-                        <img src="{{ $datos_empresa['logo_path'] }}" alt="Logo" style="max-width: 70px; max-height: 60px; border: 1px solid #ccc;">
+                        @php
+                            // Convertir imagen a base64 para DomPDF
+                            $logoPath = $datos_empresa['logo_path'];
+                            $imageData = base64_encode(file_get_contents($logoPath));
+                            $imageType = pathinfo($logoPath, PATHINFO_EXTENSION);
+                            $mimeType = $imageType === 'png' ? 'image/png' : 'image/jpeg';
+                            $logoSrc = "data:{$mimeType};base64,{$imageData}";
+                        @endphp
+                        <img src="{{ $logoSrc }}" alt="Logo Empresa">
                     @endif
                 </td>
-                <td style="vertical-align: top; text-align: center; padding: 0 10px;">
-                    <h2 style="margin: 0 0 4px 0; font-size: 14px; color: #000; font-weight: bold;">{{ $datos_empresa['razon_social'] }}</h2>
-                    <p style="margin: 2px 0; font-size: 11px; font-weight: bold; color: #c00;">RUC: {{ $datos_empresa['ruc'] }}</p>
-                    <p style="margin: 2px 0; font-size: 8px; color: #333;">{{ $datos_empresa['direccion_fiscal'] }}</p>
+                <td class="empresa-info">
+                    <h2>{{ $datos_empresa['razon_social'] }}</h2>
+                    <p>{{ $datos_empresa['direccion_fiscal'] }}</p>
                     @if(!empty($datos_empresa['distrito']) && !empty($datos_empresa['provincia']))
-                        <p style="margin: 2px 0; font-size: 8px; color: #333;">{{ $datos_empresa['distrito'] }} - {{ $datos_empresa['provincia'] }}@if(!empty($datos_empresa['departamento'])) - {{ $datos_empresa['departamento'] }}@endif</p>
+                        <p>{{ $datos_empresa['distrito'] }}, {{ $datos_empresa['provincia'] }}@if(!empty($datos_empresa['departamento'])) - {{ $datos_empresa['departamento'] }}@endif</p>
                     @endif
-                </td>
-                <td style="width: 150px; vertical-align: top; text-align: right; padding: 0; font-size: 8px;">
                     @if(!empty($datos_empresa['telefono']))
-                        <p style="margin: 2px 0;">Tel: {{ $datos_empresa['telefono'] }}</p>
+                        <p>Tel: {{ $datos_empresa['telefono'] }}</p>
                     @endif
                     @if(!empty($datos_empresa['email']))
-                        <p style="margin: 2px 0;">{{ $datos_empresa['email'] }}</p>
+                        <p>{{ $datos_empresa['email'] }}</p>
                     @endif
                     @if(!empty($datos_empresa['web']))
-                        <p style="margin: 2px 0;">{{ $datos_empresa['web'] }}</p>
+                        <p>{{ $datos_empresa['web'] }}</p>
                     @endif
+                </td>
+                <td class="comprobante-box">
+                    <p class="ruc">RUC {{ $datos_empresa['ruc'] }}</p>
+                    <p class="tipo">{{ $tipo_comprobante }}</p>
+                    <p class="numero">{{ $numero_completo }}</p>
                 </td>
             </tr>
         </table>
     </div>
 
-    <!-- TÍTULO ESPECÍFICO DEL COMPROBANTE -->
-    <div class="comprobante-titulo">
-        <span class="tipo">{{ $tipo_comprobante }}</span>
-        <span class="numero">{{ $numero_completo }}</span>
-    </div>
-
-    <!-- DATOS DEL CLIENTE -->
-    <div class="cliente-section">
-        <h3>DATOS DEL CLIENTE</h3>
-        <div class="cliente-datos">
-            <div class="cliente-col">
-                <p><strong>Cliente:</strong> {{ $datos_cliente['razon_social'] }}</p>
-                <p><strong>{{ $datos_cliente['tipo_documento'] === '6' ? 'RUC' : 'DNI' }}:</strong> {{ $datos_cliente['numero_documento'] }}</p>
-            </div>
-            <div class="cliente-col">
-                <p><strong>Dirección:</strong> {{ $datos_cliente['direccion'] }}</p>
-                <p><strong>Fecha Emisión:</strong> {{ \Carbon\Carbon::parse($fecha_emision)->format('d/m/Y') }}</p>
-            </div>
-        </div>
+    <!-- INFORMACIÓN DEL CLIENTE Y FECHA -->
+    <div class="info-section">
+        <table style="width: 100%;">
+            <tr>
+                <td style="width: 60%; vertical-align: top; padding-right: 10px;">
+                    <div class="info-box">
+                        <h3>DATOS DEL CLIENTE</h3>
+                        <p><strong>{{ $datos_cliente['tipo_documento'] === '6' ? 'RUC' : 'DNI' }}:</strong> {{ $datos_cliente['numero_documento'] }}</p>
+                        <p><strong>NOMBRE:</strong> {{ $datos_cliente['razon_social'] }}</p>
+                        <p><strong>TELÉFONO:</strong> {{ $comprobante->cliente->telefono ?? 'No especificado' }}</p>
+                    </div>
+                </td>
+                <td style="width: 40%; vertical-align: top;">
+                    <div class="info-box">
+                        <h3>INFORMACIÓN</h3>
+                        <p><strong>FECHA EMISIÓN:</strong> {{ \Carbon\Carbon::parse($fecha_emision)->format('d/m/Y') }}</p>
+                        <p><strong>CONDICIÓN PAGO:</strong> CONTADO</p>
+                        <p><strong>MEDIO DE PAGO:</strong> Efectivo</p>
+                        <p><strong>MONEDA:</strong> PEN</p>
+                    </div>
+                </td>
+            </tr>
+        </table>
     </div>
 
     <!-- DETALLE DE PRODUCTOS -->
@@ -303,13 +360,13 @@
     <table class="tabla-productos">
         <thead>
             <tr>
-                <th style="width: 8%;">Cód.</th>
-                <th style="width: 38%;">Descripción</th>
-                <th style="width: 7%;">Und.</th>
-                <th style="width: 7%;">Cant.</th>
-                <th style="width: 13%;">P. Unit.</th>
-                <th style="width: 13%;">V. Venta</th>
-                <th style="width: 14%;">Total</th>
+                <th style="width: 12%;">Código</th>
+                <th style="width: 40%;">Descripción</th>
+                <th style="width: 8%;">Unidad</th>
+                <th style="width: 8%;">Cant</th>
+                <th style="width: 11%;">V.Unitario</th>
+                <th style="width: 11%;">P.Unitario</th>
+                <th style="width: 10%;">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -319,8 +376,8 @@
                 <td>{{ $producto['descripcion'] }}</td>
                 <td class="text-center">{{ $producto['unidad_medida'] }}</td>
                 <td class="text-center">{{ $producto['cantidad'] }}</td>
-                <td class="text-right">S/ {{ $producto['precio_unitario'] }}</td>
-                <td class="text-right">S/ {{ $producto['valor_venta'] }}</td>
+                <td class="text-right">{{ $producto['precio_unitario'] }}</td>
+                <td class="text-right">{{ $producto['precio_unitario'] }}</td>
                 <td class="text-right">S/ {{ $producto['total_linea'] }}</td>
             </tr>
             @endforeach
@@ -333,28 +390,36 @@
         <div class="totales">
             <table>
                 <tr>
-                    <td><strong>Operación Gravada:</strong></td>
-                    <td class="text-right"><strong>S/ {{ $totales['operacion_gravada'] }}</strong></td>
+                    <td>Op. Gravada</td>
+                    <td class="text-right">S/ {{ $totales['operacion_gravada'] }}</td>
                 </tr>
                 <tr>
-                    <td><strong>IGV (18%):</strong></td>
-                    <td class="text-right"><strong>S/ {{ $totales['igv_18'] }}</strong></td>
+                    <td>Op. Gratuita</td>
+                    <td class="text-right">S/ 0.00</td>
+                </tr>
+                <tr>
+                    <td>Op. Exonerada</td>
+                    <td class="text-right">S/ 0.00</td>
+                </tr>
+                <tr>
+                    <td>Op. Inafecta</td>
+                    <td class="text-right">S/ 0.00</td>
                 </tr>
                 @if(!empty($totales['descuentos']))
                 <tr>
-                    <td><strong>Descuento:</strong></td>
-                    <td class="text-right"><strong>- S/ {{ $totales['descuentos'] }}</strong></td>
+                    <td>Descuento</td>
+                    <td class="text-right">- S/ {{ $totales['descuentos'] }}</td>
                 </tr>
                 @endif
+                <tr>
+                    <td>IGV</td>
+                    <td class="text-right">S/ {{ $totales['igv_18'] }}</td>
+                </tr>
                 <tr class="total-final">
-                    <td><strong>TOTAL:</strong></td>
+                    <td><strong>IMPORTE TOTAL</strong></td>
                     <td class="text-right"><strong>S/ {{ $totales['total_numeros'] }}</strong></td>
                 </tr>
             </table>
-            
-            <div class="total-letras">
-                {{ $totales['total_letras'] }}
-            </div>
         </div>
         <div class="clearfix"></div>
     </div>
