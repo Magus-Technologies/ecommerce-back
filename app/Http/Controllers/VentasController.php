@@ -171,12 +171,17 @@ class VentasController extends Controller
             'cliente_datos.email' => 'nullable|email|max:255',
             'cliente_datos.telefono' => 'nullable|string|max:20',
 
-            // Productos - Estructura simplificada
-            'productos' => 'required|array|min:1',
-            'productos.*.producto_id' => 'required|exists:productos,id',
-            'productos.*.cantidad' => 'required|numeric|min:0.01',
-            'productos.*.precio_unitario' => 'required|numeric|min:0',
-            'productos.*.descuento_unitario' => 'nullable|numeric|min:0',
+            // Items (Productos o Servicios) - Estructura simplificada
+            'items' => 'required|array|min:1',
+            'items.*.tipo_item' => 'required|in:PRODUCTO,SERVICIO',
+            'items.*.producto_id' => 'required_if:items.*.tipo_item,PRODUCTO|exists:productos,id',
+            'items.*.servicio_id' => 'nullable|exists:servicios,id',
+            'items.*.descripcion' => 'required_if:items.*.tipo_item,SERVICIO',
+            'items.*.cantidad' => 'required|numeric|min:0.01',
+            'items.*.precio_unitario' => 'required|numeric|min:0',
+            'items.*.descuento_unitario' => 'nullable|numeric|min:0',
+            'items.*.unidad_medida' => 'nullable|string|max:10',
+            'items.*.tipo_afectacion_igv' => 'nullable|string|max:2',
 
             // Datos de venta
             'descuento_total' => 'nullable|numeric|min:0',
@@ -342,42 +347,63 @@ class VentasController extends Controller
                 );
             }
 
-            // 3. VALIDAR Y AUTO-COMPLETAR DATOS DE PRODUCTOS
+            // 3. VALIDAR Y AUTO-COMPLETAR DATOS DE ITEMS (PRODUCTOS O SERVICIOS)
             $subtotal = 0;
             $igvTotal = 0;
-            $productosVenta = [];
+            $itemsVenta = [];
 
-            foreach ($request->productos as $index => $prod) {
-                // Buscar producto en BD
-                $producto = Producto::find($prod['producto_id']);
+            foreach ($request->items as $index => $item) {
+                $tipoItem = $item['tipo_item'];
+                $producto = null;
+                $servicio = null;
 
-                if (! $producto) {
-                    throw new \Exception("Producto no encontrado con ID: {$prod['producto_id']}");
+                // Buscar producto o servicio según el tipo
+                if ($tipoItem === 'PRODUCTO') {
+                    $producto = Producto::find($item['producto_id']);
+                    if (! $producto) {
+                        throw new \Exception("Producto no encontrado con ID: {$item['producto_id']}");
+                    }
+
+                    // 4. VALIDAR STOCK solo para productos
+                    if ($producto->stock < $item['cantidad']) {
+                        throw new \Exception("Stock insuficiente para el producto '{$producto->nombre}'. Stock disponible: {$producto->stock}, solicitado: {$item['cantidad']}");
+                    }
+
+                    $codigo = $producto->codigo_producto ?? 'PROD-'.$producto->id;
+                    $descripcion = $producto->nombre;
+                    $unidadMedida = 'NIU';
+                    $tipoAfectacionIgv = $producto->mostrar_igv ? '10' : '20';
+                } else {
+                    // SERVICIO - Puede ser del catálogo O manual
+                    if (isset($item['servicio_id']) && $item['servicio_id']) {
+                        // Servicio del catálogo
+                        $servicio = \App\Models\Servicio::find($item['servicio_id']);
+                        if (! $servicio) {
+                            throw new \Exception("Servicio no encontrado con ID: {$item['servicio_id']}");
+                        }
+
+                        $codigo = $servicio->codigo_servicio;
+                        $descripcion = $servicio->nombre;
+                        $unidadMedida = $servicio->unidad_medida ?? 'ZZ';
+                        $tipoAfectacionIgv = $servicio->tipo_afectacion_igv ?? '10';
+                    } else {
+                        // Servicio MANUAL (sin catálogo)
+                        $codigo = 'SERV-MANUAL-'.time();
+                        $descripcion = $item['descripcion'];
+                        $unidadMedida = $item['unidad_medida'] ?? 'ZZ';
+                        $tipoAfectacionIgv = $item['tipo_afectacion_igv'] ?? '10';
+                    }
                 }
 
-                // 4. VALIDAR STOCK
-                if ($producto->stock < $prod['cantidad']) {
-                    throw new \Exception("Stock insuficiente para el producto '{$producto->nombre}'. Stock disponible: {$producto->stock}, solicitado: {$prod['cantidad']}");
-                }
-
-                // 5. AUTO-COMPLETAR DATOS DEL PRODUCTO
-                $cantidad = $prod['cantidad'];
-                $precioUnitario = $prod['precio_unitario'];
-                $descuentoUnitario = $prod['descuento_unitario'] ?? 0;
-
-                // Auto-completar desde la tabla productos
-                $codigoProducto = $producto->codigo_producto ?? 'PROD-'.$producto->id;
-                $descripcion = $producto->nombre;
-                $unidadMedida = 'NIU'; // Unidad por defecto (NIU = Unidad)
-
-                // Determinar tipo de afectación IGV
-                // Si el producto tiene mostrar_igv = true, es GRAVADO (10), si no, EXONERADO (20)
-                $tipoAfectacionIgv = $producto->mostrar_igv ? '10' : '20';
+                // 5. AUTO-COMPLETAR DATOS
+                $cantidad = $item['cantidad'];
+                $precioUnitario = $item['precio_unitario'];
+                $descuentoUnitario = $item['descuento_unitario'] ?? 0;
 
                 // 6. CALCULAR MONTOS AUTOMÁTICAMENTE
-                $subtotalProducto = $cantidad * $precioUnitario;
-                $descuentoProducto = $descuentoUnitario * $cantidad;
-                $subtotalNeto = $subtotalProducto - $descuentoProducto;
+                $subtotalItem = $cantidad * $precioUnitario;
+                $descuentoItem = $descuentoUnitario * $cantidad;
+                $subtotalNeto = $subtotalItem - $descuentoItem;
 
                 // Calcular precio sin IGV y IGV según tipo de afectación
                 if ($tipoAfectacionIgv == '10') {
@@ -397,13 +423,17 @@ class VentasController extends Controller
                 $subtotal += $baseImponible;
                 $igvTotal += $igvLinea;
 
-                $productosVenta[] = [
+                $itemsVenta[] = [
+                    'tipo_item' => $tipoItem,
                     'producto' => $producto,
+                    'servicio' => $servicio,
+                    'producto_id' => $producto?->id,
+                    'servicio_id' => $servicio?->id,
                     'cantidad' => $cantidad,
                     'precio_unitario' => $precioUnitario,
                     'precio_sin_igv' => $precioSinIgv,
                     'descuento_unitario' => $descuentoUnitario,
-                    'codigo_producto' => $codigoProducto,
+                    'codigo' => $codigo,
                     'descripcion' => $descripcion,
                     'unidad_medida' => $unidadMedida,
                     'tipo_afectacion_igv' => $tipoAfectacionIgv,
@@ -489,25 +519,29 @@ class VentasController extends Controller
                 'user_cliente_nombre' => $userCliente ? trim(($userCliente->nombres ?? '').' '.($userCliente->apellidos ?? '')) : null,
             ]);
 
-            // 8. CREAR DETALLES Y DESCONTAR STOCK
-            foreach ($productosVenta as $prod) {
+            // 8. CREAR DETALLES Y DESCONTAR STOCK (solo productos)
+            foreach ($itemsVenta as $item) {
                 VentaDetalle::create([
                     'venta_id' => $venta->id,
-                    'producto_id' => $prod['producto']->id,
-                    'codigo_producto' => $prod['codigo_producto'],
-                    'nombre_producto' => $prod['descripcion'],
-                    'descripcion_producto' => $prod['producto']->descripcion,
-                    'cantidad' => $prod['cantidad'],
-                    'precio_unitario' => $prod['precio_unitario'],
-                    'precio_sin_igv' => $prod['precio_sin_igv'],
-                    'descuento_unitario' => $prod['descuento_unitario'],
-                    'subtotal_linea' => $prod['subtotal_linea'],
-                    'igv_linea' => $prod['igv_linea'],
-                    'total_linea' => $prod['total_linea'],
+                    'tipo_item' => $item['tipo_item'],
+                    'producto_id' => $item['producto_id'],
+                    'servicio_id' => $item['servicio_id'],
+                    'codigo_producto' => $item['codigo'],
+                    'nombre_producto' => $item['descripcion'],
+                    'descripcion_producto' => $item['producto']?->descripcion ?? $item['servicio']?->descripcion,
+                    'cantidad' => $item['cantidad'],
+                    'precio_unitario' => $item['precio_unitario'],
+                    'precio_sin_igv' => $item['precio_sin_igv'],
+                    'descuento_unitario' => $item['descuento_unitario'],
+                    'subtotal_linea' => $item['subtotal_linea'],
+                    'igv_linea' => $item['igv_linea'],
+                    'total_linea' => $item['total_linea'],
                 ]);
 
-                // Descontar stock
-                $prod['producto']->decrement('stock', $prod['cantidad']);
+                // Descontar stock solo para productos
+                if ($item['tipo_item'] === 'PRODUCTO' && $item['producto']) {
+                    $item['producto']->decrement('stock', $item['cantidad']);
+                }
             }
 
             // 8.5. GUARDAR MÉTODOS DE PAGO (si es pago mixto)
