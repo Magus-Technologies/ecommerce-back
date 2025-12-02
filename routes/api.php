@@ -32,6 +32,7 @@ require __DIR__.'/api/admin.php';
 require __DIR__.'/api/facturacion.php';
 require __DIR__.'/api/contabilidad.php';
 require __DIR__.'/api/productos.php';
+require __DIR__.'/api/servicios.php';
 require __DIR__.'/api/recompensas.php';
 require __DIR__.'/api/ecommerce.php';
 require __DIR__.'/api/marketing.php';

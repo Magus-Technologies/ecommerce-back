@@ -59,29 +59,55 @@ class NotasService
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
                 $cdrZip = $result->getCdrZip();
+                
+                // Verificar que realmente exista un CDR válido
+                if (!$cdr || !$cdrZip) {
+                    throw new \Exception('SUNAT no devolvió un CDR válido. Esto puede indicar un problema de comunicación.');
+                }
+                
+                // Verificar el código de respuesta del CDR
+                $codigoRespuesta = $cdr->getCode();
+                $esAceptado = in_array($codigoRespuesta, ['0', '99']); // 0=Aceptado, 99=Observado pero aceptado
+                
+                $estado = $esAceptado ? 'aceptado' : 'rechazado';
+                $mensaje = $cdr->getDescription();
 
                 $notaCredito->update([
-                    'estado' => 'aceptado',
+                    'estado' => $estado,
                     'xml' => $xmlFirmado,
-                    'cdr' => $cdrZip ? base64_encode($cdrZip) : null,
+                    'cdr' => base64_encode($cdrZip),
                     'hash' => hash('sha256', $xmlFirmado),
-                    'mensaje_sunat' => $cdr ? $cdr->getDescription() : 'Aceptado',
+                    'mensaje_sunat' => $mensaje,
                     'fecha_envio_sunat' => now(),
                 ]);
 
-                // Generar PDF
-                $this->generarPdfNotaCredito($notaCredito);
+                if ($esAceptado) {
+                    // Generar PDF solo si fue aceptado
+                    $this->generarPdfNotaCredito($notaCredito);
 
-                Log::info('Nota de crédito enviada exitosamente', [
-                    'nota_credito_id' => $notaCredito->id,
-                    'numero' => $notaCredito->serie.'-'.$notaCredito->numero,
-                ]);
+                    Log::info('Nota de crédito aceptada por SUNAT', [
+                        'nota_credito_id' => $notaCredito->id,
+                        'numero' => $notaCredito->serie.'-'.$notaCredito->numero,
+                    ]);
 
-                return [
-                    'success' => true,
-                    'message' => 'Nota de crédito enviada a SUNAT exitosamente',
-                    'data' => $notaCredito->fresh(),
-                ];
+                    return [
+                        'success' => true,
+                        'message' => 'Nota de crédito aceptada por SUNAT',
+                        'data' => $notaCredito->fresh(),
+                    ];
+                } else {
+                    Log::warning('Nota de crédito rechazada por SUNAT', [
+                        'nota_credito_id' => $notaCredito->id,
+                        'codigo' => $codigoRespuesta,
+                        'mensaje' => $mensaje,
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'message' => 'Nota de crédito rechazada por SUNAT',
+                        'error' => $mensaje,
+                    ];
+                }
             } else {
                 $error = $result->getError();
 
@@ -160,12 +186,17 @@ class NotasService
                 $cdr = $result->getCdrResponse();
                 $cdrZip = $result->getCdrZip();
 
+                // Verificar que realmente exista un CDR válido
+                if (!$cdr || !$cdrZip) {
+                    throw new \Exception('SUNAT no devolvió un CDR válido. Esto puede indicar un problema de comunicación.');
+                }
+
                 $notaDebito->update([
                     'estado' => 'aceptado',
                     'xml' => $xmlFirmado,
-                    'cdr' => $cdrZip ? base64_encode($cdrZip) : null,
+                    'cdr' => base64_encode($cdrZip),
                     'hash' => hash('sha256', $xmlFirmado),
-                    'mensaje_sunat' => $cdr ? $cdr->getDescription() : 'Aceptado',
+                    'mensaje_sunat' => $cdr->getDescription(),
                     'fecha_envio_sunat' => now(),
                 ]);
 
@@ -284,6 +315,14 @@ class NotasService
             ->setMtoIGV($notaCredito->igv)
             ->setTotalImpuestos($notaCredito->igv)
             ->setMtoImpVenta($notaCredito->total);
+
+        // Forma de pago (requerido para boletas según error 3257)
+        // Indicar que fue al contado
+        $legend = new \Greenter\Model\Sale\Legend();
+        $montoEnLetras = $this->numeroALetras($notaCredito->total);
+        $legend->setCode('1000') // Leyenda: Monto en letras
+            ->setValue($montoEnLetras);
+        $note->setLegends([$legend]);
 
         return $note;
     }
@@ -575,5 +614,47 @@ class NotasService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Convertir número a letras
+     */
+    private function numeroALetras($numero)
+    {
+        $entero = floor($numero);
+        $decimales = round(($numero - $entero) * 100);
+        
+        return strtoupper($this->convertirEntero($entero)) . ' CON ' . str_pad($decimales, 2, '0', STR_PAD_LEFT) . '/100 SOLES';
+    }
+
+    private function convertirEntero($numero)
+    {
+        $unidades = ['', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+        $decenas = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+        $especiales = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+        
+        if ($numero == 0) return 'CERO';
+        if ($numero < 10) return $unidades[$numero];
+        if ($numero >= 10 && $numero < 20) return $especiales[$numero - 10];
+        if ($numero >= 20 && $numero < 100) {
+            $dec = floor($numero / 10);
+            $uni = $numero % 10;
+            return $decenas[$dec] . ($uni > 0 ? ' Y ' . $unidades[$uni] : '');
+        }
+        if ($numero >= 100 && $numero < 1000) {
+            $cen = floor($numero / 100);
+            $resto = $numero % 100;
+            $centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+            if ($numero == 100) return 'CIEN';
+            return $centenas[$cen] . ($resto > 0 ? ' ' . $this->convertirEntero($resto) : '');
+        }
+        if ($numero >= 1000) {
+            $mil = floor($numero / 1000);
+            $resto = $numero % 1000;
+            $textoMil = $mil == 1 ? 'MIL' : $this->convertirEntero($mil) . ' MIL';
+            return $textoMil . ($resto > 0 ? ' ' . $this->convertirEntero($resto) : '');
+        }
+        
+        return '';
     }
 }

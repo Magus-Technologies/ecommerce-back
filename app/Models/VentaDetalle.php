@@ -11,7 +11,9 @@ class VentaDetalle extends Model
 
     protected $fillable = [
         'venta_id',
+        'tipo_item',
         'producto_id',
+        'servicio_id',
         'codigo_producto',
         'nombre_producto',
         'descripcion_producto',
@@ -47,9 +49,14 @@ class VentaDetalle extends Model
         return $this->belongsTo(Producto::class);
     }
 
+    public function servicio()
+    {
+        return $this->belongsTo(Servicio::class);
+    }
+
     /**
-     * Métodos de pago asignados a este producto
-     * (solo se usa en pagos mixtos con distribución por producto)
+     * Métodos de pago asignados a este item
+     * (solo se usa en pagos mixtos con distribución por item)
      */
     public function metodosPago()
     {
