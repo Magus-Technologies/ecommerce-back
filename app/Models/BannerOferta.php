@@ -11,7 +11,8 @@ class BannerOferta extends Model
     protected $fillable = [
         'imagen',
         'activo',
-        'prioridad'
+        'prioridad',
+        'tipo'
     ];
 
     protected $casts = [
@@ -55,5 +56,21 @@ class BannerOferta extends Model
     public function scopeOrdenadosPorPrioridad($query)
     {
         return $query->orderBy('prioridad', 'desc')->orderBy('id', 'desc');
+    }
+
+    /**
+     * Scope para obtener solo banners de ofertas especiales
+     */
+    public function scopeTipoEspeciales($query)
+    {
+        return $query->where('tipo', 'especiales');
+    }
+
+    /**
+     * Scope para obtener solo banners de oferta de la semana
+     */
+    public function scopeTipoSemana($query)
+    {
+        return $query->where('tipo', 'semana');
     }
 }

@@ -37,7 +37,7 @@ class BannerOfertaController extends Controller
     }
 
     /**
-     * Obtener el banner activo para mostrar en el index
+     * Obtener el banner activo para mostrar en el index (Ofertas Especiales)
      */
     public function getBannerActivo()
     {
@@ -46,6 +46,7 @@ class BannerOfertaController extends Controller
                   ->with(['categoria:id,nombre', 'marca:id,nombre']);
         }])
         ->activos()
+        ->tipoEspeciales()
         ->ordenadosPorPrioridad()
         ->first();
 
@@ -76,21 +77,62 @@ class BannerOfertaController extends Controller
     }
 
     /**
+     * Obtener el banner activo para la Oferta de la Semana
+     */
+    public function getBannerActivoSemana()
+    {
+        $banner = BannerOferta::with(['productos' => function($query) {
+            $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock', 'categoria_id', 'marca_id')
+                  ->with(['categoria:id,nombre', 'marca:id,nombre']);
+        }])
+        ->activos()
+        ->tipoSemana()
+        ->ordenadosPorPrioridad()
+        ->first();
+
+        if (!$banner) {
+            return response()->json(['message' => 'No hay banner activo de oferta de la semana'], 404);
+        }
+
+        // Agregar descuento y precio con descuento a cada producto
+        $banner->productos->transform(function($producto) {
+            $descuento = $producto->pivot->descuento_porcentaje;
+            $producto->descuento_porcentaje = $descuento;
+            $producto->precio = $producto->precio_venta;
+            $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
+            $producto->imagen_principal = $producto->imagen ? url('storage/productos/' . $producto->imagen) : null;
+
+            // Agregar información de categoría y marca
+            $producto->categoria_nombre = $producto->categoria ? $producto->categoria->nombre : null;
+            $producto->marca_nombre = $producto->marca ? $producto->marca->nombre : null;
+
+            // Limpiar relaciones innecesarias del JSON
+            unset($producto->categoria);
+            unset($producto->marca);
+
+            return $producto;
+        });
+
+        return response()->json($banner);
+    }
+
+    /**
      * Crear un nuevo banner
      */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'imagen' => 'required|image|mimes:jpeg,png,jpg,webp,gif|max:2048',
+            'imagen' => 'required|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
             'activo' => 'boolean',
-            'prioridad' => 'integer|min:0'
+            'prioridad' => 'integer|min:0',
+            'tipo' => 'required|in:especiales,semana'
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->only(['activo', 'prioridad']);
+        $data = $request->only(['activo', 'prioridad', 'tipo']);
 
         // Subir imagen
         if ($request->hasFile('imagen')) {
@@ -134,16 +176,17 @@ class BannerOfertaController extends Controller
         $banner = BannerOferta::findOrFail($id);
 
         $validator = Validator::make($request->all(), [
-            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:2048',
+            'imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:10240',
             'activo' => 'boolean',
-            'prioridad' => 'integer|min:0'
+            'prioridad' => 'integer|min:0',
+            'tipo' => 'nullable|in:especiales,semana'
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $request->only(['activo', 'prioridad']);
+        $data = $request->only(['activo', 'prioridad', 'tipo']);
 
         // Actualizar imagen si se proporciona una nueva
         if ($request->hasFile('imagen')) {
