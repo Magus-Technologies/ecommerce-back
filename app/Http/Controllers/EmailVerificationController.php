@@ -40,7 +40,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no encontrado'
-            ], 400);
+            ], 400, [], JSON_UNESCAPED_UNICODE);
         }
         
         // Log de los tokens del usuario
@@ -55,7 +55,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'La cuenta ya está verificada'
-            ], 400);
+            ], 400, [], JSON_UNESCAPED_UNICODE);
         }
         
         // Verificar token o código
@@ -86,7 +86,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Código o token de verificación inválido o expirado'
-            ], 400);
+            ], 400, [], JSON_UNESCAPED_UNICODE);
         }
 
         // Verificar la cuenta
@@ -122,7 +122,7 @@ class EmailVerificationController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Cuenta verificada exitosamente. ¡Ya puedes iniciar sesión!'
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 
 
@@ -140,7 +140,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no encontrado o ya verificado'
-            ], 404);
+            ], 404, [], JSON_UNESCAPED_UNICODE);
         }
 
         // Generar nuevo token y código
@@ -156,12 +156,29 @@ class EmailVerificationController extends Controller
         $verificationUrl = rtrim($appUrl, '/') . "/api/verify-email-link?token={$verificationToken}&email=" . urlencode($user->email);
 
         // Enviar correo
-        Mail::to($user->email)->send(new EmailVerificationMail($user, $verificationUrl, $verificationCode));
+        try {
+            $template = EmailTemplate::where('name', 'verification')->where('is_active', true)->first();
+            if (!$template) {
+                $template = EmailTemplate::create([
+                    'name' => 'verification',
+                    'use_default' => true,
+                    'is_active' => true
+                ]);
+            }
+            
+            Mail::to($user->email)->send(new EmailVerificationMail($user, $verificationUrl, $verificationCode, $template));
+        } catch (\Exception $e) {
+            Log::error('Error enviando correo de verificación: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al enviar el correo de verificación'
+            ], 500, [], JSON_UNESCAPED_UNICODE);
+        }
 
         return response()->json([
             'status' => 'success',
             'message' => 'Código de verificación reenviado exitosamente'
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 
   public function verifyByLink(Request $request)

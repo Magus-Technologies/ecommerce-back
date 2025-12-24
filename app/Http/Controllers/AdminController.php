@@ -58,7 +58,7 @@ class AdminController extends Controller
                     'permissions' => $user->getAllPermissions()->pluck('name'),
                 ],
                 'token' => $token,
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
         // PASO 2: Si no es admin, intentar login como CLIENTE
@@ -102,7 +102,7 @@ class AdminController extends Controller
                     'email_verified_at' => $cliente->email_verified_at
                 ],
                 'token' => $token,
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
         // PASO 3: Intentar como MOTORIZADO
