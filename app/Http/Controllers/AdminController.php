@@ -58,7 +58,7 @@ class AdminController extends Controller
                     'permissions' => $user->getAllPermissions()->pluck('name'),
                 ],
                 'token' => $token,
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         // PASO 2: Si no es admin, intentar login como CLIENTE
@@ -102,7 +102,7 @@ class AdminController extends Controller
                     'email_verified_at' => $cliente->email_verified_at
                 ],
                 'token' => $token,
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         // PASO 3: Intentar como MOTORIZADO
@@ -423,7 +423,7 @@ class AdminController extends Controller
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at
                 ],
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            ]);
         } elseif ($user instanceof UserCliente) {
             // Cliente del e-commerce
             return response()->json([
@@ -443,7 +443,7 @@ class AdminController extends Controller
                     'foto' => $user->foto ? (string) $user->foto : null,
                     'email_verified_at' => $user->email_verified_at
                 ],
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            ]);
         } elseif ($user instanceof UserMotorizado) {
             // Motorizado del sistema de delivery
             return response()->json([
@@ -464,7 +464,7 @@ class AdminController extends Controller
                     'estado_actual' => $user->estado_actual,
                     'estadisticas' => $user->estadisticasDelDia(),
                 ],
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            ]);
         }
 
         return response()->json(['message' => 'Usuario no válido'], 401);
