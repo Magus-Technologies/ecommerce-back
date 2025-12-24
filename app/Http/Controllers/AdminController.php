@@ -423,7 +423,7 @@ class AdminController extends Controller
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at
                 ],
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE);
         } elseif ($user instanceof UserCliente) {
             // Cliente del e-commerce
             return response()->json([
@@ -440,10 +440,10 @@ class AdminController extends Controller
                     'numero_documento' => $user->numero_documento,
                     'tipo_documento' => $user->tipoDocumento?->nombre,
                     'puede_facturar' => $user->puedeFacturar(),
-                    'foto' => $user->foto,
+                    'foto' => $user->foto ? (string) $user->foto : null,
                     'email_verified_at' => $user->email_verified_at
                 ],
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE);
         } elseif ($user instanceof UserMotorizado) {
             // Motorizado del sistema de delivery
             return response()->json([
@@ -464,7 +464,7 @@ class AdminController extends Controller
                     'estado_actual' => $user->estado_actual,
                     'estadisticas' => $user->estadisticasDelDia(),
                 ],
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
         return response()->json(['message' => 'Usuario no válido'], 401);
