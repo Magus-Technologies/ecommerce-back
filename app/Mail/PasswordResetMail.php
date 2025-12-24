@@ -30,16 +30,51 @@ class PasswordResetMail extends Mailable
 
     public function build()
     {
-        $empresaInfo = \App\Models\EmpresaInfo::first();
-        $subject = $this->template ? $this->template->subject : "Recuperación de contraseña - {$empresaInfo->nombre_empresa}";
-        
-        return $this->subject($subject)
-                    ->view('emails.password-reset-dynamic')
-                    ->with([
-                        'user' => $this->user,
-                        'resetUrl' => $this->resetUrl,
-                        'template' => $this->template,
-                        'empresaInfo' => $empresaInfo
-                    ]);
+        try {
+            $empresaInfo = \App\Models\EmpresaInfo::first();
+
+            // Manejar caso donde no existe empresa_info
+            if (!$empresaInfo) {
+                $empresaInfo = (object)[
+                    'nombre_empresa' => config('app.name', 'Ecommerce Magus'),
+                    'logo' => null,
+                    'direccion' => '',
+                    'telefono' => '',
+                    'email' => config('mail.from.address')
+                ];
+            }
+
+            // Limpiar caracteres UTF-8 problemáticos del nombre de empresa
+            $nombreEmpresa = mb_convert_encoding($empresaInfo->nombre_empresa ?? 'Ecommerce Magus', 'UTF-8', 'UTF-8');
+
+            $subject = $this->template && $this->template->subject
+                ? $this->template->subject
+                : "Recuperación de contraseña - {$nombreEmpresa}";
+
+            return $this->subject($subject)
+                        ->view('emails.password-reset-dynamic')
+                        ->with([
+                            'user' => $this->user,
+                            'resetUrl' => $this->resetUrl,
+                            'template' => $this->template,
+                            'empresaInfo' => $empresaInfo
+                        ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error en PasswordResetMail::build()', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
+            // Fallback seguro
+            return $this->subject('Recuperación de contraseña')
+                        ->view('emails.password-reset-dynamic')
+                        ->with([
+                            'user' => $this->user,
+                            'resetUrl' => $this->resetUrl,
+                            'template' => $this->template,
+                            'empresaInfo' => null
+                        ]);
+        }
     }
 }
