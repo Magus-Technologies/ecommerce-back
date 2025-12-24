@@ -40,7 +40,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no encontrado'
-            ], 400, [], JSON_UNESCAPED_UNICODE);
+            ], 400);
         }
         
         // Log de los tokens del usuario
@@ -55,7 +55,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'La cuenta ya está verificada'
-            ], 400, [], JSON_UNESCAPED_UNICODE);
+            ], 400);
         }
         
         // Verificar token o código
@@ -86,7 +86,7 @@ class EmailVerificationController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Código o token de verificación inválido o expirado'
-            ], 400, [], JSON_UNESCAPED_UNICODE);
+            ], 400);
         }
 
         // Verificar la cuenta
@@ -122,7 +122,7 @@ class EmailVerificationController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Cuenta verificada exitosamente. ¡Ya puedes iniciar sesión!'
-        ], 200, [], JSON_UNESCAPED_UNICODE);
+        ]);
     }
 
 
@@ -132,23 +132,35 @@ class EmailVerificationController extends Controller
             'email' => 'required|email'
         ]);
 
+        Log::info('EmailVerificationController@resendVerification - Inicio', [
+            'email' => $request->email
+        ]);
+
         $user = UserCliente::where('email', $request->email)
                         ->whereNull('email_verified_at')
                         ->first();
 
         if (!$user) {
+            Log::warning('EmailVerificationController@resendVerification - Usuario no encontrado', [
+                'email' => $request->email
+            ]);
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no encontrado o ya verificado'
-            ], 404, [], JSON_UNESCAPED_UNICODE);
+            ], 404);
         }
 
         // Generar nuevo token y código
         $verificationToken = Str::random(60);
         $verificationCode = strtoupper(Str::random(6));
-        
+
         $user->update([
             'verification_token' => $verificationToken,
+            'verification_code' => $verificationCode
+        ]);
+
+        Log::info('EmailVerificationController@resendVerification - Token actualizado', [
+            'user_id' => $user->id,
             'verification_code' => $verificationCode
         ]);
 
@@ -165,20 +177,32 @@ class EmailVerificationController extends Controller
                     'is_active' => true
                 ]);
             }
-            
+
+            Log::info('EmailVerificationController@resendVerification - Enviando correo', [
+                'destinatario' => $user->email,
+                'verification_url' => $verificationUrl
+            ]);
+
             Mail::to($user->email)->send(new EmailVerificationMail($user, $verificationUrl, $verificationCode, $template));
+
+            Log::info('EmailVerificationController@resendVerification - Correo enviado exitosamente');
         } catch (\Exception $e) {
-            Log::error('Error enviando correo de verificación: ' . $e->getMessage());
+            Log::error('EmailVerificationController@resendVerification - Error enviando correo', [
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'error_trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error al enviar el correo de verificación'
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            ], 500);
         }
 
         return response()->json([
             'status' => 'success',
             'message' => 'Código de verificación reenviado exitosamente'
-        ], 200, [], JSON_UNESCAPED_UNICODE);
+        ]);
     }
 
   public function verifyByLink(Request $request)
