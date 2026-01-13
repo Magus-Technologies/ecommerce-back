@@ -239,12 +239,25 @@ class GuiasRemisionController extends Controller
             $tipoComprobante = '09';
 
             // Obtener serie para guías de remisión
-            $serie = SerieComprobante::where('tipo_comprobante', $tipoComprobante)
-                                   ->where('activo', true)
-                                   ->first();
-
-            if (!$serie) {
-                throw new \Exception("No hay series activas para guías de remisión tipo {$tipoComprobante}");
+            // Si es traslado interno, usar serie específica "TI"
+            if ($tipoGuia === 'INTERNO') {
+                $serie = SerieComprobante::where('tipo_comprobante', $tipoComprobante)
+                                       ->where('serie', 'TI')
+                                       ->where('activo', true)
+                                       ->first();
+                
+                if (!$serie) {
+                    throw new \Exception("No hay serie TI activa para traslados internos. Por favor, cree la serie TI en el sistema.");
+                }
+            } else {
+                // Para otros tipos de guía, usar cualquier serie activa
+                $serie = SerieComprobante::where('tipo_comprobante', $tipoComprobante)
+                                       ->where('activo', true)
+                                       ->first();
+                
+                if (!$serie) {
+                    throw new \Exception("No hay series activas para guías de remisión tipo {$tipoComprobante}");
+                }
             }
 
             // Generar correlativo
@@ -1479,6 +1492,57 @@ class GuiasRemisionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al validar placa',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Eliminar/Anular guía de remisión
+     * Solo se pueden eliminar guías INTERNAS o guías PENDIENTES que no se enviaron a SUNAT
+     */
+    public function destroy($id): JsonResponse
+    {
+        try {
+            $guia = GuiaRemision::findOrFail($id);
+
+            // Validar que se puede eliminar
+            if ($guia->requiere_sunat && $guia->estado !== GuiaRemision::ESTADO_PENDIENTE) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede eliminar una guía que ya fue enviada a SUNAT. Debe anularla mediante el proceso oficial.'
+                ], 400);
+            }
+
+            // Si la guía ya fue enviada a SUNAT (tiene CDR), no se puede eliminar
+            if ($guia->tiene_cdr) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede eliminar una guía que tiene respuesta de SUNAT. Debe anularla mediante comunicación de baja.'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Eliminar detalles
+            $guia->detalles()->delete();
+
+            // Eliminar guía
+            $guia->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Guía de remisión eliminada correctamente'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error eliminando guía de remisión: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar guía de remisión',
                 'error' => $e->getMessage()
             ], 500);
         }

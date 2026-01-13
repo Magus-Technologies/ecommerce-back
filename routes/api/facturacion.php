@@ -223,6 +223,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/generar-xml', [GuiasRemisionController::class, 'generarXml'])->middleware('permission:facturacion.guias_remision.edit');
         Route::post('/{id}/enviar-sunat', [GuiasRemisionController::class, 'enviarSunat'])->middleware('permission:facturacion.guias_remision.edit');
         Route::post('/{id}/consultar-sunat', [GuiasRemisionController::class, 'consultarSunat'])->middleware('permission:facturacion.guias_remision.edit');
+        
+        // Eliminar guía
+        Route::delete('/{id}', [GuiasRemisionController::class, 'destroy'])->middleware('permission:facturacion.guias_remision.delete');
     });
 
     // ============================================

@@ -139,4 +139,9 @@ class Producto extends Model
     {
         return $this->hasOne(ProductoDetalle::class);
     }
+    // Relación con kardex
+    public function kardex()
+    {
+        return $this->hasMany(Kardex::class, 'producto_id');
+    }
 }
