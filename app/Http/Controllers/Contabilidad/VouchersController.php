@@ -183,6 +183,8 @@ class VouchersController extends Controller
 
     /**
      * Vouchers pendientes de verificación
+     * NOTA: Este endpoint es redundante. Usar index() con ?estado=PENDIENTE
+     * Se mantiene por compatibilidad pero se recomienda usar el filtro en index()
      */
     public function pendientes()
     {

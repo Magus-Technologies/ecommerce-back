@@ -107,6 +107,14 @@ class CuentasPorCobrarController extends Controller
         }
     }
 
+    public function show($id)
+    {
+        $cuenta = CuentaPorCobrar::with(['cliente', 'venta', 'comprobante', 'pagos.user'])
+            ->findOrFail($id);
+
+        return response()->json($cuenta);
+    }
+
     public function antiguedadSaldos()
     {
         $cuentas = CuentaPorCobrar::with('cliente')
@@ -142,5 +150,15 @@ class CuentasPorCobrarController extends Controller
             'rangos' => $rangos,
             'total_pendiente' => $cuentas->sum('saldo_pendiente')
         ]);
+    }
+
+    public function getPagos($cuentaId)
+    {
+        $pagos = CxcPago::where('cuenta_por_cobrar_id', $cuentaId)
+            ->with('user')
+            ->orderBy('fecha_pago', 'desc')
+            ->get();
+
+        return response()->json($pagos);
     }
 }

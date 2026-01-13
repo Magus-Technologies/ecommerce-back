@@ -10,7 +10,12 @@ use Spatie\Permission\Traits\HasRoles; // Add this import
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles; 
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
+
+    /**
+     * The guard name for Spatie permissions
+     */
+    protected $guard_name = 'api';
 
     /**
      * The attributes that are mass assignable.
@@ -43,13 +48,12 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
- 
-    //public function isSuperadmin()
-    //{
-    //    return $this->hasRole('superadmin');
-    //}
 
-    
+    // public function isSuperadmin()
+    // {
+    //    return $this->hasRole('superadmin');
+    // }
+
     public function profile()
     {
         return $this->hasOne(UserProfile::class);
@@ -81,11 +85,11 @@ class User extends Authenticatable
         return self::whereHas('roles', function ($query) use ($roleName) {
             $query->where('name', $roleName);
         })
-        ->where('is_enabled', true)
-        ->get()
-        ->filter(function ($user) {
-            return $user->isDisponibleAhora();
-        });
+            ->where('is_enabled', true)
+            ->get()
+            ->filter(function ($user) {
+                return $user->isDisponibleAhora();
+            });
     }
 
     public function getRoleAttribute()
@@ -94,6 +98,7 @@ class User extends Authenticatable
         if ($role) {
             return (object) ['nombre' => $role->name];
         }
+
         return null;
     }
 
@@ -101,13 +106,14 @@ class User extends Authenticatable
     public function getRoleIdAttribute()
     {
         $role = $this->roles->first();
+
         return $role ? $role->id : null;
     }
 
     public function getRoleNombreAttribute()
     {
         $role = $this->roles->first();
+
         return $role ? $role->name : '';
     }
-
 }

@@ -128,4 +128,37 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:configuracion.delete')->group(function () {
         Route::delete('/tipos-pago/{id}', [TipoPagoController::class, 'destroy']);
     });
+
+    // ============================================
+    // MENÚS (ADMIN)
+    // ============================================
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/menus', [\App\Http\Controllers\MenuController::class, 'index']);
+        Route::get('/menus/{id}', [\App\Http\Controllers\MenuController::class, 'show']);
+    });
+
+    Route::middleware('permission:configuracion.create')->group(function () {
+        Route::post('/menus', [\App\Http\Controllers\MenuController::class, 'store']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/menus/{id}', [\App\Http\Controllers\MenuController::class, 'update']);
+        Route::patch('/menus/{id}/toggle-visible', [\App\Http\Controllers\MenuController::class, 'toggleVisible']);
+        Route::post('/menus/reordenar', [\App\Http\Controllers\MenuController::class, 'reordenar']);
+    });
+
+    Route::middleware('permission:configuracion.delete')->group(function () {
+        Route::delete('/menus/{id}', [\App\Http\Controllers\MenuController::class, 'destroy']);
+    });
+
+    // ============================================
+    // CONFIGURACIÓN DE COOKIES (ADMIN)
+    // ============================================
+    Route::middleware('permission:configuracion.ver')->group(function () {
+        Route::get('/cookies/configuracion', [\App\Http\Controllers\CookieConfiguracionController::class, 'index']);
+    });
+
+    Route::middleware('permission:configuracion.edit')->group(function () {
+        Route::put('/cookies/configuracion', [\App\Http\Controllers\CookieConfiguracionController::class, 'update']);
+    });
 });

@@ -23,58 +23,55 @@ class ContabilidadPermissionsSeeder extends Seeder
         $permissions = [
             // CAJAS
             'contabilidad.cajas.ver' => 'Ver cajas y reportes de caja',
-            'contabilidad.cajas.create' => 'Crear nuevas cajas',
-            'contabilidad.cajas.edit' => 'Aperturar, cerrar caja y registrar transacciones',
-
-            // KARDEX
-            'contabilidad.kardex.ver' => 'Ver kardex e inventario valorizado',
-            'contabilidad.kardex.edit' => 'Hacer ajustes de inventario',
-
-            // CUENTAS POR COBRAR
-            'contabilidad.cxc.ver' => 'Ver cuentas por cobrar y antigüedad',
-            'contabilidad.cxc.create' => 'Crear cuentas por cobrar',
-            'contabilidad.cxc.edit' => 'Registrar pagos de clientes',
-
-            // CUENTAS POR PAGAR
-            'contabilidad.cxp.ver' => 'Ver cuentas por pagar y antigüedad',
-            'contabilidad.cxp.create' => 'Crear cuentas por pagar',
-            'contabilidad.cxp.edit' => 'Registrar pagos a proveedores',
-
-            // PROVEEDORES
-            'contabilidad.proveedores.ver' => 'Ver proveedores',
-            'contabilidad.proveedores.create' => 'Crear proveedores',
-            'contabilidad.proveedores.edit' => 'Editar proveedores',
+            'contabilidad.cajas.crear' => 'Crear cajas y aperturar',
+            'contabilidad.cajas.editar' => 'Editar cajas y cerrar',
+            'contabilidad.cajas.eliminar' => 'Anular transacciones',
 
             // CAJA CHICA
             'contabilidad.caja_chica.ver' => 'Ver caja chica y rendiciones',
-            'contabilidad.caja_chica.create' => 'Crear caja chica',
-            'contabilidad.caja_chica.edit' => 'Registrar gastos y reposiciones',
+            'contabilidad.caja_chica.crear' => 'Crear caja chica y registrar gastos',
+            'contabilidad.caja_chica.editar' => 'Editar gastos, aprobar y reponer',
 
             // FLUJO DE CAJA
             'contabilidad.flujo_caja.ver' => 'Ver flujo de caja y proyecciones',
-            'contabilidad.flujo_caja.create' => 'Crear proyecciones de flujo',
-            'contabilidad.flujo_caja.edit' => 'Registrar montos reales',
+            'contabilidad.flujo_caja.crear' => 'Crear proyecciones de flujo',
+            'contabilidad.flujo_caja.editar' => 'Editar y registrar montos reales',
+            'contabilidad.flujo_caja.eliminar' => 'Eliminar proyecciones',
+
+            // KARDEX
+            'contabilidad.kardex.ver' => 'Ver kardex e inventario valorizado',
+            'contabilidad.kardex.ajustar' => 'Hacer ajustes de inventario',
+
+            // CUENTAS POR COBRAR
+            'contabilidad.cuentas-cobrar.ver' => 'Ver cuentas por cobrar',
+            'contabilidad.cuentas-cobrar.crear' => 'Crear cuentas por cobrar',
+            'contabilidad.cuentas-cobrar.pagar' => 'Registrar pagos de clientes',
+
+            // CUENTAS POR PAGAR
+            'contabilidad.cuentas-pagar.ver' => 'Ver cuentas por pagar',
+            'contabilidad.cuentas-pagar.crear' => 'Crear cuentas por pagar',
+            'contabilidad.cuentas-pagar.editar' => 'Editar cuentas por pagar',
+            'contabilidad.cuentas-pagar.eliminar' => 'Eliminar cuentas por pagar',
+            'contabilidad.cuentas-pagar.pagar' => 'Registrar pagos a proveedores',
+
+            // PROVEEDORES
+            'contabilidad.proveedores.ver' => 'Ver proveedores',
+            'contabilidad.proveedores.crear' => 'Crear proveedores',
+            'contabilidad.proveedores.editar' => 'Editar proveedores',
 
             // REPORTES
             'contabilidad.reportes.ver' => 'Ver todos los reportes contables',
 
             // UTILIDADES
             'contabilidad.utilidades.ver' => 'Ver utilidades y rentabilidad',
-            'contabilidad.utilidades.create' => 'Registrar gastos operativos',
-            'contabilidad.utilidades.edit' => 'Calcular utilidades mensuales',
-
-            // VOUCHERS
-            'contabilidad.vouchers.ver' => 'Ver vouchers/bauchers de pago',
-            'contabilidad.vouchers.create' => 'Registrar vouchers',
-            'contabilidad.vouchers.edit' => 'Editar y verificar vouchers',
-            'contabilidad.vouchers.delete' => 'Eliminar vouchers',
+            'contabilidad.utilidades.crear' => 'Registrar gastos operativos',
+            'contabilidad.utilidades.editar' => 'Calcular utilidades mensuales',
         ];
 
         // Crear permisos
         foreach ($permissions as $name => $description) {
             Permission::firstOrCreate(
-                ['name' => $name],
-                ['guard_name' => 'api']
+                ['name' => $name, 'guard_name' => 'api']
             );
         }
 
@@ -83,6 +80,13 @@ class ContabilidadPermissionsSeeder extends Seeder
         // ============================================
         // ASIGNAR PERMISOS A ROLES
         // ============================================
+
+        // ROL: Superadmin - Acceso total
+        $superadminRole = Role::where('name', 'superadmin')->first();
+        if ($superadminRole) {
+            $superadminRole->givePermissionTo(array_keys($permissions));
+            $this->command->info('✅ Permisos asignados al rol Superadmin');
+        }
 
         // ROL: Administrador - Acceso total
         $adminRole = Role::where('name', 'Administrador')->first();
@@ -112,8 +116,9 @@ class ContabilidadPermissionsSeeder extends Seeder
             ['guard_name' => 'api']
         );
         $cajeroRole->givePermissionTo([
-            Permission::findByName('contabilidad.cajas.ver', 'api'),
-            Permission::findByName('contabilidad.cajas.edit', 'api'),
+            'contabilidad.cajas.ver',
+            'contabilidad.cajas.crear',
+            'contabilidad.cajas.editar',
         ]);
         $this->command->info('✅ Permisos asignados al rol Cajero');
 
@@ -121,9 +126,9 @@ class ContabilidadPermissionsSeeder extends Seeder
         $vendedorRole = Role::where('name', 'Vendedor')->where('guard_name', 'api')->first();
         if ($vendedorRole) {
             $vendedorRole->givePermissionTo([
-                Permission::findByName('contabilidad.cxc.ver', 'api'),
-                Permission::findByName('contabilidad.cxc.edit', 'api'),
-                Permission::findByName('contabilidad.reportes.ver', 'api'),
+                'contabilidad.cuentas-cobrar.ver',
+                'contabilidad.cuentas-cobrar.pagar',
+                'contabilidad.reportes.ver',
             ]);
             $this->command->info('✅ Permisos asignados al rol Vendedor');
         }
@@ -134,13 +139,14 @@ class ContabilidadPermissionsSeeder extends Seeder
             ['guard_name' => 'api']
         );
         $comprasRole->givePermissionTo([
-            Permission::findByName('contabilidad.proveedores.ver', 'api'),
-            Permission::findByName('contabilidad.proveedores.create', 'api'),
-            Permission::findByName('contabilidad.proveedores.edit', 'api'),
-            Permission::findByName('contabilidad.cxp.ver', 'api'),
-            Permission::findByName('contabilidad.cxp.create', 'api'),
-            Permission::findByName('contabilidad.cxp.edit', 'api'),
-            Permission::findByName('contabilidad.kardex.ver', 'api'),
+            'contabilidad.proveedores.ver',
+            'contabilidad.proveedores.crear',
+            'contabilidad.proveedores.editar',
+            'contabilidad.cuentas-pagar.ver',
+            'contabilidad.cuentas-pagar.crear',
+            'contabilidad.cuentas-pagar.editar',
+            'contabilidad.cuentas-pagar.pagar',
+            'contabilidad.kardex.ver',
         ]);
         $this->command->info('✅ Permisos asignados al rol Compras');
 

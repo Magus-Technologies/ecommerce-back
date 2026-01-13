@@ -29,17 +29,72 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
     // ============================================
     Route::middleware('permission:contabilidad.cajas.ver')->group(function () {
         Route::get('/cajas', [CajasController::class, 'index']);
+        Route::get('/cajas/abiertas', [CajasController::class, 'abiertas']);
+        Route::get('/cajas/{id}', [CajasController::class, 'show']);
+        Route::get('/cajas/{id}/estado', [CajasController::class, 'estado']);
+        Route::get('/cajas/{id}/transacciones', [CajasController::class, 'getTransacciones']);
         Route::get('/cajas/{id}/reporte', [CajasController::class, 'reporte']);
     });
 
-    Route::middleware('permission:contabilidad.cajas.create')->group(function () {
+    Route::middleware('permission:contabilidad.cajas.crear')->group(function () {
         Route::post('/cajas', [CajasController::class, 'store']);
+        Route::post('/cajas/{id}/aperturar', [CajasController::class, 'aperturar']);
+        Route::post('/cajas/{id}/transacciones', [CajasController::class, 'storeTransaccion']);
     });
 
-    Route::middleware('permission:contabilidad.cajas.edit')->group(function () {
-        Route::post('/cajas/aperturar', [CajasController::class, 'aperturar']);
+    Route::middleware('permission:contabilidad.cajas.editar')->group(function () {
+        Route::put('/cajas/{id}', [CajasController::class, 'update']);
         Route::post('/cajas/{id}/cerrar', [CajasController::class, 'cerrar']);
-        Route::post('/cajas/transaccion', [CajasController::class, 'registrarTransaccion']);
+    });
+
+    Route::middleware('permission:contabilidad.cajas.eliminar')->group(function () {
+        Route::delete('/cajas/{id}/transacciones/{txId}', [CajasController::class, 'deleteTransaccion']);
+    });
+
+    // ============================================
+    // CAJA CHICA - Gastos menores
+    // ============================================
+    Route::middleware('permission:contabilidad.caja_chica.ver')->group(function () {
+        Route::get('/caja-chica', [CajaChicaController::class, 'index']);
+        Route::get('/caja-chica/{id}', [CajaChicaController::class, 'show']);
+        Route::get('/caja-chica/{id}/saldo', [CajaChicaController::class, 'saldo']);
+        Route::get('/caja-chica/{id}/gastos', [CajaChicaController::class, 'getGastos']);
+        Route::get('/caja-chica/gastos-pendientes', [CajaChicaController::class, 'gastosPendientes']);
+        Route::get('/caja-chica/{id}/rendicion', [CajaChicaController::class, 'rendicion']);
+    });
+
+    Route::middleware('permission:contabilidad.caja_chica.crear')->group(function () {
+        Route::post('/caja-chica', [CajaChicaController::class, 'store']);
+        Route::post('/caja-chica/{id}/gastos', [CajaChicaController::class, 'storeGasto']);
+    });
+
+    Route::middleware('permission:contabilidad.caja_chica.editar')->group(function () {
+        Route::put('/caja-chica/gastos/{gastoId}', [CajaChicaController::class, 'updateGasto']);
+        Route::post('/caja-chica/gastos/{gastoId}/aprobar', [CajaChicaController::class, 'aprobarGasto']);
+        Route::post('/caja-chica/{id}/reposicion', [CajaChicaController::class, 'reposicion']);
+    });
+
+    // ============================================
+    // FLUJO DE CAJA - Proyecciones
+    // ============================================
+    Route::middleware('permission:contabilidad.flujo_caja.ver')->group(function () {
+        Route::get('/flujo-caja', [FlujoCajaController::class, 'index']);
+        Route::get('/flujo-caja/comparativa', [FlujoCajaController::class, 'comparativa']);
+        Route::get('/flujo-caja/alertas', [FlujoCajaController::class, 'alertas']);
+        Route::get('/flujo-caja/{id}', [FlujoCajaController::class, 'show']);
+    });
+
+    Route::middleware('permission:contabilidad.flujo_caja.crear')->group(function () {
+        Route::post('/flujo-caja', [FlujoCajaController::class, 'store']);
+    });
+
+    Route::middleware('permission:contabilidad.flujo_caja.editar')->group(function () {
+        Route::put('/flujo-caja/{id}', [FlujoCajaController::class, 'update']);
+        Route::post('/flujo-caja/{id}/real', [FlujoCajaController::class, 'registrarReal']);
+    });
+
+    Route::middleware('permission:contabilidad.flujo_caja.eliminar')->group(function () {
+        Route::delete('/flujo-caja/{id}', [FlujoCajaController::class, 'destroy']);
     });
 
     // ============================================
@@ -50,39 +105,52 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
         Route::get('/kardex/inventario-valorizado', [KardexController::class, 'inventarioValorizado']);
     });
 
-    Route::middleware('permission:contabilidad.kardex.edit')->group(function () {
+    Route::middleware('permission:contabilidad.kardex.ajustar')->group(function () {
         Route::post('/kardex/ajuste', [KardexController::class, 'ajuste']);
     });
 
     // ============================================
     // CUENTAS POR COBRAR - Créditos a clientes
     // ============================================
-    Route::middleware('permission:contabilidad.cxc.ver')->group(function () {
+    Route::middleware('permission:contabilidad.cuentas-cobrar.ver')->group(function () {
         Route::get('/cuentas-por-cobrar', [CuentasPorCobrarController::class, 'index']);
+        Route::get('/cuentas-por-cobrar/{id}', [CuentasPorCobrarController::class, 'show']);
         Route::get('/cuentas-por-cobrar/antiguedad-saldos', [CuentasPorCobrarController::class, 'antiguedadSaldos']);
+        Route::get('/cuentas-por-cobrar/{cuentaId}/pagos', [CuentasPorCobrarController::class, 'getPagos']);
     });
 
-    Route::middleware('permission:contabilidad.cxc.create')->group(function () {
+    Route::middleware('permission:contabilidad.cuentas-cobrar.crear')->group(function () {
         Route::post('/cuentas-por-cobrar', [CuentasPorCobrarController::class, 'store']);
     });
 
-    Route::middleware('permission:contabilidad.cxc.edit')->group(function () {
+    Route::middleware('permission:contabilidad.cuentas-cobrar.pagar')->group(function () {
         Route::post('/cuentas-por-cobrar/{id}/pago', [CuentasPorCobrarController::class, 'registrarPago']);
     });
 
     // ============================================
     // CUENTAS POR PAGAR - Deudas con proveedores
     // ============================================
-    Route::middleware('permission:contabilidad.cxp.ver')->group(function () {
+    Route::middleware('permission:contabilidad.cuentas-pagar.ver')->group(function () {
         Route::get('/cuentas-por-pagar', [CuentasPorPagarController::class, 'index']);
+        Route::get('/cuentas-por-pagar/{id}', [CuentasPorPagarController::class, 'show']);
         Route::get('/cuentas-por-pagar/antiguedad-saldos', [CuentasPorPagarController::class, 'antiguedadSaldos']);
+        Route::get('/cuentas-por-pagar/{id}/pagos', [CuentasPorPagarController::class, 'getPagos']);
+        Route::get('/cuentas-por-pagar/estadisticas', [CuentasPorPagarController::class, 'estadisticas']);
     });
 
-    Route::middleware('permission:contabilidad.cxp.create')->group(function () {
+    Route::middleware('permission:contabilidad.cuentas-pagar.crear')->group(function () {
         Route::post('/cuentas-por-pagar', [CuentasPorPagarController::class, 'store']);
     });
 
-    Route::middleware('permission:contabilidad.cxp.edit')->group(function () {
+    Route::middleware('permission:contabilidad.cuentas-pagar.editar')->group(function () {
+        Route::put('/cuentas-por-pagar/{id}', [CuentasPorPagarController::class, 'update']);
+    });
+
+    Route::middleware('permission:contabilidad.cuentas-pagar.eliminar')->group(function () {
+        Route::delete('/cuentas-por-pagar/{id}', [CuentasPorPagarController::class, 'destroy']);
+    });
+
+    Route::middleware('permission:contabilidad.cuentas-pagar.pagar')->group(function () {
         Route::post('/cuentas-por-pagar/{id}/pago', [CuentasPorPagarController::class, 'registrarPago']);
     });
 
@@ -94,45 +162,12 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
         Route::get('/proveedores/{id}', [ProveedoresController::class, 'show']);
     });
 
-    Route::middleware('permission:contabilidad.proveedores.create')->group(function () {
+    Route::middleware('permission:contabilidad.proveedores.crear')->group(function () {
         Route::post('/proveedores', [ProveedoresController::class, 'store']);
     });
 
-    Route::middleware('permission:contabilidad.proveedores.edit')->group(function () {
+    Route::middleware('permission:contabilidad.proveedores.editar')->group(function () {
         Route::put('/proveedores/{id}', [ProveedoresController::class, 'update']);
-    });
-
-    // ============================================
-    // CAJA CHICA - Gastos menores
-    // ============================================
-    Route::middleware('permission:contabilidad.caja_chica.ver')->group(function () {
-        Route::get('/caja-chica', [CajaChicaController::class, 'index']);
-        Route::get('/caja-chica/{id}/rendicion', [CajaChicaController::class, 'rendicion']);
-    });
-
-    Route::middleware('permission:contabilidad.caja_chica.create')->group(function () {
-        Route::post('/caja-chica', [CajaChicaController::class, 'store']);
-    });
-
-    Route::middleware('permission:contabilidad.caja_chica.edit')->group(function () {
-        Route::post('/caja-chica/gasto', [CajaChicaController::class, 'registrarGasto']);
-        Route::post('/caja-chica/{id}/reposicion', [CajaChicaController::class, 'reposicion']);
-    });
-
-    // ============================================
-    // FLUJO DE CAJA - Proyecciones
-    // ============================================
-    Route::middleware('permission:contabilidad.flujo_caja.ver')->group(function () {
-        Route::get('/flujo-caja', [FlujoCajaController::class, 'index']);
-        Route::get('/flujo-caja/proyeccion-mensual', [FlujoCajaController::class, 'proyeccionMensual']);
-    });
-
-    Route::middleware('permission:contabilidad.flujo_caja.create')->group(function () {
-        Route::post('/flujo-caja', [FlujoCajaController::class, 'store']);
-    });
-
-    Route::middleware('permission:contabilidad.flujo_caja.edit')->group(function () {
-        Route::post('/flujo-caja/{id}/registrar-real', [FlujoCajaController::class, 'registrarReal']);
     });
 
     // ============================================
@@ -159,11 +194,11 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
         Route::get('/utilidades/punto-equilibrio', [UtilidadesController::class, 'puntoEquilibrio']);
     });
 
-    Route::middleware('permission:contabilidad.utilidades.create')->group(function () {
+    Route::middleware('permission:contabilidad.utilidades.crear')->group(function () {
         Route::post('/utilidades/gastos', [UtilidadesController::class, 'registrarGasto']);
     });
 
-    Route::middleware('permission:contabilidad.utilidades.edit')->group(function () {
+    Route::middleware('permission:contabilidad.utilidades.editar')->group(function () {
         Route::post('/utilidades/mensual/{mes}/{anio}', [UtilidadesController::class, 'calcularUtilidadMensual']);
     });
 

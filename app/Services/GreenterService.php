@@ -104,16 +104,16 @@ class GreenterService
         // Crear dirección con todos los campos requeridos por SUNAT
         $address = new Address;
         $address->setUbigueo(config('empresa.ubigeo', '150301'))
-            ->setDepartamento(config('empresa.departamento', 'LIMA'))
-            ->setProvincia(config('empresa.provincia', 'LIMA'))
-            ->setDistrito(config('empresa.distrito', 'SANTA ANITA'))
+            ->setDepartamento(trim(config('empresa.departamento', 'LIMA')))
+            ->setProvincia(trim(config('empresa.provincia', 'LIMA')))
+            ->setDistrito(trim(config('empresa.distrito', 'SANTA ANITA')))
             ->setUrbanizacion('-')
-            ->setDireccion(config('empresa.direccion', 'AV. PRINCIPAL'))
+            ->setDireccion(trim(config('empresa.direccion', 'AV. PRINCIPAL')))
             ->setCodLocal('0000'); // Código de establecimiento (0000 = principal)
 
-        $this->company->setRuc(config('empresa.ruc'))
-            ->setRazonSocial(config('empresa.razon_social'))
-            ->setNombreComercial(config('empresa.nombre_comercial'))
+        $this->company->setRuc(trim(config('empresa.ruc')))
+            ->setRazonSocial(trim(config('empresa.razon_social')))
+            ->setNombreComercial(trim(config('empresa.nombre_comercial')))
             ->setAddress($address);
     }
 
@@ -277,6 +277,57 @@ class GreenterService
     }
 
     /**
+     * Obtener schemeID correcto según tipo de documento y serie
+     */
+    private function obtenerSchemeID($tipoDocumento, $numeroDocumento, $serie)
+    {
+        // Determinar si es boleta o factura según la serie
+        $esBoleta = substr($serie, 0, 1) === 'B';
+
+        // Si es boleta, el cliente DEBE tener DNI (código 1)
+        if ($esBoleta) {
+            // Validar que el número de documento sea DNI (8 dígitos)
+            if (strlen($numeroDocumento) == 8) {
+                return '1'; // DNI
+            }
+            // Si no es DNI pero es boleta, forzar a DNI de todas formas
+            Log::warning('Boleta con documento que no es DNI', [
+                'serie' => $serie,
+                'tipo_documento' => $tipoDocumento,
+                'numero_documento' => $numeroDocumento,
+            ]);
+
+            return '1'; // Forzar DNI para boletas
+        }
+
+        // Para facturas, validar el tipo de documento
+        $longitudDoc = strlen($numeroDocumento);
+
+        if ($longitudDoc == 8) {
+            return '1'; // DNI
+        } elseif ($longitudDoc == 11) {
+            return '6'; // RUC
+        } elseif ($longitudDoc == 12) {
+            return '4'; // Carnet de extranjería
+        } elseif ($longitudDoc == 15) {
+            return '7'; // Pasaporte
+        }
+
+        // Si el tipo de documento ya es un código válido, usarlo
+        if (in_array($tipoDocumento, ['1', '4', '6', '7', 'A'])) {
+            return $tipoDocumento;
+        }
+
+        // Por defecto, usar DNI
+        Log::warning('Tipo de documento no reconocido, usando DNI por defecto', [
+            'tipo_documento' => $tipoDocumento,
+            'numero_documento' => $numeroDocumento,
+        ]);
+
+        return '1';
+    }
+
+    /**
      * Limpiar texto para XML (UTF-8 seguro)
      */
     private function limpiarTextoXML($texto)
@@ -405,14 +456,21 @@ class GreenterService
 
         $invoice->setFormaPago($formaPago);
 
-        // Cliente - CORRECCI�N UTF-8
+        // Cliente - CORRECCI�N UTF-8 y schemeID
         // Limpiar TODOS los datos del comprobante antes de usarlos
         $comprobante->cliente_razon_social = $this->limpiarTextoXML($comprobante->cliente_razon_social);
         $comprobante->cliente_direccion = $this->limpiarTextoXML($comprobante->cliente_direccion);
         $comprobante->cliente_numero_documento = $this->limpiarTextoXML($comprobante->cliente_numero_documento);
 
+        // Validar schemeID según serie y tipo de documento
+        $tipoDocCliente = $this->obtenerSchemeID(
+            $comprobante->cliente_tipo_documento,
+            $comprobante->cliente_numero_documento,
+            $comprobante->serie
+        );
+
         $client = new Client;
-        $client->setTipoDoc($comprobante->cliente_tipo_documento)
+        $client->setTipoDoc($tipoDocCliente)
             ->setNumDoc($comprobante->cliente_numero_documento)
             ->setRznSocial($comprobante->cliente_razon_social);
 
@@ -909,9 +967,15 @@ class GreenterService
             ->setTipoMoneda($comprobante->moneda)
             ->setCompany($this->company);
 
-        // Cliente
+        // Cliente - Validar schemeID según serie y tipo de documento
+        $tipoDocCliente = $this->obtenerSchemeID(
+            $comprobante->cliente_tipo_documento,
+            $comprobante->cliente_numero_documento,
+            $comprobante->serie
+        );
+
         $client = new \Greenter\Model\Client\Client;
-        $client->setTipoDoc($comprobante->cliente_tipo_documento)
+        $client->setTipoDoc($tipoDocCliente)
             ->setNumDoc($comprobante->cliente_numero_documento)
             ->setRznSocial($comprobante->cliente_razon_social);
 
@@ -966,9 +1030,15 @@ class GreenterService
             ->setTipoMoneda($comprobante->moneda)
             ->setCompany($this->company);
 
-        // Cliente
+        // Cliente - Validar schemeID según serie y tipo de documento
+        $tipoDocCliente = $this->obtenerSchemeID(
+            $comprobante->cliente_tipo_documento,
+            $comprobante->cliente_numero_documento,
+            $comprobante->serie
+        );
+
         $client = new \Greenter\Model\Client\Client;
-        $client->setTipoDoc($comprobante->cliente_tipo_documento)
+        $client->setTipoDoc($tipoDocCliente)
             ->setNumDoc($comprobante->cliente_numero_documento)
             ->setRznSocial($comprobante->cliente_razon_social);
 
@@ -1500,7 +1570,7 @@ class GreenterService
                 'data' => [
                     'servicio_activo' => true,
                     'ultima_verificacion' => now()->format('Y-m-d H:i:s'),
-                    'endpoint' => config('services.greenter.endpoint', 'beta'),
+                    'endpoint' => env('GREENTER_AMBIENTE', 'beta'),
                     'tiempo_respuesta_ms' => rand(100, 500),
                 ],
             ];
@@ -1960,12 +2030,11 @@ class GreenterService
      */
     public function getCompany()
     {
+        $this->initializeSee();
+
         return $this->company;
     }
 
-    /**
-     * ✅ NUEVO: Validar que el CDR sea real y válido
-     */
     private function validarCdrReal($cdrResponse, $cdrZip, $comprobante)
     {
         // 1. Verificar que exista el CDR

@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BannerFlashSalesController;
 use App\Http\Controllers\BannerOfertaController;
@@ -16,6 +15,7 @@ use App\Http\Controllers\MarcaProductoController;
 use App\Http\Controllers\OfertasController;
 use App\Http\Controllers\ProductosController;
 use App\Http\Controllers\ReclamosController;
+use App\Http\Controllers\Recompensas\RecompensaNotificacionController;
 use App\Http\Controllers\ReniecController;
 use App\Http\Controllers\TipoPagoController;
 use App\Http\Controllers\UbigeoController;
@@ -83,6 +83,7 @@ Route::get('/banners-sidebar-shop/publico', [BannersController::class, 'bannerSi
 Route::get('/banners-promocionales/publicos', [BannersPromocionalesController::class, 'bannersPromocionalesPublicos']);
 Route::get('/banners-flash-sales/activos', [BannerFlashSalesController::class, 'activos']);
 Route::get('/banners-ofertas/activo', [BannerOfertaController::class, 'getBannerActivo']);
+Route::get('/banners-ofertas/activo-semana', [BannerOfertaController::class, 'getBannerActivoSemana']);
 Route::get('/banners-flash-sales/activos', [BannersController::class, 'bannersFlashSalesActivos']);
 
 // ============================================
@@ -105,6 +106,12 @@ Route::get('/cupones/activos', [CuponesController::class, 'cuponesActivos']);
 // ============================================
 Route::get('/empresa-info/publica', [EmpresaInfoController::class, 'obtenerInfoPublica']);
 Route::get('/asesores/disponibles', [HorariosController::class, 'asesorDisponibles']);
+
+// ============================================
+// COOKIES Y MENÚS PÚBLICOS
+// ============================================
+Route::get('/cookies/configuracion/publica', [\App\Http\Controllers\CookieConfiguracionController::class, 'getConfiguracionPublica']);
+Route::get('/menus/publicos', [\App\Http\Controllers\MenuController::class, 'obtenerMenusPublicos']);
 
 // ============================================
 // FORMAS DE ENVÍO Y TIPOS DE PAGO
@@ -149,3 +156,9 @@ Route::get('/nota-credito/cdr/{notaId}/{numeroCompleto}', [\App\Http\Controllers
 Route::get('/nota-debito/pdf/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');
 Route::get('/nota-debito/xml/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarXmlPublico'])->where('numeroCompleto', '.*');
 Route::get('/nota-debito/cdr/{notaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\NotaDebitoController::class, 'descargarCdrPublico'])->where('numeroCompleto', '.*');
+
+// GUÍAS DE REMISIÓN PÚBLICAS (para WhatsApp)
+// ============================================
+Route::get('/guia-remision/pdf/{guiaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\GuiasRemisionController::class, 'descargarPdfPublico'])->where('numeroCompleto', '.*');
+Route::get('/guia-remision/xml/{guiaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\GuiasRemisionController::class, 'descargarXmlPublico'])->where('numeroCompleto', '.*');
+Route::get('/guia-remision/cdr/{guiaId}/{numeroCompleto}', [\App\Http\Controllers\Facturacion\GuiasRemisionController::class, 'descargarCdrPublico'])->where('numeroCompleto', '.*');

@@ -3,26 +3,26 @@
 namespace App\Http\Controllers\Contabilidad;
 
 use App\Http\Controllers\Controller;
-use App\Models\UtilidadVenta;
-use App\Models\UtilidadProducto;
 use App\Models\GastoOperativo;
-use App\Models\UtilidadMensual;
-use App\Models\Venta;
-use App\Models\Producto;
 use App\Models\Kardex;
+use App\Models\Producto;
+use App\Models\UtilidadMensual;
+use App\Models\UtilidadVenta;
+use App\Models\Venta;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class UtilidadesController extends Controller
 {
     /**
      * Calcular utilidad de una venta específica
+     * POST porque modifica/guarda datos en la tabla utilidad_ventas
      */
     public function calcularUtilidadVenta($ventaId)
     {
         $venta = Venta::with('detalles.producto')->findOrFail($ventaId);
-        
+
         $costoTotal = 0;
         $detallesUtilidad = [];
 
@@ -32,7 +32,7 @@ class UtilidadesController extends Controller
                 ->where('fecha', '<=', $venta->created_at)
                 ->latest('id')
                 ->first();
-            
+
             $costoUnitario = $kardex ? $kardex->costo_promedio : $detalle->producto->precio_compra;
             $costoItem = $costoUnitario * $detalle->cantidad;
             $costoTotal += $costoItem;
@@ -45,7 +45,7 @@ class UtilidadesController extends Controller
                 'subtotal_venta' => $detalle->subtotal,
                 'subtotal_costo' => $costoItem,
                 'utilidad' => $detalle->subtotal - $costoItem,
-                'margen' => $detalle->subtotal > 0 ? (($detalle->subtotal - $costoItem) / $detalle->subtotal) * 100 : 0
+                'margen' => $detalle->subtotal > 0 ? (($detalle->subtotal - $costoItem) / $detalle->subtotal) * 100 : 0,
             ];
         }
 
@@ -61,7 +61,7 @@ class UtilidadesController extends Controller
                 'costo_total' => $costoTotal,
                 'utilidad_bruta' => $utilidadBruta,
                 'margen_porcentaje' => $margenPorcentaje,
-                'utilidad_neta' => $utilidadBruta
+                'utilidad_neta' => $utilidadBruta,
             ]
         );
 
@@ -72,7 +72,7 @@ class UtilidadesController extends Controller
             'costo_total' => $costoTotal,
             'utilidad_bruta' => $utilidadBruta,
             'margen_porcentaje' => round($margenPorcentaje, 2),
-            'detalles' => $detallesUtilidad
+            'detalles' => $detallesUtilidad,
         ]);
     }
 
@@ -86,7 +86,7 @@ class UtilidadesController extends Controller
 
         // Ventas del período
         $ventas = Venta::whereBetween('created_at', [$fechaInicio, $fechaFin])->get();
-        
+
         $totalVentas = 0;
         $totalCostos = 0;
 
@@ -97,11 +97,11 @@ class UtilidadesController extends Controller
                     ->where('fecha', '<=', $venta->created_at)
                     ->latest('id')
                     ->first();
-                
+
                 $costoUnitario = $kardex ? $kardex->costo_promedio : $detalle->producto->precio_compra;
                 $costoVenta += $costoUnitario * $detalle->cantidad;
             }
-            
+
             $totalVentas += $venta->total;
             $totalCostos += $costoVenta;
         }
@@ -121,16 +121,16 @@ class UtilidadesController extends Controller
         return response()->json([
             'periodo' => [
                 'fecha_inicio' => $fechaInicio,
-                'fecha_fin' => $fechaFin
+                'fecha_fin' => $fechaFin,
             ],
             'ventas' => [
                 'total' => $totalVentas,
-                'cantidad' => $ventas->count()
+                'cantidad' => $ventas->count(),
             ],
             'costos' => [
                 'costo_ventas' => $totalCostos,
                 'gastos_operativos' => $gastosOperativos,
-                'total_costos' => $totalCostos + $gastosOperativos
+                'total_costos' => $totalCostos + $gastosOperativos,
             ],
             'utilidad' => [
                 'utilidad_bruta' => $utilidadBruta,
@@ -138,8 +138,8 @@ class UtilidadesController extends Controller
                 'utilidad_operativa' => $utilidadOperativa,
                 'margen_operativo' => round($margenOperativo, 2),
                 'utilidad_neta' => $utilidadNeta,
-                'margen_neto' => round($margenNeto, 2)
-            ]
+                'margen_neto' => round($margenNeto, 2),
+            ],
         ]);
     }
 
@@ -183,7 +183,7 @@ class UtilidadesController extends Controller
                 'total_ventas' => $item->total_ventas,
                 'total_costos' => $totalCostos,
                 'utilidad' => $utilidad,
-                'margen_porcentaje' => round($margen, 2)
+                'margen_porcentaje' => round($margen, 2),
             ];
         })->sortByDesc('utilidad')->values();
 
@@ -192,8 +192,8 @@ class UtilidadesController extends Controller
             'resumen' => [
                 'total_ventas' => $resultado->sum('total_ventas'),
                 'total_costos' => $resultado->sum('total_costos'),
-                'utilidad_total' => $resultado->sum('utilidad')
-            ]
+                'utilidad_total' => $resultado->sum('utilidad'),
+            ],
         ]);
     }
 
@@ -204,16 +204,20 @@ class UtilidadesController extends Controller
     {
         $request->validate([
             'fecha' => 'required|date',
-            'categoria' => 'required|string',
-            'concepto' => 'required|string',
+            'categoria' => 'required|in:ALQUILER,SERVICIOS,SUELDOS,MARKETING,TRANSPORTE,MANTENIMIENTO,IMPUESTOS,OTROS',
+            'concepto' => 'required|string|max:200',
             'monto' => 'required|numeric|min:0',
+            'comprobante_tipo' => 'nullable|string|max:20',
+            'comprobante_numero' => 'nullable|string|max:50',
+            'proveedor_id' => 'nullable|exists:proveedores,id',
             'es_fijo' => 'boolean',
-            'es_recurrente' => 'boolean'
+            'es_recurrente' => 'boolean',
+            'descripcion' => 'nullable|string',
         ]);
 
         $gasto = GastoOperativo::create([
             ...$request->all(),
-            'user_id' => auth()->id()
+            'user_id' => auth()->id(),
         ]);
 
         return response()->json($gasto, 201);
@@ -259,10 +263,10 @@ class UtilidadesController extends Controller
         return response()->json([
             'periodo' => [
                 'fecha_inicio' => $fechaInicio,
-                'fecha_fin' => $fechaFin
+                'fecha_fin' => $fechaFin,
             ],
             'gastos_por_categoria' => $gastos,
-            'total_gastos' => $gastos->sum('total')
+            'total_gastos' => $gastos->sum('total'),
         ]);
     }
 
@@ -276,7 +280,7 @@ class UtilidadesController extends Controller
 
         // Ventas del mes
         $ventas = Venta::whereBetween('created_at', [$fechaInicio, $fechaFin])->get();
-        
+
         $totalVentas = 0;
         $totalCostos = 0;
 
@@ -287,11 +291,11 @@ class UtilidadesController extends Controller
                     ->where('fecha', '<=', $venta->created_at)
                     ->latest('id')
                     ->first();
-                
+
                 $costoUnitario = $kardex ? $kardex->costo_promedio : $detalle->producto->precio_compra;
                 $costoVenta += $costoUnitario * $detalle->cantidad;
             }
-            
+
             $totalVentas += $venta->total;
             $totalCostos += $costoVenta;
         }
@@ -320,7 +324,7 @@ class UtilidadesController extends Controller
                 'utilidad_operativa' => $utilidadOperativa,
                 'margen_operativo_porcentaje' => $margenOperativo,
                 'utilidad_neta' => $utilidadNeta,
-                'margen_neto_porcentaje' => $margenNeto
+                'margen_neto_porcentaje' => $margenNeto,
             ]
         );
 
@@ -344,8 +348,8 @@ class UtilidadesController extends Controller
                 'total_costos' => $utilidades->sum('total_costos'),
                 'utilidad_bruta' => $utilidades->sum('utilidad_bruta'),
                 'gastos_operativos' => $utilidades->sum('gastos_operativos'),
-                'utilidad_neta' => $utilidades->sum('utilidad_neta')
-            ]
+                'utilidad_neta' => $utilidades->sum('utilidad_neta'),
+            ],
         ]);
     }
 
@@ -367,7 +371,7 @@ class UtilidadesController extends Controller
 
         // Calcular margen de contribución promedio
         $ventas = Venta::whereBetween('created_at', [$fechaInicio, $fechaFin])->get();
-        
+
         $totalVentas = $ventas->sum('total');
         $totalCostos = 0;
 
@@ -390,7 +394,7 @@ class UtilidadesController extends Controller
             'punto_equilibrio_ventas' => round($puntoEquilibrio, 2),
             'ventas_actuales' => $totalVentas,
             'diferencia' => $totalVentas - $puntoEquilibrio,
-            'alcanzado' => $totalVentas >= $puntoEquilibrio
+            'alcanzado' => $totalVentas >= $puntoEquilibrio,
         ]);
     }
 }

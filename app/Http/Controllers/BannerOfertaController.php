@@ -15,20 +15,21 @@ class BannerOfertaController extends Controller
      */
     public function index()
     {
-        $banners = BannerOferta::with(['productos' => function($query) {
+        $banners = BannerOferta::with(['productos' => function ($query) {
             $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock');
         }])
-        ->ordenadosPorPrioridad()
-        ->get();
+            ->ordenadosPorPrioridad()
+            ->get();
 
         // Transformar para compatibilidad con frontend
-        $banners->each(function($banner) {
-            $banner->productos->transform(function($producto) {
+        $banners->each(function ($banner) {
+            $banner->productos->transform(function ($producto) {
                 $descuento = $producto->pivot->descuento_porcentaje;
                 $producto->descuento_porcentaje = $descuento;
                 $producto->precio = $producto->precio_venta;
                 $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
-                $producto->imagen_principal = $producto->imagen ? url('storage/productos/' . $producto->imagen) : null;
+                $producto->imagen_principal = $producto->imagen ? url('storage/productos/'.$producto->imagen) : null;
+
                 return $producto;
             });
         });
@@ -41,25 +42,65 @@ class BannerOfertaController extends Controller
      */
     public function getBannerActivo()
     {
-        $banner = BannerOferta::with(['productos' => function($query) {
+        $banner = BannerOferta::with(['productos' => function ($query) {
             $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock', 'categoria_id', 'marca_id')
-                  ->with(['categoria:id,nombre', 'marca:id,nombre']);
+                ->with(['categoria:id,nombre', 'marca:id,nombre']);
         }])
-        ->activos()
-        ->ordenadosPorPrioridad()
-        ->first();
+            ->activos()
+            ->ordenadosPorPrioridad()
+            ->first();
 
-        if (!$banner) {
+        if (! $banner) {
             return response()->json(['message' => 'No hay banner activo'], 404);
         }
 
         // Agregar descuento y precio con descuento a cada producto
-        $banner->productos->transform(function($producto) {
+        $banner->productos->transform(function ($producto) {
             $descuento = $producto->pivot->descuento_porcentaje;
             $producto->descuento_porcentaje = $descuento;
             $producto->precio = $producto->precio_venta;
             $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
-            $producto->imagen_principal = $producto->imagen ? url('storage/productos/' . $producto->imagen) : null;
+            $producto->imagen_principal = $producto->imagen ? url('storage/productos/'.$producto->imagen) : null;
+
+            // Agregar información de categoría y marca
+            $producto->categoria_nombre = $producto->categoria ? $producto->categoria->nombre : null;
+            $producto->marca_nombre = $producto->marca ? $producto->marca->nombre : null;
+
+            // Limpiar relaciones innecesarias del JSON
+            unset($producto->categoria);
+            unset($producto->marca);
+
+            return $producto;
+        });
+
+        return response()->json($banner);
+    }
+
+    /**
+     * Obtener el banner activo de la semana (público)
+     * Endpoint para mostrar ofertas de la semana en la página principal
+     */
+    public function getBannerActivoSemana()
+    {
+        $banner = BannerOferta::with(['productos' => function ($query) {
+            $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock', 'categoria_id', 'marca_id')
+                ->with(['categoria:id,nombre', 'marca:id,nombre']);
+        }])
+            ->activos()
+            ->ordenadosPorPrioridad()
+            ->first();
+
+        if (! $banner) {
+            return response()->json(['message' => 'No hay banner activo'], 404);
+        }
+
+        // Agregar descuento y precio con descuento a cada producto
+        $banner->productos->transform(function ($producto) {
+            $descuento = $producto->pivot->descuento_porcentaje;
+            $producto->descuento_porcentaje = $descuento;
+            $producto->precio = $producto->precio_venta;
+            $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
+            $producto->imagen_principal = $producto->imagen ? url('storage/productos/'.$producto->imagen) : null;
 
             // Agregar información de categoría y marca
             $producto->categoria_nombre = $producto->categoria ? $producto->categoria->nombre : null;
@@ -83,7 +124,7 @@ class BannerOfertaController extends Controller
         $validator = Validator::make($request->all(), [
             'imagen' => 'required|image|mimes:jpeg,png,jpg,webp,gif|max:2048',
             'activo' => 'boolean',
-            'prioridad' => 'integer|min:0'
+            'prioridad' => 'integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -109,17 +150,18 @@ class BannerOfertaController extends Controller
      */
     public function show($id)
     {
-        $banner = BannerOferta::with(['productos' => function($query) {
+        $banner = BannerOferta::with(['productos' => function ($query) {
             $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock');
         }])->findOrFail($id);
 
         // Agregar precio e imagen_principal para compatibilidad con el frontend
-        $banner->productos->transform(function($producto) {
+        $banner->productos->transform(function ($producto) {
             $descuento = $producto->pivot->descuento_porcentaje;
             $producto->descuento_porcentaje = $descuento;
             $producto->precio = $producto->precio_venta;
             $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
-            $producto->imagen_principal = $producto->imagen ? url('storage/productos/' . $producto->imagen) : null;
+            $producto->imagen_principal = $producto->imagen ? url('storage/productos/'.$producto->imagen) : null;
+
             return $producto;
         });
 
@@ -136,7 +178,7 @@ class BannerOfertaController extends Controller
         $validator = Validator::make($request->all(), [
             'imagen' => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:2048',
             'activo' => 'boolean',
-            'prioridad' => 'integer|min:0'
+            'prioridad' => 'integer|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -189,7 +231,7 @@ class BannerOfertaController extends Controller
         $validator = Validator::make($request->all(), [
             'productos' => 'required|array',
             'productos.*.producto_id' => 'required|exists:productos,id',
-            'productos.*.descuento_porcentaje' => 'required|numeric|min:0|max:100'
+            'productos.*.descuento_porcentaje' => 'required|numeric|min:0|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -199,22 +241,23 @@ class BannerOfertaController extends Controller
         foreach ($request->productos as $productoData) {
             $banner->productos()->syncWithoutDetaching([
                 $productoData['producto_id'] => [
-                    'descuento_porcentaje' => $productoData['descuento_porcentaje']
-                ]
+                    'descuento_porcentaje' => $productoData['descuento_porcentaje'],
+                ],
             ]);
         }
 
-        $banner->load(['productos' => function($query) {
+        $banner->load(['productos' => function ($query) {
             $query->select('productos.id', 'nombre', 'precio_venta', 'imagen', 'codigo_producto', 'stock');
         }]);
 
         // Transformar productos para compatibilidad con frontend
-        $banner->productos->transform(function($producto) {
+        $banner->productos->transform(function ($producto) {
             $descuento = $producto->pivot->descuento_porcentaje;
             $producto->descuento_porcentaje = $descuento;
             $producto->precio = $producto->precio_venta;
             $producto->precio_con_descuento = $producto->precio_venta - ($producto->precio_venta * $descuento / 100);
-            $producto->imagen_principal = $producto->imagen ? url('storage/productos/' . $producto->imagen) : null;
+            $producto->imagen_principal = $producto->imagen ? url('storage/productos/'.$producto->imagen) : null;
+
             return $producto;
         });
 
@@ -240,7 +283,7 @@ class BannerOfertaController extends Controller
         $banner = BannerOferta::findOrFail($bannerId);
 
         $validator = Validator::make($request->all(), [
-            'descuento_porcentaje' => 'required|numeric|min:0|max:100'
+            'descuento_porcentaje' => 'required|numeric|min:0|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -248,7 +291,7 @@ class BannerOfertaController extends Controller
         }
 
         $banner->productos()->updateExistingPivot($productoId, [
-            'descuento_porcentaje' => $request->descuento_porcentaje
+            'descuento_porcentaje' => $request->descuento_porcentaje,
         ]);
 
         return response()->json(['message' => 'Descuento actualizado correctamente']);

@@ -3,65 +3,52 @@
 namespace App\Services;
 
 use App\Models\Comprobante;
+use App\Models\Compra;
 use App\Models\Venta;
-use App\Models\NotaCredito;
-use App\Models\NotaDebito;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
-/**
- * Servicio de Exportación a formato TXT
- * Genera archivos de texto plano según los formatos del PLE (Programa de Libros Electrónicos) de SUNAT
- */
 class ExportacionTxtService
 {
     /**
-     * Exportar Registro de Ventas e Ingresos (Formato 14.1)
-     * Según las especificaciones de SUNAT para PLE
-     *
-     * @param string $periodo Período en formato YYYYMM (ejemplo: 202501)
-     * @param string $ruc RUC del contribuyente
-     * @return array
+     * Exportar Registro de Ventas en formato PLE 14.1 SUNAT
      */
     public function exportarRegistroVentas($periodo, $ruc)
     {
         try {
-            // Parsear período
-            $year = substr($periodo, 0, 4);
-            $month = substr($periodo, 4, 2);
+            $anio = substr($periodo, 0, 4);
+            $mes = substr($periodo, 4, 2);
 
-            $fechaInicio = Carbon::createFromFormat('Y-m-d', "{$year}-{$month}-01")->startOfMonth();
-            $fechaFin = Carbon::createFromFormat('Y-m-d', "{$year}-{$month}-01")->endOfMonth();
+            $fechaInicio = Carbon::create($anio, $mes, 1)->startOfMonth();
+            $fechaFin = Carbon::create($anio, $mes, 1)->endOfMonth();
 
-            // Obtener comprobantes del período
-            $comprobantes = Comprobante::whereBetween('fecha_emision', [
-                $fechaInicio->format('Y-m-d'),
-                $fechaFin->format('Y-m-d')
-            ])
-            ->whereIn('estado', ['ACEPTADO', 'ANULADO'])
-            ->orderBy('fecha_emision')
-            ->orderBy('serie')
-            ->orderBy('correlativo')
-            ->get();
+            $comprobantes = Comprobante::whereBetween('fecha_emision', [$fechaInicio, $fechaFin])
+                ->whereIn('tipo_comprobante', ['01', '03', '07', '08']) // Factura, Boleta, NC, ND
+                ->orderBy('fecha_emision')
+                ->orderBy('serie')
+                ->orderBy('numero')
+                ->get();
 
-            // Generar contenido TXT
-            $contenido = $this->generarContenidoRegistroVentas($comprobantes, $periodo, $ruc);
+            $lineas = [];
+            $correlativo = 1;
 
-            // Generar nombre de archivo según formato SUNAT
-            // LE + RUC + AAAAMMDD + LIBRO + CODIGO_OPORTUNIDAD + INDICADOR_OPERACION + CONTENIDO + MONEDA + INDICADOR_LIBRO + .txt
-            $fechaGeneracion = now()->format('Ymd');
+            foreach ($comprobantes as $comp) {
+                $linea = $this->generarLineaRegistroVentas($comp, $periodo, $correlativo);
+                $lineas[] = $linea;
+                $correlativo++;
+            }
+
+            $contenido = implode("\n", $lineas);
             $nombreArchivo = "LE{$ruc}{$periodo}00140100001111.txt";
 
             return [
                 'success' => true,
                 'contenido' => $contenido,
                 'nombre_archivo' => $nombreArchivo,
-                'total_registros' => count($comprobantes),
-                'periodo' => $periodo
+                'total_registros' => count($lineas)
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error exportando registro de ventas TXT: ' . $e->getMessage());
             return [
                 'success' => false,
                 'error' => $e->getMessage()
@@ -70,261 +57,86 @@ class ExportacionTxtService
     }
 
     /**
-     * Generar contenido del archivo TXT para Registro de Ventas (Formato 14.1)
+     * Generar línea de registro de ventas formato PLE 14.1
      */
-    private function generarContenidoRegistroVentas($comprobantes, $periodo, $ruc)
+    private function generarLineaRegistroVentas($comprobante, $periodo, $correlativo)
     {
-        $lineas = [];
-        $correlativo = 1;
+        $campos = [
+            $periodo . '00',                                    // 1. Período
+            str_pad($correlativo, 10, '0', STR_PAD_LEFT),      // 2. Correlativo
+            'M' . str_pad($correlativo, 9, '0', STR_PAD_LEFT), // 3. Número correlativo asiento
+            $comprobante->fecha_emision->format('d/m/Y'),      // 4. Fecha emisión
+            $comprobante->fecha_vencimiento ? $comprobante->fecha_vencimiento->format('d/m/Y') : '', // 5. Fecha vencimiento
+            $comprobante->tipo_comprobante,                    // 6. Tipo comprobante
+            $comprobante->serie,                               // 7. Serie
+            str_pad($comprobante->numero, 8, '0', STR_PAD_LEFT), // 8. Número
+            '',                                                // 9. Número final (rango)
+            $comprobante->cliente->tipo_documento ?? '1',      // 10. Tipo documento cliente
+            $comprobante->cliente->numero_documento ?? '',     // 11. Número documento cliente
+            $comprobante->cliente->razon_social ?? $comprobante->cliente->nombre_completo ?? '', // 12. Razón social
+            number_format($comprobante->total_exportacion, 2, '.', ''), // 13. Exportación
+            number_format($comprobante->total_gravada, 2, '.', ''),     // 14. Base imponible
+            number_format($comprobante->total_descuento ?? 0, 2, '.', ''), // 15. Descuento
+            number_format($comprobante->total_igv, 2, '.', ''),         // 16. IGV
+            '0.00',                                            // 17. Descuento IGV
+            number_format($comprobante->total_exonerada, 2, '.', ''),   // 18. Exonerado
+            number_format($comprobante->total_inafecta, 2, '.', ''),    // 19. Inafecto
+            '0.00',                                            // 20. ISC
+            '0.00',                                            // 21. Base imponible IVAP
+            '0.00',                                            // 22. IVAP
+            '0.00',                                            // 23. ICBPER
+            '0.00',                                            // 24. Otros tributos
+            number_format($comprobante->total, 2, '.', ''),    // 25. Total
+            $comprobante->moneda ?? 'PEN',                     // 26. Moneda
+            '1.000',                                           // 27. Tipo cambio
+            $comprobante->fecha_emision->format('d/m/Y'),      // 28. Fecha emisión doc modificado
+            $comprobante->nota_credito_tipo_doc ?? '',         // 29. Tipo doc modificado
+            $comprobante->nota_credito_serie ?? '',            // 30. Serie doc modificado
+            $comprobante->nota_credito_numero ?? '',           // 31. Número doc modificado
+            '',                                                // 32. Proyecto operadores atribución
+            '',                                                // 33. Tipo nota crédito/débito
+            '1',                                               // 34. Estado (1=Aceptado)
+        ];
 
-        foreach ($comprobantes as $comprobante) {
-            // Formato 14.1 tiene 41 campos separados por |
-            $campos = [
-                // Campo 1: Período
-                $periodo . '00',
-
-                // Campo 2: Correlativo único (CUO)
-                str_pad($correlativo, 10, '0', STR_PAD_LEFT),
-
-                // Campo 3: Correlativo del asiento contable (M)
-                'M' . str_pad($correlativo, 9, '0', STR_PAD_LEFT),
-
-                // Campo 4: Fecha de emisión
-                Carbon::parse($comprobante->fecha_emision)->format('d/m/Y'),
-
-                // Campo 5: Fecha de vencimiento o pago
-                Carbon::parse($comprobante->fecha_emision)->format('d/m/Y'),
-
-                // Campo 6: Tipo de comprobante (01=Factura, 03=Boleta, 07=NC, 08=ND)
-                $comprobante->tipo_comprobante,
-
-                // Campo 7: Serie del comprobante
-                $comprobante->serie,
-
-                // Campo 8: Número del comprobante
-                str_pad($comprobante->correlativo, 8, '0', STR_PAD_LEFT),
-
-                // Campo 9: Número final (en rango, sino vacio)
-                '',
-
-                // Campo 10: Tipo de documento del cliente
-                $this->convertirTipoDocumento($comprobante->cliente_tipo_documento),
-
-                // Campo 11: Número de documento del cliente
-                $comprobante->cliente_numero_documento ?? '',
-
-                // Campo 12: Apellidos y nombres o denominación
-                $this->limpiarTexto($comprobante->cliente_razon_social ?? ''),
-
-                // Campo 13: Valor facturado de exportación (si aplica)
-                '0.00',
-
-                // Campo 14: Base imponible operaciones gravadas
-                number_format($comprobante->operacion_gravada ?? 0, 2, '.', ''),
-
-                // Campo 15: Descuento base imponible
-                '0.00',
-
-                // Campo 16: IGV
-                number_format($comprobante->total_igv ?? 0, 2, '.', ''),
-
-                // Campo 17: Descuento IGV
-                '0.00',
-
-                // Campo 18: Importe exonerado
-                number_format($comprobante->operacion_exonerada ?? 0, 2, '.', ''),
-
-                // Campo 19: Importe inafecto
-                number_format($comprobante->operacion_inafecta ?? 0, 2, '.', ''),
-
-                // Campo 20: ISC (Impuesto Selectivo al Consumo)
-                '0.00',
-
-                // Campo 21: Base imponible arroz pilado
-                '0.00',
-
-                // Campo 22: Impuesto arroz pilado
-                '0.00',
-
-                // Campo 23: ICBPER (Impuesto bolsas plásticas)
-                number_format($comprobante->total_icbper ?? 0, 2, '.', ''),
-
-                // Campo 24: Otros cargos
-                '0.00',
-
-                // Campo 25: Importe total
-                number_format($comprobante->importe_total ?? 0, 2, '.', ''),
-
-                // Campo 26: Código de moneda (PEN=S/, USD=$)
-                $comprobante->moneda ?? 'PEN',
-
-                // Campo 27: Tipo de cambio (si es USD)
-                '1.000',
-
-                // Campo 28: Fecha emisión documento modificado (para NC/ND)
-                $this->obtenerFechaDocumentoModificado($comprobante),
-
-                // Campo 29: Tipo documento modificado
-                $this->obtenerTipoDocumentoModificado($comprobante),
-
-                // Campo 30: Serie documento modificado
-                $this->obtenerSerieDocumentoModificado($comprobante),
-
-                // Campo 31: Número documento modificado
-                $this->obtenerNumeroDocumentoModificado($comprobante),
-
-                // Campo 32: Identificación contrato o proyecto
-                '',
-
-                // Campo 33: Error tipo 1
-                '',
-
-                // Campo 34: Indicador comprobante cancelación
-                '1', // 1=Cancelado
-
-                // Campo 35: Estado (0=Activo, 1=Anulado, 8=Anulado error SUNAT, 9=Anulado otros)
-                $comprobante->estado === 'ANULADO' ? '1' : '0',
-
-                // Campo 36-41: Campos adicionales (vacíos por defecto)
-                '', '', '', '', '', ''
-            ];
-
-            // Unir campos con pipe |
-            $lineas[] = implode('|', $campos) . '|';
-            $correlativo++;
-        }
-
-        return implode("\n", $lineas);
+        return implode('|', $campos) . '|';
     }
 
     /**
-     * Exportar Registro de Compras (Formato 8.1)
+     * Exportar Registro de Compras en formato PLE 8.1 SUNAT
      */
     public function exportarRegistroCompras($periodo, $ruc)
     {
         try {
-            $year = substr($periodo, 0, 4);
-            $month = substr($periodo, 4, 2);
+            $anio = substr($periodo, 0, 4);
+            $mes = substr($periodo, 4, 2);
 
-            $fechaInicio = Carbon::createFromFormat('Y-m-d', "{$year}-{$month}-01")->startOfMonth();
-            $fechaFin = Carbon::createFromFormat('Y-m-d', "{$year}-{$month}-01")->endOfMonth();
+            $fechaInicio = Carbon::create($anio, $mes, 1)->startOfMonth();
+            $fechaFin = Carbon::create($anio, $mes, 1)->endOfMonth();
 
-            // Obtener compras del período
-            $compras = \App\Models\Compra::whereBetween('fecha_emision', [
-                $fechaInicio->format('Y-m-d'),
-                $fechaFin->format('Y-m-d')
-            ])
-            ->orderBy('fecha_emision')
-            ->get();
+            // Aquí deberías tener un modelo de compras con comprobantes
+            // Por ahora usamos una estructura básica
+            $compras = Compra::whereBetween('fecha_compra', [$fechaInicio, $fechaFin])
+                ->where('numero_documento', '!=', null)
+                ->orderBy('fecha_compra')
+                ->get();
 
-            $contenido = $this->generarContenidoRegistroCompras($compras, $periodo, $ruc);
+            $lineas = [];
+            $correlativo = 1;
 
-            $fechaGeneracion = now()->format('Ymd');
+            foreach ($compras as $compra) {
+                $linea = $this->generarLineaRegistroCompras($compra, $periodo, $correlativo);
+                $lineas[] = $linea;
+                $correlativo++;
+            }
+
+            $contenido = implode("\n", $lineas);
             $nombreArchivo = "LE{$ruc}{$periodo}00080100001111.txt";
 
             return [
                 'success' => true,
                 'contenido' => $contenido,
                 'nombre_archivo' => $nombreArchivo,
-                'total_registros' => count($compras),
-                'periodo' => $periodo
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('Error exportando registro de compras TXT: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'error' => $e->getMessage()
-            ];
-        }
-    }
-
-    /**
-     * Generar contenido del archivo TXT para Registro de Compras (Formato 8.1)
-     */
-    private function generarContenidoRegistroCompras($compras, $periodo, $ruc)
-    {
-        $lineas = [];
-        $correlativo = 1;
-
-        foreach ($compras as $compra) {
-            $campos = [
-                // Campo 1: Período
-                $periodo . '00',
-
-                // Campo 2: Correlativo único
-                str_pad($correlativo, 10, '0', STR_PAD_LEFT),
-
-                // Campo 3: Correlativo asiento contable
-                'M' . str_pad($correlativo, 9, '0', STR_PAD_LEFT),
-
-                // Campo 4: Fecha de emisión
-                Carbon::parse($compra->fecha_emision)->format('d/m/Y'),
-
-                // Campo 5: Fecha de vencimiento
-                Carbon::parse($compra->fecha_emision)->format('d/m/Y'),
-
-                // Campo 6: Tipo de comprobante
-                $compra->tipo_comprobante ?? '01',
-
-                // Campo 7: Serie
-                $compra->serie ?? '',
-
-                // Campo 8: Año DUA o DSI
-                '',
-
-                // Campo 9: Número del comprobante
-                $compra->numero_comprobante ?? '',
-
-                // Campo 10: Número final (rango)
-                '',
-
-                // Campo 11: Tipo documento proveedor
-                $compra->proveedor_tipo_documento ?? '6',
-
-                // Campo 12: Número documento proveedor
-                $compra->proveedor_ruc ?? '',
-
-                // Campo 13: Apellidos y nombres
-                $this->limpiarTexto($compra->proveedor_razon_social ?? ''),
-
-                // Campo 14-37: Montos y valores (base imponible, IGV, etc.)
-                number_format($compra->base_imponible ?? 0, 2, '.', ''),
-                number_format($compra->igv ?? 0, 2, '.', ''),
-                '0.00', '0.00', '0.00', '0.00',
-                number_format($compra->total ?? 0, 2, '.', ''),
-                $compra->moneda ?? 'PEN',
-                '1.000',
-                '', '', '', '', '', '', '', '', '', '', '', '', '', '',
-
-                // Campo 38: Estado
-                $compra->estado === 'ANULADO' ? '1' : '0',
-
-                // Campos finales
-                '', '', ''
-            ];
-
-            $lineas[] = implode('|', $campos) . '|';
-            $correlativo++;
-        }
-
-        return implode("\n", $lineas);
-    }
-
-    /**
-     * Exportar Libro Diario (Formato 5.1)
-     */
-    public function exportarLibroDiario($periodo, $ruc)
-    {
-        try {
-            $contenido = ""; // Implementación simplificada
-            $nombreArchivo = "LE{$ruc}{$periodo}00050100001111.txt";
-
-            return [
-                'success' => true,
-                'contenido' => $contenido,
-                'nombre_archivo' => $nombreArchivo,
-                'mensaje' => 'Libro Diario - Formato simplificado'
+                'total_registros' => count($lineas)
             ];
 
         } catch (\Exception $e) {
@@ -335,88 +147,51 @@ class ExportacionTxtService
         }
     }
 
-    // ===== MÉTODOS AUXILIARES =====
-
     /**
-     * Convertir tipo de documento del cliente al código SUNAT
+     * Generar línea de registro de compras formato PLE 8.1
      */
-    private function convertirTipoDocumento($tipo)
+    private function generarLineaRegistroCompras($compra, $periodo, $correlativo)
     {
-        $mapeo = [
-            '0' => '0',  // Sin documento
-            '1' => '1',  // DNI
-            '4' => '4',  // Carnet de extranjería
-            '6' => '6',  // RUC
-            '7' => '7',  // Pasaporte
+        $campos = [
+            $periodo . '00',                                    // 1. Período
+            str_pad($correlativo, 10, '0', STR_PAD_LEFT),      // 2. Correlativo
+            'M' . str_pad($correlativo, 9, '0', STR_PAD_LEFT), // 3. Número correlativo asiento
+            Carbon::parse($compra->fecha_compra)->format('d/m/Y'), // 4. Fecha emisión
+            Carbon::parse($compra->fecha_compra)->format('d/m/Y'), // 5. Fecha vencimiento
+            '01',                                              // 6. Tipo comprobante (Factura)
+            'F001',                                            // 7. Serie
+            $compra->numero_documento ?? '00000001',           // 8. Número
+            '',                                                // 9. Número final
+            '6',                                               // 10. Tipo documento proveedor (RUC)
+            $compra->proveedor->numero_documento ?? '00000000000', // 11. Número documento
+            $compra->proveedor->razon_social ?? 'PROVEEDOR',  // 12. Razón social
+            number_format($compra->subtotal, 2, '.', ''),     // 13. Base imponible
+            number_format($compra->igv, 2, '.', ''),          // 14. IGV
+            '0.00',                                            // 15. Base imponible 2
+            '0.00',                                            // 16. IGV 2
+            '0.00',                                            // 17. Base imponible 3
+            '0.00',                                            // 18. IGV 3
+            '0.00',                                            // 19. Valor adquisiciones no gravadas
+            '0.00',                                            // 20. ISC
+            '0.00',                                            // 21. ICBPER
+            '0.00',                                            // 22. Otros tributos
+            number_format($compra->total, 2, '.', ''),        // 23. Total
+            'PEN',                                             // 24. Moneda
+            '1.000',                                           // 25. Tipo cambio
+            Carbon::parse($compra->fecha_compra)->format('d/m/Y'), // 26. Fecha emisión doc modificado
+            '',                                                // 27. Tipo doc modificado
+            '',                                                // 28. Serie doc modificado
+            '',                                                // 29. Número doc modificado
+            '',                                                // 30. Proyecto operadores atribución
+            '',                                                // 31. Tipo nota
+            '1',                                               // 32. Estado (1=Aceptado)
         ];
 
-        return $mapeo[$tipo] ?? '0';
+        return implode('|', $campos) . '|';
     }
 
     /**
-     * Limpiar texto para formato TXT (sin caracteres especiales)
-     */
-    private function limpiarTexto($texto)
-    {
-        // Remover caracteres especiales y pipes
-        $texto = str_replace(['|', "\n", "\r", "\t"], ' ', $texto);
-
-        // Convertir caracteres especiales
-        $texto = mb_strtoupper($texto, 'UTF-8');
-
-        return trim($texto);
-    }
-
-    /**
-     * Obtener fecha del documento modificado (para NC/ND)
-     */
-    private function obtenerFechaDocumentoModificado($comprobante)
-    {
-        if (in_array($comprobante->tipo_comprobante, ['07', '08'])) {
-            if ($comprobante->comprobanteReferencia) {
-                return Carbon::parse($comprobante->comprobanteReferencia->fecha_emision)->format('d/m/Y');
-            }
-        }
-        return '';
-    }
-
-    /**
-     * Obtener tipo del documento modificado
-     */
-    private function obtenerTipoDocumentoModificado($comprobante)
-    {
-        if (in_array($comprobante->tipo_comprobante, ['07', '08'])) {
-            return $comprobante->comprobanteReferencia->tipo_comprobante ?? '';
-        }
-        return '';
-    }
-
-    /**
-     * Obtener serie del documento modificado
-     */
-    private function obtenerSerieDocumentoModificado($comprobante)
-    {
-        if (in_array($comprobante->tipo_comprobante, ['07', '08'])) {
-            return $comprobante->comprobanteReferencia->serie ?? '';
-        }
-        return '';
-    }
-
-    /**
-     * Obtener número del documento modificado
-     */
-    private function obtenerNumeroDocumentoModificado($comprobante)
-    {
-        if (in_array($comprobante->tipo_comprobante, ['07', '08'])) {
-            if ($comprobante->comprobanteReferencia) {
-                return str_pad($comprobante->comprobanteReferencia->correlativo, 8, '0', STR_PAD_LEFT);
-            }
-        }
-        return '';
-    }
-
-    /**
-     * Exportar reporte de ventas simple en TXT
+     * Exportar reporte simple de ventas en TXT
      */
     public function exportarReporteVentasSimple($fechaInicio, $fechaFin)
     {
@@ -432,42 +207,70 @@ class ExportacionTxtService
             $lineas[] = str_repeat("=", 120);
             $lineas[] = "";
 
-            $formato = "%-12s %-20s %-40s %15s %15s";
-            $lineas[] = sprintf($formato, "FECHA", "NÚMERO", "CLIENTE", "SUBTOTAL", "TOTAL");
+            $formato = "%-12s %-15s %-40s %12s %12s %12s";
+            $lineas[] = sprintf(
+                $formato,
+                "FECHA",
+                "DOCUMENTO",
+                "CLIENTE",
+                "SUBTOTAL",
+                "IGV",
+                "TOTAL"
+            );
             $lineas[] = str_repeat("-", 120);
 
+            $totalVentas = 0;
+            $totalIGV = 0;
             $totalGeneral = 0;
+
             foreach ($ventas as $venta) {
+                $cliente = $venta->cliente ? 
+                    ($venta->cliente->razon_social ?? $venta->cliente->nombre_completo) : 
+                    'CLIENTE GENERAL';
+
+                $subtotal = $venta->total / 1.18;
+                $igv = $venta->total - $subtotal;
+
                 $lineas[] = sprintf(
                     $formato,
-                    Carbon::parse($venta->created_at)->format('d/m/Y'),
-                    $venta->codigo_venta ?? $venta->id,
-                    mb_substr($venta->cliente->razon_social ?? 'PÚBLICO GENERAL', 0, 40),
-                    'S/ ' . number_format($venta->subtotal, 2),
-                    'S/ ' . number_format($venta->total, 2)
+                    $venta->created_at->format('d/m/Y'),
+                    $venta->numero_venta ?? 'V-' . $venta->id,
+                    mb_substr($cliente, 0, 40),
+                    number_format($subtotal, 2),
+                    number_format($igv, 2),
+                    number_format($venta->total, 2)
                 );
+
+                $totalVentas += $subtotal;
+                $totalIGV += $igv;
                 $totalGeneral += $venta->total;
             }
 
             $lineas[] = str_repeat("-", 120);
-            $lineas[] = sprintf($formato, "", "", "TOTAL GENERAL:", "", "S/ " . number_format($totalGeneral, 2));
+            $lineas[] = sprintf(
+                $formato,
+                "",
+                "",
+                "TOTALES:",
+                number_format($totalVentas, 2),
+                number_format($totalIGV, 2),
+                number_format($totalGeneral, 2)
+            );
             $lineas[] = "";
             $lineas[] = "Total de ventas: " . count($ventas);
             $lineas[] = "Generado: " . now()->format('d/m/Y H:i:s');
 
             $contenido = implode("\n", $lineas);
-            $nombreArchivo = "reporte-ventas-{$fechaInicio}-{$fechaFin}.txt";
+            $nombreArchivo = "ventas-{$fechaInicio}-{$fechaFin}.txt";
 
             return [
                 'success' => true,
                 'contenido' => $contenido,
                 'nombre_archivo' => $nombreArchivo,
-                'total_registros' => count($ventas),
-                'total_monto' => $totalGeneral
+                'total_registros' => count($ventas)
             ];
 
         } catch (\Exception $e) {
-            Log::error('Error exportando reporte de ventas TXT: ' . $e->getMessage());
             return [
                 'success' => false,
                 'error' => $e->getMessage()

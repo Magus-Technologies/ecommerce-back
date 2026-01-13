@@ -118,6 +118,14 @@ class GuiasRemisionController extends Controller
     }
 
     /**
+     * Crear guía de remisión - GRE Transportista
+     */
+    public function storeTransportista(Request $request): JsonResponse
+    {
+        return $this->storeGuia($request, 'TRANSPORTISTA');
+    }
+
+    /**
      * Crear nueva guía de remisión (método genérico)
      */
     public function store(Request $request): JsonResponse
@@ -476,9 +484,9 @@ class GuiasRemisionController extends Controller
     }
 
     /**
-     * Ver XML (obtiene URL)
+     * Descargar XML de guía de remisión (igual que NotaCreditoController)
      */
-    public function verXml($id): JsonResponse
+    public function verXml($id)
     {
         try {
             $guia = GuiaRemision::findOrFail($id);
@@ -486,31 +494,29 @@ class GuiasRemisionController extends Controller
             if (empty($guia->xml_firmado)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No hay XML disponible para esta guía de remisión'
+                    'message' => 'XML no disponible'
                 ], 404);
             }
 
-            $url = url("/api/guias-remision/{$id}/ver-xml-archivo");
+            // Decodificar el XML desde base64
+            $xmlContent = base64_decode($guia->xml_firmado);
+            $filename = 'GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.xml';
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'url' => $url,
-                    'filename' => $guia->numero_completo . '.xml'
-                ]
-            ]);
+            return response($xmlContent, 200)
+                ->header('Content-Type', 'application/xml')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al obtener XML',
+                'message' => 'Error al descargar XML',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Ver archivo XML (sirve el XML desde backend)
+     * Ver archivo XML en el navegador (inline)
      */
     public function verArchivoXml($id)
     {
@@ -518,17 +524,26 @@ class GuiasRemisionController extends Controller
             $guia = GuiaRemision::findOrFail($id);
 
             if (empty($guia->xml_firmado)) {
-                abort(404, 'No hay XML disponible');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'XML no disponible'
+                ], 404);
             }
 
+            // Decodificar el XML desde base64
             $xmlContent = base64_decode($guia->xml_firmado);
+            $filename = 'GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.xml';
 
             return response($xmlContent, 200)
                 ->header('Content-Type', 'application/xml')
-                ->header('Content-Disposition', 'inline; filename="' . $guia->numero_completo . '.xml"');
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
 
         } catch (\Exception $e) {
-            abort(500, 'Error al mostrar XML: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al mostrar XML',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -608,9 +623,9 @@ class GuiasRemisionController extends Controller
     }
 
     /**
-     * Ver PDF
+     * Descargar PDF de guía de remisión (igual que NotaCreditoController)
      */
-    public function verPdf($id): JsonResponse
+    public function verPdf($id)
     {
         try {
             $guia = GuiaRemision::findOrFail($id);
@@ -618,31 +633,29 @@ class GuiasRemisionController extends Controller
             if (empty($guia->pdf_base64)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No hay PDF disponible'
+                    'message' => 'PDF no disponible'
                 ], 404);
             }
 
-            $url = url("/api/guias-remision/{$id}/ver-pdf-archivo");
+            // Decodificar el PDF desde base64
+            $pdfContent = base64_decode($guia->pdf_base64);
+            $filename = 'GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.pdf';
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'url' => $url,
-                    'filename' => $guia->numero_completo . '.pdf'
-                ]
-            ]);
+            return response($pdfContent, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al obtener PDF',
+                'message' => 'Error al descargar PDF',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Ver archivo PDF
+     * Ver archivo PDF en el navegador (inline)
      */
     public function verArchivoPdf($id)
     {
@@ -650,17 +663,26 @@ class GuiasRemisionController extends Controller
             $guia = GuiaRemision::findOrFail($id);
 
             if (empty($guia->pdf_base64)) {
-                abort(404, 'No hay PDF disponible');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PDF no disponible'
+                ], 404);
             }
 
+            // Decodificar el PDF desde base64
             $pdfContent = base64_decode($guia->pdf_base64);
+            $filename = 'GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.pdf';
 
             return response($pdfContent, 200)
                 ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'inline; filename="' . $guia->numero_completo . '.pdf"');
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
 
         } catch (\Exception $e) {
-            abort(500, 'Error al mostrar PDF: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al mostrar PDF',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -1160,6 +1182,132 @@ class GuiasRemisionController extends Controller
     }
 
     /**
+     * Descargar PDF público (sin autenticación - para WhatsApp)
+     * URL: /api/guia-remision/pdf/{guiaId}/{numeroCompleto}
+     */
+    public function descargarPdfPublico($guiaId, $numeroCompleto)
+    {
+        try {
+            $guia = GuiaRemision::findOrFail($guiaId);
+
+            // Validar número completo (seguridad)
+            $numeroEsperado = $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT);
+            if ($numeroCompleto !== $numeroEsperado) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Número de guía no válido',
+                ], 403);
+            }
+
+            if (empty($guia->pdf_base64)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PDF no disponible',
+                ], 404);
+            }
+
+            $pdfContent = base64_decode($guia->pdf_base64);
+            $filename = 'GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.pdf';
+
+            return response($pdfContent, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
+                ->header('Cache-Control', 'public, max-age=3600');
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al descargar PDF',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Descargar XML público (sin autenticación - para WhatsApp)
+     * URL: /api/guia-remision/xml/{guiaId}/{numeroCompleto}
+     */
+    public function descargarXmlPublico($guiaId, $numeroCompleto)
+    {
+        try {
+            $guia = GuiaRemision::findOrFail($guiaId);
+
+            // Validar número completo (seguridad)
+            $numeroEsperado = $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT);
+            if ($numeroCompleto !== $numeroEsperado) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Número de guía no válido',
+                ], 403);
+            }
+
+            if (empty($guia->xml_firmado)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'XML no disponible',
+                ], 404);
+            }
+
+            $xmlContent = base64_decode($guia->xml_firmado);
+            $filename = 'GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.xml';
+
+            return response($xmlContent, 200)
+                ->header('Content-Type', 'application/xml')
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
+                ->header('Cache-Control', 'public, max-age=3600');
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al descargar XML',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Descargar CDR público (sin autenticación - para WhatsApp)
+     * URL: /api/guia-remision/cdr/{guiaId}/{numeroCompleto}
+     */
+    public function descargarCdrPublico($guiaId, $numeroCompleto)
+    {
+        try {
+            $guia = GuiaRemision::findOrFail($guiaId);
+
+            // Validar número completo (seguridad)
+            $numeroEsperado = $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT);
+            if ($numeroCompleto !== $numeroEsperado) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Número de guía no válido',
+                ], 403);
+            }
+
+            if (empty($guia->xml_respuesta_sunat)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'CDR no disponible',
+                ], 404);
+            }
+
+            $cdrContent = base64_decode($guia->xml_respuesta_sunat);
+            $filename = 'R-GRE-' . $guia->serie . '-' . str_pad($guia->correlativo, 8, '0', STR_PAD_LEFT) . '.xml';
+
+            return response($cdrContent, 200)
+                ->header('Content-Type', 'application/xml')
+                ->header('Content-Disposition', 'inline; filename="' . $filename . '"')
+                ->header('Cache-Control', 'public, max-age=3600');
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al descargar CDR',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Validar ubigeo
      */
     public function validarUbigeo(Request $request): JsonResponse
@@ -1206,7 +1354,7 @@ class GuiasRemisionController extends Controller
     }
 
     /**
-     * Validar RUC transportista
+     * Validar RUC transportista y consultar en SUNAT
      */
     public function validarRucTransportista(Request $request): JsonResponse
     {
@@ -1224,23 +1372,71 @@ class GuiasRemisionController extends Controller
             }
 
             $ruc = $request->ruc;
+            
+            // Validar formato básico
             $valido = in_array(substr($ruc, 0, 2), ['10', '20']);
+            
+            if (!$valido) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'RUC inválido',
+                    'data' => [
+                        'valido' => false,
+                        'ruc' => $ruc,
+                        'mensaje' => 'RUC debe empezar con 10 o 20'
+                    ]
+                ], 422);
+            }
 
+            // Consultar en API de RENIEC/SUNAT
+            $token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6InN5c3RlbWNyYWZ0LnBlQGdtYWlsLmNvbSJ9.yuNS5hRaC0hCwymX_PjXRoSZJWLNNBeOdlLRSUGlHGA';
+            $url = 'https://dniruc.apisperu.com/api/v1/ruc/' . $ruc . '?token=' . $token;
+
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()->get($url);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'valido' => true,
+                        'ruc' => $ruc,
+                        'razon_social' => $data['razonSocial'] ?? '',
+                        'nombre_comercial' => $data['nombreComercial'] ?? '',
+                        'direccion' => $data['direccion'] ?? '',
+                        'estado' => $data['estado'] ?? '',
+                        'condicion' => $data['condicion'] ?? '',
+                        'mensaje' => 'RUC encontrado en SUNAT'
+                    ]
+                ]);
+            } else {
+                // Si la API falla, retornar solo validación de formato
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'valido' => true,
+                        'ruc' => $ruc,
+                        'razon_social' => '',
+                        'mensaje' => 'RUC válido (no se pudo consultar en SUNAT)'
+                    ]
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error validando RUC transportista: ' . $e->getMessage());
+            
+            // En caso de error, retornar validación básica
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'valido' => $valido,
-                    'ruc' => $ruc,
-                    'mensaje' => $valido ? 'RUC válido' : 'RUC inválido'
+                    'valido' => true,
+                    'ruc' => $request->ruc,
+                    'razon_social' => '',
+                    'mensaje' => 'RUC válido (error al consultar SUNAT)',
+                    'error' => $e->getMessage()
                 ]
             ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al validar RUC',
-                'error' => $e->getMessage()
-            ], 500);
         }
     }
 

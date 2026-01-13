@@ -11,19 +11,19 @@ return [
     |
     */
 
-    'ruc' => env('EMPRESA_RUC', '10427993120'),
+    'ruc' => trim(env('EMPRESA_RUC', '10427993120')),
 
-    'razon_social' => env('EMPRESA_RAZON_SOCIAL', 'AGUADO SIERRA MANUEL HIPOLITO'),
+    'razon_social' => trim(env('EMPRESA_RAZON_SOCIAL', 'AGUADO SIERRA MANUEL HIPOLITO')),
 
-    'nombre_comercial' => env('EMPRESA_NOMBRE_COMERCIAL', 'MAGUS TEC'),
+    'nombre_comercial' => trim(env('EMPRESA_NOMBRE_COMERCIAL', 'MAGUS TEC')),
 
-    'direccion' => env('EMPRESA_DIRECCION', 'Urb. Primavera, Mz A20 Lte. 2 Calle Los Portales'),
+    'direccion' => trim(env('EMPRESA_DIRECCION', 'Urb. Primavera, Mz A20 Lte. 2 Calle Los Portales')),
 
-    'distrito' => env('EMPRESA_DISTRITO', 'Santa Anita'),
+    'distrito' => trim(env('EMPRESA_DISTRITO', 'Santa Anita')),
 
-    'provincia' => env('EMPRESA_PROVINCIA', 'Lima'),
+    'provincia' => trim(env('EMPRESA_PROVINCIA', 'Lima')),
 
-    'departamento' => env('EMPRESA_DEPARTAMENTO', 'Lima'),
+    'departamento' => trim(env('EMPRESA_DEPARTAMENTO', 'Lima')),
 
     'ubigeo' => env('EMPRESA_UBIGEO', '150301'), // Lima-Lima-Santa Anita
 

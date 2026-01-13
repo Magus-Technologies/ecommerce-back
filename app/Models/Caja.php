@@ -15,11 +15,11 @@ class Caja extends Model
         'nombre',
         'codigo',
         'tienda_id',
-        'activo'
+        'activo',
     ];
 
     protected $casts = [
-        'activo' => 'boolean'
+        'activo' => 'boolean',
     ];
 
     public function tienda()

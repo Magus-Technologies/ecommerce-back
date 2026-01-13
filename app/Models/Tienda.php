@@ -12,18 +12,17 @@ class Tienda extends Model
     protected $fillable = [
         'nombre',
         'descripcion',
-        'direccion',
-        'telefono',
-        'email',
-        'activo'
-    ];
-
-    protected $casts = [
-        'activo' => 'boolean'
+        'logo',
+        'estado'
     ];
 
     public function pedidos()
     {
         return $this->hasMany(Pedido::class, 'tienda_id');
+    }
+
+    public function cajas()
+    {
+        return $this->hasMany(Caja::class, 'tienda_id');
     }
 }

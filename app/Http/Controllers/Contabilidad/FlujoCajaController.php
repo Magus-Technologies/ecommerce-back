@@ -3,104 +3,186 @@
 namespace App\Http\Controllers\Contabilidad;
 
 use App\Http\Controllers\Controller;
-use App\Models\FlujoCajaProyeccion;
+use App\Models\FlujoCaja;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class FlujoCajaController extends Controller
 {
+    // 1. Listar proyecciones
     public function index(Request $request)
     {
-        $fechaInicio = $request->fecha_inicio ?? now()->startOfMonth()->toDateString();
-        $fechaFin = $request->fecha_fin ?? now()->endOfMonth()->toDateString();
+        $query = FlujoCaja::with('user');
 
-        $proyecciones = FlujoCajaProyeccion::whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->orderBy('fecha')
-            ->get();
+        if ($request->fecha_inicio) {
+            $query->where('fecha', '>=', $request->fecha_inicio);
+        }
 
-        $ingresos = $proyecciones->where('tipo', 'INGRESO');
-        $egresos = $proyecciones->where('tipo', 'EGRESO');
+        if ($request->fecha_fin) {
+            $query->where('fecha', '<=', $request->fecha_fin);
+        }
 
-        return response()->json([
-            'proyecciones' => $proyecciones,
-            'resumen' => [
-                'total_ingresos_proyectados' => $ingresos->sum('monto_proyectado'),
-                'total_egresos_proyectados' => $egresos->sum('monto_proyectado'),
-                'total_ingresos_reales' => $ingresos->sum('monto_real'),
-                'total_egresos_reales' => $egresos->sum('monto_real'),
-                'saldo_proyectado' => $ingresos->sum('monto_proyectado') - $egresos->sum('monto_proyectado'),
-                'saldo_real' => $ingresos->sum('monto_real') - $egresos->sum('monto_real')
-            ]
-        ]);
+        if ($request->tipo) {
+            $query->where('tipo', $request->tipo);
+        }
+
+        $flujos = $query->orderBy('fecha')->get();
+
+        return response()->json($flujos);
     }
 
+    // 2. Crear proyección
     public function store(Request $request)
     {
         $request->validate([
             'fecha' => 'required|date',
             'tipo' => 'required|in:INGRESO,EGRESO',
-            'concepto' => 'required|string',
-            'monto_proyectado' => 'required|numeric|min:0',
-            'categoria' => 'required|string',
-            'recurrente' => 'boolean',
-            'frecuencia' => 'nullable|string'
+            'categoria' => 'required|in:VENTAS,COBROS,PRESTAMOS,OTROS_INGRESOS,COMPRAS,PAGOS_PROVEEDORES,SUELDOS,SERVICIOS,IMPUESTOS,PRESTAMOS_PAGO,OTROS_EGRESOS',
+            'concepto' => 'required|string|max:200',
+            'monto_proyectado' => 'required|numeric',
+            'recurrente' => 'sometimes|boolean',
+            'frecuencia' => 'nullable|string',
+            'observaciones' => 'nullable|string'
         ]);
 
-        $proyeccion = FlujoCajaProyeccion::create([
+        $flujo = FlujoCaja::create([
             ...$request->all(),
+            'estado' => 'PROYECTADO',
             'user_id' => auth()->id()
         ]);
 
-        return response()->json($proyeccion, 201);
+        return response()->json($flujo->load('user'), 201);
     }
 
+    // 3. Ver detalle
+    public function show($id)
+    {
+        $flujo = FlujoCaja::with('user')->findOrFail($id);
+        return response()->json($flujo);
+    }
+
+    // 4. Actualizar
+    public function update(Request $request, $id)
+    {
+        $flujo = FlujoCaja::findOrFail($id);
+
+        $request->validate([
+            'fecha' => 'sometimes|date',
+            'tipo' => 'sometimes|in:INGRESO,EGRESO',
+            'categoria' => 'sometimes|in:VENTAS,COBROS,PRESTAMOS,OTROS_INGRESOS,COMPRAS,PAGOS_PROVEEDORES,SUELDOS,SERVICIOS,IMPUESTOS,PRESTAMOS_PAGO,OTROS_EGRESOS',
+            'concepto' => 'sometimes|string|max:200',
+            'monto_proyectado' => 'sometimes|numeric',
+            'recurrente' => 'sometimes|boolean',
+            'frecuencia' => 'nullable|string',
+            'observaciones' => 'nullable|string'
+        ]);
+
+        $flujo->update($request->all());
+
+        return response()->json($flujo);
+    }
+
+    // 5. Eliminar
+    public function destroy($id)
+    {
+        $flujo = FlujoCaja::findOrFail($id);
+        $flujo->delete();
+
+        return response()->json(['message' => 'Proyección eliminada correctamente']);
+    }
+
+    // 6. Registrar monto real
     public function registrarReal(Request $request, $id)
     {
         $request->validate([
-            'monto_real' => 'required|numeric|min:0'
+            'monto_real' => 'required|numeric',
+            'observaciones' => 'nullable|string'
         ]);
 
-        $proyeccion = FlujoCajaProyeccion::findOrFail($id);
-        $proyeccion->update([
+        $flujo = FlujoCaja::findOrFail($id);
+
+        $flujo->update([
             'monto_real' => $request->monto_real,
-            'estado' => 'REALIZADO'
+            'estado' => 'REALIZADO',
+            'observaciones' => $request->observaciones ?? $flujo->observaciones
         ]);
 
-        return response()->json($proyeccion);
+        return response()->json($flujo);
     }
 
-    public function proyeccionMensual(Request $request)
+    // 7. Comparativa proyectado vs real
+    public function comparativa(Request $request)
     {
-        $mes = $request->mes ?? now()->month;
-        $anio = $request->anio ?? now()->year;
+        $fechaInicio = $request->fecha_inicio ?? now()->startOfMonth()->toDateString();
+        $fechaFin = $request->fecha_fin ?? now()->endOfMonth()->toDateString();
 
-        $fechaInicio = Carbon::create($anio, $mes, 1)->startOfMonth();
-        $fechaFin = Carbon::create($anio, $mes, 1)->endOfMonth();
-
-        $proyecciones = FlujoCajaProyeccion::whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->orderBy('fecha')
+        $flujos = FlujoCaja::whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->where('estado', 'REALIZADO')
             ->get();
 
-        $saldoInicial = 0; // Aquí podrías obtener el saldo real de caja
-        $saldoAcumulado = $saldoInicial;
+        $ingresos = [
+            'proyectado' => $flujos->where('tipo', 'INGRESO')->sum('monto_proyectado'),
+            'real' => $flujos->where('tipo', 'INGRESO')->sum('monto_real'),
+        ];
+        $ingresos['desviacion'] = $ingresos['real'] - $ingresos['proyectado'];
 
-        $flujo = $proyecciones->map(function ($p) use (&$saldoAcumulado) {
-            $monto = $p->tipo === 'INGRESO' ? $p->monto_proyectado : -$p->monto_proyectado;
-            $saldoAcumulado += $monto;
+        $egresos = [
+            'proyectado' => $flujos->where('tipo', 'EGRESO')->sum('monto_proyectado'),
+            'real' => $flujos->where('tipo', 'EGRESO')->sum('monto_real'),
+        ];
+        $egresos['desviacion'] = $egresos['real'] - $egresos['proyectado'];
 
-            return [
-                'fecha' => $p->fecha,
-                'concepto' => $p->concepto,
-                'tipo' => $p->tipo,
-                'monto' => abs($monto),
-                'saldo_acumulado' => $saldoAcumulado
-            ];
-        });
+        $flujoNeto = [
+            'proyectado' => $ingresos['proyectado'] - $egresos['proyectado'],
+            'real' => $ingresos['real'] - $egresos['real'],
+        ];
+        $flujoNeto['desviacion'] = $flujoNeto['real'] - $flujoNeto['proyectado'];
 
         return response()->json([
-            'saldo_inicial' => $saldoInicial,
-            'flujo' => $flujo,
-            'saldo_final' => $saldoAcumulado
+            'periodo' => [
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin' => $fechaFin
+            ],
+            'ingresos' => $ingresos,
+            'egresos' => $egresos,
+            'flujo_neto' => $flujoNeto,
+            'detalle' => $flujos
+        ]);
+    }
+
+    // 8. Alertas (desviaciones > 10%)
+    public function alertas(Request $request)
+    {
+        $fechaInicio = $request->fecha_inicio ?? now()->startOfMonth()->toDateString();
+        $fechaFin = $request->fecha_fin ?? now()->endOfMonth()->toDateString();
+
+        $flujos = FlujoCaja::whereBetween('fecha', [$fechaInicio, $fechaFin])
+            ->where('estado', 'REALIZADO')
+            ->with('user')
+            ->get();
+
+        // Filtrar alertas con desviación > 10%
+        $alertas = $flujos->filter(function($flujo) {
+            $desviacion = abs($flujo->desviacion_porcentaje);
+            return $desviacion !== null && $desviacion > 10;
+        })->sortByDesc(function($flujo) {
+            return abs($flujo->desviacion_porcentaje);
+        })->values();
+
+        $criticas = $alertas->filter(function($flujo) {
+            return abs($flujo->desviacion_porcentaje) > 20;
+        })->count();
+
+        $moderadas = $alertas->filter(function($flujo) {
+            $abs = abs($flujo->desviacion_porcentaje);
+            return $abs >= 10 && $abs <= 20;
+        })->count();
+
+        return response()->json([
+            'total_alertas' => $alertas->count(),
+            'criticas' => $criticas,
+            'moderadas' => $moderadas,
+            'alertas' => $alertas
         ]);
     }
 }

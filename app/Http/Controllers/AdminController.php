@@ -2,20 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\EmailVerificationMail;
+use App\Models\EmailTemplate;
 use App\Models\User;
 use App\Models\UserCliente;
 use App\Models\UserMotorizado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\EmailVerificationMail;
-use App\Mail\WelcomeEmail;
 use Illuminate\Support\Facades\Log;
-use App\Models\EmailTemplate;
-
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
@@ -35,13 +32,14 @@ class AdminController extends Controller
         // PASO 1: Intentar login como ADMIN primero
         if (Auth::guard('web')->attempt(['email' => $email, 'password' => $password])) {
             $user = Auth::guard('web')->user();
-            
+
             // Verificar que el usuario esté habilitado
-            if (!$user->is_enabled) {
+            if (! $user->is_enabled) {
                 Auth::guard('web')->logout();
+
                 return response()->json([
                     'message' => 'Usuario deshabilitado',
-                    'errors' => ['email' => ['Tu cuenta está deshabilitada']]
+                    'errors' => ['email' => ['Tu cuenta está deshabilitada']],
                 ], 401);
             }
 
@@ -67,22 +65,21 @@ class AdminController extends Controller
 
         if ($cliente && Hash::check($password, $cliente->password)) {
             // Verificar que el cliente esté activo
-            if (!$cliente->estado) {
+            if (! $cliente->estado) {
                 return response()->json([
                     'message' => 'Cuenta de cliente deshabilitada',
-                    'errors' => ['email' => ['Tu cuenta está deshabilitada']]
+                    'errors' => ['email' => ['Tu cuenta está deshabilitada']],
                 ], 401);
             }
 
             // NUEVO: Verificar si el email está verificado
-            if (!$cliente->email_verified_at) {
+            if (! $cliente->email_verified_at) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Debes verificar tu correo electrónico antes de iniciar sesión.',
-                    'requires_verification' => true
+                    'requires_verification' => true,
                 ], 403);
             }
-
 
             $token = $cliente->createToken('cliente_token')->plainTextToken;
 
@@ -101,7 +98,7 @@ class AdminController extends Controller
                     'tipo_documento' => $cliente->tipoDocumento?->nombre,
                     'puede_facturar' => $cliente->puedeFacturar(),
                     'foto_url' => $cliente->foto_url,
-                    'email_verified_at' => $cliente->email_verified_at
+                    'email_verified_at' => $cliente->email_verified_at,
                 ],
                 'token' => $token,
             ]);
@@ -112,18 +109,18 @@ class AdminController extends Controller
 
         if ($userMotorizado && Hash::check($password, $userMotorizado->password)) {
             // Verificar que el usuario motorizado esté activo
-            if (!$userMotorizado->is_active) {
+            if (! $userMotorizado->is_active) {
                 return response()->json([
                     'message' => 'Usuario motorizado deshabilitado',
-                    'errors' => ['email' => ['Tu usuario está deshabilitado']]
+                    'errors' => ['email' => ['Tu usuario está deshabilitado']],
                 ], 401);
             }
 
             // Verificar que el motorizado esté activo
-            if (!$userMotorizado->motorizado->estado) {
+            if (! $userMotorizado->motorizado->estado) {
                 return response()->json([
                     'message' => 'Motorizado deshabilitado',
-                    'errors' => ['email' => ['Tu cuenta de motorizado está deshabilitada']]
+                    'errors' => ['email' => ['Tu cuenta de motorizado está deshabilitada']],
                 ], 401);
             }
 
@@ -158,14 +155,14 @@ class AdminController extends Controller
         // PASO 4: Si no encuentra en ninguna tabla
         return response()->json([
             'message' => 'Las credenciales proporcionadas son incorrectas.',
-            'errors' => ['email' => ['Las credenciales proporcionadas son incorrectas.']]
+            'errors' => ['email' => ['Las credenciales proporcionadas son incorrectas.']],
         ], 401);
     }
 
-  public function checkEmail(Request $request)
+    public function checkEmail(Request $request)
     {
         $request->validate([
-            'email' => 'required|email'
+            'email' => 'required|email',
         ]);
 
         $emailExists = UserCliente::where('email', $request->email)->exists() ||
@@ -174,7 +171,7 @@ class AdminController extends Controller
 
         return response()->json([
             'exists' => $emailExists,
-            'message' => $emailExists ? 'Este correo ya está registrado' : 'Correo disponible'
+            'message' => $emailExists ? 'Este correo ya está registrado' : 'Correo disponible',
         ]);
     }
 
@@ -184,21 +181,21 @@ class AdminController extends Controller
     public function checkDocumento(Request $request)
     {
         $request->validate([
-            'numero_documento' => 'required|string'
+            'numero_documento' => 'required|string',
         ]);
 
         $documentoExists = UserCliente::where('numero_documento', $request->numero_documento)->exists();
 
         return response()->json([
             'exists' => $documentoExists,
-            'message' => $documentoExists ? 'Este número de documento ya está registrado' : 'Documento disponible'
+            'message' => $documentoExists ? 'Este número de documento ya está registrado' : 'Documento disponible',
         ]);
     }
 
     /**
      * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
      */
-        /**
+    /**
      * Registro de nuevos clientes - FUNCIÓN COMPLETA ACTUALIZADA
      */
     public function register(Request $request)
@@ -207,7 +204,7 @@ class AdminController extends Controller
         Log::info('AuthController@register - Iniciando registro de cliente', [
             'request_data' => $request->all(),
             'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
+            'user_agent' => $request->userAgent(),
         ]);
 
         Log::info('AuthController@register - Iniciando validación de datos');
@@ -223,10 +220,10 @@ class AdminController extends Controller
             'numero_documento' => 'required|string|max:20|unique:user_clientes,numero_documento',
             'fecha_nacimiento' => 'nullable|date|before:today',
             'genero' => 'nullable|in:masculino,femenino,otro',
-            
+
             // Datos de dirección (opcional)
             'direccion_completa' => 'nullable|string',
-            'ubigeo' => 'nullable|string|exists:ubigeo_inei,id_ubigeo'
+            'ubigeo' => 'nullable|string|exists:ubigeo_inei,id_ubigeo',
         ], [
             // Mensajes personalizados
             'email.unique' => 'Este correo electrónico ya está registrado.',
@@ -244,23 +241,23 @@ class AdminController extends Controller
         // Convertir ubigeo a string si viene como número
         $ubigeoOriginal = $request->ubigeo;
         $ubigeo = $request->ubigeo ? (string) $request->ubigeo : null;
-        
+
         Log::debug('AuthController@register - Procesando ubigeo', [
             'ubigeo_original' => $ubigeoOriginal,
             'ubigeo_converted' => $ubigeo,
-            'ubigeo_type' => gettype($ubigeo)
+            'ubigeo_type' => gettype($ubigeo),
         ]);
 
         Log::info('AuthController@register - Iniciando transacción para crear cliente');
 
         try {
-            
+
             $verificationToken = Str::random(60);
             $verificationCode = strtoupper(Str::random(6)); // Generar código de 6 caracteres
-            
+
             Log::info('AuthController@register - Token de verificación generado', [
                 'token_length' => strlen($verificationToken),
-                'token_preview' => substr($verificationToken, 0, 10) . '...'
+                'token_preview' => substr($verificationToken, 0, 10).'...',
             ]);
 
             Log::info('AuthController@register - Creando cliente en base de datos', [
@@ -272,8 +269,8 @@ class AdminController extends Controller
                 'telefono' => $request->telefono,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
                 'genero' => $request->genero,
-                'has_password' => !empty($request->password),
-                'estado' => false
+                'has_password' => ! empty($request->password),
+                'estado' => false,
             ]);
 
             // Crear cliente (INACTIVO hasta verificar email)
@@ -290,7 +287,7 @@ class AdminController extends Controller
                 'genero' => $request->genero,
                 'estado' => false, // INACTIVO hasta verificar
                 'verification_token' => $verificationToken,
-                'verification_code' => $verificationCode // NUEVO
+                'verification_code' => $verificationCode, // NUEVO
             ]);
 
             Log::info('AuthController@register - Cliente creado exitosamente', [
@@ -298,7 +295,7 @@ class AdminController extends Controller
                 'cliente_email' => $cliente->email,
                 'cliente_estado' => $cliente->estado,
                 'nombre_completo' => $cliente->nombre_completo,
-                'verification_code' => $cliente->verification_code // <-- aquí lo agregas
+                'verification_code' => $cliente->verification_code, // <-- aquí lo agregas
             ]);
 
             // Crear dirección si se proporciona
@@ -307,7 +304,7 @@ class AdminController extends Controller
                     'cliente_id' => $cliente->id,
                     'direccion_completa' => $request->direccion_completa,
                     'id_ubigeo' => $ubigeo,
-                    'nombre_destinatario' => $cliente->nombre_completo
+                    'nombre_destinatario' => $cliente->nombre_completo,
                 ]);
 
                 $direccion = $cliente->direcciones()->create([
@@ -315,47 +312,46 @@ class AdminController extends Controller
                     'direccion_completa' => $request->direccion_completa,
                     'id_ubigeo' => $ubigeo,
                     'predeterminada' => true,
-                    'activa' => true
+                    'activa' => true,
                 ]);
 
                 Log::info('AuthController@register - Dirección creada exitosamente', [
                     'direccion_id' => $direccion->id,
-                    'direccion' => $direccion->toArray()
+                    'direccion' => $direccion->toArray(),
                 ]);
             } else {
                 Log::info('AuthController@register - No se creará dirección', [
-                    'has_direccion_completa' => !empty($request->direccion_completa),
-                    'has_ubigeo' => !empty($ubigeo),
+                    'has_direccion_completa' => ! empty($request->direccion_completa),
+                    'has_ubigeo' => ! empty($ubigeo),
                     'direccion_completa' => $request->direccion_completa,
-                    'ubigeo' => $ubigeo
+                    'ubigeo' => $ubigeo,
                 ]);
             }
 
             // Crear URL de verificación
             $frontendUrl = env('FRONTEND_URL', 'http://localhost:4200');
             $appUrl = env('APP_URL', 'http://localhost:8000');
-            $verificationUrl = rtrim($appUrl, '/') . "/api/verify-email-link?token={$verificationToken}&email=" . urlencode($cliente->email);
+            $verificationUrl = rtrim($appUrl, '/')."/api/verify-email-link?token={$verificationToken}&email=".urlencode($cliente->email);
 
-            
             Log::info('AuthController@register - URL de verificación generada', [
                 'frontend_url' => $frontendUrl,
                 'verification_url' => $verificationUrl,
-                'encoded_email' => urlencode($cliente->email)
+                'encoded_email' => urlencode($cliente->email),
             ]);
 
             Log::info('AuthController@register - Enviando correo de verificación', [
                 'destinatario' => $cliente->email,
-                'cliente_id' => $cliente->id
+                'cliente_id' => $cliente->id,
             ]);
 
             // Obtener plantilla de verificación
             $template = EmailTemplate::where('name', 'verification')->where('is_active', true)->first();
-            if (!$template) {
+            if (! $template) {
                 // Crear plantilla por defecto si no existe
                 $template = EmailTemplate::create([
                     'name' => 'verification',
                     'use_default' => true,
-                    'is_active' => true
+                    'is_active' => true,
                 ]);
             }
 
@@ -381,7 +377,7 @@ class AdminController extends Controller
 
             Log::info('AuthController@register - Registro completado exitosamente', [
                 'cliente_id' => $cliente->id,
-                'response_data' => $responseData
+                'response_data' => $responseData,
             ]);
 
             return response()->json($responseData, 201);
@@ -392,12 +388,12 @@ class AdminController extends Controller
                 'error_file' => $e->getFile(),
                 'error_line' => $e->getLine(),
                 'error_trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'message' => 'Error al registrar cliente',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -440,7 +436,7 @@ class AdminController extends Controller
                     'tipo_documento' => $user->tipoDocumento?->nombre,
                     'puede_facturar' => $user->puedeFacturar(),
                     'foto' => $user->foto,
-                    'email_verified_at' => $user->email_verified_at
+                    'email_verified_at' => $user->email_verified_at,
                 ],
             ]);
         } elseif ($user instanceof UserMotorizado) {
@@ -488,16 +484,16 @@ class AdminController extends Controller
     public function refreshPermissions(Request $request)
     {
         $user = $request->user();
-        
-        if (!$user instanceof User) {
+
+        if (! $user instanceof User) {
             return response()->json(['message' => 'Solo usuarios admin pueden refrescar permisos'], 403);
         }
-        
+
         $user->load('roles.permissions');
 
         return response()->json([
             'status' => 'success',
-            'permissions' => $user->getAllPermissions()->pluck('name')
+            'permissions' => $user->getAllPermissions()->pluck('name'),
         ]);
     }
 }

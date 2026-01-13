@@ -275,14 +275,20 @@ class NotasService
         $company = $this->greenterService->getCompany();
         $note->setCompany($company);
 
-        // Cliente
+        // Cliente - Validar schemeID según serie y tipo de documento
+        $tipoDocCliente = $this->obtenerSchemeID(
+            $notaCredito->cliente->tipo_documento,
+            $notaCredito->cliente->numero_documento,
+            $notaCredito->serie
+        );
+
         $client = new Client;
-        $client->setTipoDoc($notaCredito->cliente->tipo_documento)
-            ->setNumDoc($notaCredito->cliente->numero_documento)
-            ->setRznSocial($notaCredito->cliente->razon_social);
+        $client->setTipoDoc($tipoDocCliente)
+            ->setNumDoc(trim($notaCredito->cliente->numero_documento))
+            ->setRznSocial(trim($notaCredito->cliente->razon_social));
 
         if ($notaCredito->cliente->direccion) {
-            $client->setAddress(new Address(['direccion' => $notaCredito->cliente->direccion]));
+            $client->setAddress(new Address(['direccion' => trim($notaCredito->cliente->direccion)]));
         }
 
         $note->setClient($client);
@@ -295,7 +301,7 @@ class NotasService
 
         $item->setCodProducto('NOTA001')
             ->setUnidad('NIU')
-            ->setDescripcion($notaCredito->motivo)
+            ->setDescripcion(trim($notaCredito->motivo))
             ->setCantidad(1)
             ->setMtoValorUnitario($valorUnitario)
             ->setMtoValorVenta($valorUnitario)
@@ -350,14 +356,20 @@ class NotasService
         $company = $this->greenterService->getCompany();
         $note->setCompany($company);
 
-        // Cliente
+        // Cliente - Validar schemeID según serie y tipo de documento
+        $tipoDocCliente = $this->obtenerSchemeID(
+            $notaDebito->cliente->tipo_documento,
+            $notaDebito->cliente->numero_documento,
+            $notaDebito->serie
+        );
+
         $client = new Client;
-        $client->setTipoDoc($notaDebito->cliente->tipo_documento)
-            ->setNumDoc($notaDebito->cliente->numero_documento)
-            ->setRznSocial($notaDebito->cliente->razon_social);
+        $client->setTipoDoc($tipoDocCliente)
+            ->setNumDoc(trim($notaDebito->cliente->numero_documento))
+            ->setRznSocial(trim($notaDebito->cliente->razon_social));
 
         if ($notaDebito->cliente->direccion) {
-            $client->setAddress(new Address(['direccion' => $notaDebito->cliente->direccion]));
+            $client->setAddress(new Address(['direccion' => trim($notaDebito->cliente->direccion)]));
         }
 
         $note->setClient($client);
@@ -370,7 +382,7 @@ class NotasService
 
         $item->setCodProducto('NOTA001')
             ->setUnidad('NIU')
-            ->setDescripcion($notaDebito->motivo)
+            ->setDescripcion(trim($notaDebito->motivo))
             ->setCantidad(1)
             ->setMtoValorUnitario($valorUnitario)
             ->setMtoValorVenta($valorUnitario)
@@ -614,6 +626,113 @@ class NotasService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Consultar estado de nota de crédito en SUNAT
+     */
+    public function consultarEstadoNotaCredito($notaCreditoId)
+    {
+        try {
+            $notaCredito = NotaCredito::findOrFail($notaCreditoId);
+
+            if (!$notaCredito->xml) {
+                throw new \Exception('La nota no tiene XML generado');
+            }
+
+            // Obtener instancia de See
+            $see = $this->greenterService->getSee();
+
+            // Consultar estado
+            $result = $see->getStatus(
+                $notaCredito->serie . '-' . $notaCredito->numero,
+                '07' // Tipo: Nota de Crédito
+            );
+
+            if ($result->isSuccess()) {
+                $cdr = $result->getCdrResponse();
+                
+                return [
+                    'success' => true,
+                    'message' => 'Consulta exitosa',
+                    'data' => [
+                        'codigo' => $cdr->getCode(),
+                        'descripcion' => $cdr->getDescription(),
+                        'estado' => $notaCredito->estado,
+                    ],
+                ];
+            } else {
+                $error = $result->getError();
+                
+                return [
+                    'success' => false,
+                    'message' => 'Error en la consulta',
+                    'error' => $error->getMessage(),
+                    'codigo_error' => $error->getCode(),
+                ];
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error consultando estado de nota de crédito', [
+                'nota_credito_id' => $notaCreditoId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Error al consultar estado',
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Obtener schemeID correcto según tipo de documento y serie
+     */
+    private function obtenerSchemeID($tipoDocumento, $numeroDocumento, $serie)
+    {
+        // Limpiar el número de documento
+        $numeroDocumento = trim($numeroDocumento);
+        $longitudDoc = strlen($numeroDocumento);
+        
+        // Determinar si es boleta o factura según la serie
+        $esBoleta = substr($serie, 0, 1) === 'B';
+        
+        // Primero validar por longitud del documento (más confiable)
+        if ($longitudDoc == 8) {
+            return '1'; // DNI
+        } elseif ($longitudDoc == 11) {
+            return '6'; // RUC
+        } elseif ($longitudDoc == 12) {
+            return '4'; // Carnet de extranjería
+        } elseif ($longitudDoc == 15) {
+            return '7'; // Pasaporte
+        }
+        
+        // Si el tipo de documento ya es un código válido, usarlo
+        if (in_array($tipoDocumento, ['1', '4', '6', '7', 'A'], true)) {
+            return $tipoDocumento;
+        }
+        
+        // Si es boleta y no se pudo determinar, forzar DNI
+        if ($esBoleta) {
+            Log::warning('Boleta sin tipo de documento válido, forzando DNI', [
+                'serie' => $serie,
+                'tipo_documento' => $tipoDocumento,
+                'numero_documento' => $numeroDocumento,
+                'longitud' => $longitudDoc,
+            ]);
+            return '1'; // Forzar DNI para boletas
+        }
+        
+        // Por defecto, usar DNI y registrar advertencia
+        Log::warning('Tipo de documento no reconocido, usando DNI por defecto', [
+            'serie' => $serie,
+            'tipo_documento' => $tipoDocumento,
+            'numero_documento' => $numeroDocumento,
+            'longitud' => $longitudDoc,
+        ]);
+        return '1';
     }
 
     /**

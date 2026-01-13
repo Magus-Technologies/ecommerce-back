@@ -10,6 +10,55 @@ use Illuminate\Support\Facades\DB;
 
 class KardexController extends Controller
 {
+    public function index(Request $request)
+    {
+        $query = Producto::with(['categoria', 'marca'])
+            ->where('activo', true);
+
+        // Filtros
+        if ($request->categoria_id) {
+            $query->where('categoria_id', $request->categoria_id);
+        }
+
+        if ($request->stock_bajo) {
+            $query->where('stock', '<=', DB::raw('stock_minimo'));
+        }
+
+        if ($request->search) {
+            $query->where(function($q) use ($request) {
+                $q->where('nombre', 'like', "%{$request->search}%")
+                  ->orWhere('codigo_producto', 'like', "%{$request->search}%");
+            });
+        }
+
+        $productos = $query->get();
+
+        // Agregar información de kardex a cada producto
+        $inventario = $productos->map(function ($producto) {
+            $ultimoKardex = Kardex::where('producto_id', $producto->id)->latest('id')->first();
+            $costoPromedio = $ultimoKardex ? $ultimoKardex->costo_promedio : $producto->precio_compra;
+
+            return [
+                'producto_id' => $producto->id,
+                'codigo' => $producto->codigo_producto,
+                'nombre' => $producto->nombre,
+                'categoria' => $producto->categoria->nombre ?? '',
+                'stock_actual' => $producto->stock,
+                'stock_minimo' => $producto->stock_minimo,
+                'costo_promedio' => $costoPromedio,
+                'valor_total' => $producto->stock * $costoPromedio,
+                'alerta_stock' => $producto->stock <= $producto->stock_minimo
+            ];
+        });
+
+        return response()->json([
+            'productos' => $inventario,
+            'total_productos' => $inventario->count(),
+            'total_valorizado' => $inventario->sum('valor_total'),
+            'productos_bajo_stock' => $inventario->where('alerta_stock', true)->count()
+        ]);
+    }
+
     // Ver kardex de un producto
     public function show($productoId, Request $request)
     {

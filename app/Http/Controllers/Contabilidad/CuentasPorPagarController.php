@@ -106,6 +106,41 @@ class CuentasPorPagarController extends Controller
         }
     }
 
+    public function show($id)
+    {
+        $cuenta = CuentaPorPagar::with(['proveedor', 'compra', 'pagos.user'])
+            ->findOrFail($id);
+
+        return response()->json($cuenta);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $cuenta = CuentaPorPagar::findOrFail($id);
+
+        $request->validate([
+            'fecha_vencimiento' => 'date',
+            'observaciones' => 'nullable|string'
+        ]);
+
+        $cuenta->update($request->only(['fecha_vencimiento', 'observaciones']));
+
+        return response()->json($cuenta);
+    }
+
+    public function destroy($id)
+    {
+        $cuenta = CuentaPorPagar::findOrFail($id);
+
+        if ($cuenta->monto_pagado > 0) {
+            return response()->json(['error' => 'No se puede eliminar una cuenta con pagos registrados'], 400);
+        }
+
+        $cuenta->delete();
+
+        return response()->json(['message' => 'Cuenta por pagar eliminada correctamente']);
+    }
+
     public function antiguedadSaldos()
     {
         $cuentas = CuentaPorPagar::with('proveedor')
@@ -140,6 +175,37 @@ class CuentasPorPagarController extends Controller
             'detalle' => $detalle,
             'rangos' => $rangos,
             'total_pendiente' => $cuentas->sum('saldo_pendiente')
+        ]);
+    }
+
+    public function getPagos($id)
+    {
+        $pagos = CxpPago::where('cuenta_por_pagar_id', $id)
+            ->with('user')
+            ->orderBy('fecha_pago', 'desc')
+            ->get();
+
+        return response()->json($pagos);
+    }
+
+    public function estadisticas()
+    {
+        $totalPendiente = CuentaPorPagar::whereIn('estado', ['PENDIENTE', 'PARCIAL'])
+            ->sum('saldo_pendiente');
+
+        $vencidas = CuentaPorPagar::whereIn('estado', ['PENDIENTE', 'PARCIAL'])
+            ->where('fecha_vencimiento', '<', now()->toDateString())
+            ->sum('saldo_pendiente');
+
+        $porVencer = CuentaPorPagar::whereIn('estado', ['PENDIENTE', 'PARCIAL'])
+            ->where('fecha_vencimiento', '>=', now()->toDateString())
+            ->where('fecha_vencimiento', '<=', now()->addDays(30)->toDateString())
+            ->sum('saldo_pendiente');
+
+        return response()->json([
+            'total_pendiente' => $totalPendiente,
+            'vencidas' => $vencidas,
+            'por_vencer_30_dias' => $porVencer
         ]);
     }
 }

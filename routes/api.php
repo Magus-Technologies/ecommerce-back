@@ -36,3 +36,19 @@ require __DIR__.'/api/servicios.php';
 require __DIR__.'/api/recompensas.php';
 require __DIR__.'/api/ecommerce.php';
 require __DIR__.'/api/marketing.php';
+
+// CRUD de Tiendas
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/tiendas', [\App\Http\Controllers\TiendasController::class, 'index']);
+    Route::post('/tiendas', [\App\Http\Controllers\TiendasController::class, 'store']);
+    Route::get('/tiendas/{id}', [\App\Http\Controllers\TiendasController::class, 'show']);
+    Route::put('/tiendas/{id}', [\App\Http\Controllers\TiendasController::class, 'update']);
+    Route::delete('/tiendas/{id}', [\App\Http\Controllers\TiendasController::class, 'destroy']);
+});
+
+// Permisos del Usuario
+Route::middleware(['auth:sanctum'])->prefix('user')->group(function () {
+    Route::get('/permissions', [\App\Http\Controllers\UserPermissionsController::class, 'index']);
+    Route::post('/permissions/check', [\App\Http\Controllers\UserPermissionsController::class, 'check']);
+    Route::get('/permissions/available', [\App\Http\Controllers\UserPermissionsController::class, 'available']);
+});

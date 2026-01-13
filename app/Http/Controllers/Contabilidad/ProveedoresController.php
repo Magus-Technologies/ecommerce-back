@@ -69,4 +69,40 @@ class ProveedoresController extends Controller
 
         return response()->json($proveedor);
     }
+
+    public function destroy($id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
+        
+        // Verificar si tiene cuentas por pagar pendientes
+        $cuentasPendientes = $proveedor->cuentasPorPagar()
+            ->whereIn('estado', ['PENDIENTE', 'PARCIAL'])
+            ->count();
+
+        if ($cuentasPendientes > 0) {
+            return response()->json([
+                'error' => 'No se puede eliminar el proveedor porque tiene cuentas por pagar pendientes'
+            ], 400);
+        }
+
+        $proveedor->delete();
+
+        return response()->json(['message' => 'Proveedor eliminado correctamente']);
+    }
+
+    public function desactivar($id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
+        $proveedor->update(['activo' => false]);
+
+        return response()->json(['message' => 'Proveedor desactivado correctamente']);
+    }
+
+    public function activar($id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
+        $proveedor->update(['activo' => true]);
+
+        return response()->json(['message' => 'Proveedor activado correctamente']);
+    }
 }

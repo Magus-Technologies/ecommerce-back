@@ -116,20 +116,7 @@ class NotaDebitoController extends Controller
             // Obtener comprobante de referencia
             $comprobanteRef = \App\Models\Comprobante::with('cliente')->findOrFail($request->comprobante_referencia_id);
 
-            // VALIDACIÓN CRÍTICA: Solo se permiten Notas de Débito para Facturas (tipo 01)
-            if ($comprobanteRef->tipo_comprobante === '03') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Las Notas de Débito solo pueden crearse para Facturas Electrónicas',
-                    'error' => 'No se pueden crear Notas de Débito para Boletas según normativa SUNAT',
-                    'data' => [
-                        'tipo_comprobante_actual' => '03',
-                        'tipo_comprobante_requerido' => '01',
-                        'sugerencia' => 'Para anular Boletas use Comunicación de Baja',
-                    ],
-                ], 400);
-            }
-
+            // Validar que el comprobante esté aceptado
             if ($comprobanteRef->estado !== 'ACEPTADO') {
                 return response()->json([
                     'success' => false,
@@ -163,6 +150,9 @@ class NotaDebitoController extends Controller
 
             $total = $subtotal + $totalIgv;
 
+            // Incrementar correlativo ANTES de crear la nota
+            $serie->increment('correlativo');
+            
             // Crear nota de débito
             $notaDebito = NotaDebito::create([
                 'serie' => $serie->serie,
@@ -182,9 +172,6 @@ class NotaDebitoController extends Controller
                 'estado' => 'pendiente', // Estado inicial: PENDIENTE (sin XML)
                 'observaciones' => $request->descripcion,
             ]);
-
-            // Actualizar correlativo de la serie
-            $serie->increment('correlativo');
 
             DB::commit();
 
@@ -267,21 +254,6 @@ class NotaDebitoController extends Controller
     {
         try {
             $notaDebito = NotaDebito::with(['cliente', 'venta'])->findOrFail($id);
-
-            // VALIDACIÓN CRÍTICA: Verificar que el comprobante de referencia sea Factura (tipo 01)
-            if ($notaDebito->tipo_comprobante_ref === '03') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Nota de débito rechazada por SUNAT',
-                    'error' => 'Las Notas de Débito solo pueden modificar Facturas Electrónicas, no Boletas de Venta',
-                    'data' => [
-                        'tipo_comprobante_ref' => '03',
-                        'tipo_comprobante_requerido' => '01',
-                        'codigo_error_sunat' => '2116',
-                        'sugerencia' => 'Para anular Boletas use Comunicación de Baja',
-                    ],
-                ], 400);
-            }
 
             // Validar que el XML esté generado
             if (! $notaDebito->xml) {
