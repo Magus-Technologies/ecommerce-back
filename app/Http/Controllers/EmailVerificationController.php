@@ -54,7 +54,7 @@ class EmailVerificationController extends Controller
         if ($user->email_verified_at) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'La cuenta ya está verificada'
+                'message' => 'La cuenta ya esta verificada'
             ], 400);
         }
         
@@ -85,7 +85,7 @@ class EmailVerificationController extends Controller
             
             return response()->json([
                 'status' => 'error',
-                'message' => 'Código o token de verificación inválido o expirado'
+                'message' => 'Codigo o token de verificacion invalido o expirado'
             ], 400);
         }
 
@@ -121,7 +121,7 @@ class EmailVerificationController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Cuenta verificada exitosamente. ¡Ya puedes iniciar sesión!'
+            'message' => 'Cuenta verificada exitosamente. Ya puedes iniciar sesion.'
         ]);
     }
 
@@ -195,13 +195,13 @@ class EmailVerificationController extends Controller
             ]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Error al enviar el correo de verificación'
+                'message' => 'Error al enviar el correo de verificacion'
             ], 500);
         }
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Código de verificación reenviado exitosamente'
+            'message' => 'Codigo de verificacion reenviado exitosamente'
         ]);
     }
 
