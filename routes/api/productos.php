@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ============================================
     Route::middleware('permission:productos.ver')->group(function () {
         Route::get('/productos', [ProductosController::class, 'index']);
+        Route::get('/productos/listar', [ProductosController::class, 'listar']);
         Route::get('/productos/stock/bajo', [ProductosController::class, 'stockBajo']);
         Route::get('/productos/estadisticas', [ProductosController::class, 'estadisticasDashboard']);
         Route::get('/productos/stock-critico', [ProductosController::class, 'productosStockCritico']);

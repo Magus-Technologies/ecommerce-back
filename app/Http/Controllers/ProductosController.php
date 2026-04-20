@@ -47,6 +47,57 @@ class ProductosController extends Controller
         }
     }
 
+    public function listar(Request $request)
+    {
+        try {
+            $query = Producto::with([
+                    'categoria:id,nombre',
+                    'marca:id,nombre',
+                ])
+                ->select([
+                    'id', 'nombre', 'codigo_producto',
+                    'precio_venta', 'precio_compra',
+                    'stock', 'stock_minimo',
+                    'imagen', 'activo', 'destacado',
+                    'categoria_id', 'marca_id',
+                ])
+                ->whereNull('deleted_at')
+                ->orderBy('nombre');
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('nombre', 'like', "%{$search}%")
+                      ->orWhere('codigo_producto', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('categoria_id')) {
+                $query->where('categoria_id', $request->categoria_id);
+            }
+
+            if ($request->filled('marca_id')) {
+                $query->where('marca_id', $request->marca_id);
+            }
+
+            $paginated = $query->paginate(10);
+
+            $paginated->getCollection()->transform(function ($producto) {
+                $producto->imagen_url = $producto->imagen
+                    ? asset('storage/productos/' . $producto->imagen)
+                    : null;
+                return $producto;
+            });
+
+            return response()->json($paginated);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al obtener productos',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Crear nuevo producto
      */
