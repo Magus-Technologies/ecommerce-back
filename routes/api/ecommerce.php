@@ -77,9 +77,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('cotizaciones')->group(function () {
         Route::post('/ecommerce', [CotizacionesController::class, 'crearCotizacionEcommerce']);
         Route::get('/mis-cotizaciones', [CotizacionesController::class, 'misCotizaciones']);
+        Route::get('/{id}', [CotizacionesController::class, 'show']);
         Route::get('/{id}/pdf', [CotizacionesController::class, 'generarPDF']);
         Route::post('/{id}/convertir-compra', [CotizacionesController::class, 'convertirACompra']);
         Route::post('/{id}/pedir', [CotizacionesController::class, 'pedirCotizacion']);
+        Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']);
     });
 
     // ============================================
@@ -89,15 +91,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [CotizacionesController::class, 'index']);
         Route::get('/estadisticas', [CotizacionesController::class, 'estadisticas']);
         Route::get('/estados/lista', [CotizacionesController::class, 'getEstados']);
-        Route::get('/{id}', [CotizacionesController::class, 'show'])->middleware('permission:cotizaciones.show');
-        Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']);
         Route::patch('/{id}', [CotizacionesController::class, 'update'])->middleware('permission:cotizaciones.edit');
         Route::delete('/{id}', [CotizacionesController::class, 'destroy']);
-
-        // ✅ ELIMINADAS las rutas duplicadas que ya están en el grupo de clientes (líneas 78, 81)
-        // Route::post('/ecommerce', ...) - Ya existe en línea 78 sin permisos
-        // Route::post('/{id}/convertir-compra', ...) - Ya existe en línea 81 sin permisos
-
         Route::patch('/{id}/estado', [CotizacionesController::class, 'cambiarEstado'])->middleware('permission:cotizaciones.edit');
     });
 
