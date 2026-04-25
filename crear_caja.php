@@ -6,19 +6,18 @@
  *   - Aperturar caja: POST /crear_caja.php?action=aperturar
  */
 
-require 'vendor/autoload.php';
-
-use Illuminate\Database\Capsule\Manager as DB;
-use App\Models\Caja;
-use App\Models\CajaMovimiento;
-
-// Cargar configuración de Laravel
-$app = require_once 'bootstrap/app.php';
-$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
-
 header('Content-Type: application/json');
 
 try {
+    // Cargar Laravel
+    $app = require __DIR__ . '/bootstrap/app.php';
+    $kernel = $app->make('Illuminate\Contracts\Console\Kernel');
+    $kernel->bootstrap();
+
+    // Importar modelos
+    use App\Models\Caja;
+    use App\Models\CajaMovimiento;
+
     $action = $_GET['action'] ?? $_POST['action'] ?? null;
 
     if ($action === 'crear') {
@@ -80,10 +79,10 @@ try {
 
         $movimiento = CajaMovimiento::create([
             'caja_id' => $caja_id,
-            'user_id' => 1, // Admin user
+            'user_id' => 1,
             'tipo' => 'APERTURA',
-            'fecha' => now()->toDateString(),
-            'hora' => now()->toTimeString(),
+            'fecha' => date('Y-m-d'),
+            'hora' => date('H:i:s'),
             'monto_inicial' => $monto_inicial,
             'observaciones' => $observaciones,
             'estado' => 'ABIERTA'
