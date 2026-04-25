@@ -142,7 +142,8 @@ class CotizacionesController extends Controller
         try {
             $userCliente = $request->user();
 
-            if (!$userCliente instanceof UserCliente) {
+            // Permitir tanto UserCliente como User (admin)
+            if (!$userCliente) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Acceso no autorizado'
@@ -179,7 +180,7 @@ class CotizacionesController extends Controller
             // Crear cotización
             $cotizacion = Cotizacion::create([
                 'codigo_cotizacion' => Cotizacion::generarCodigoCotizacion(),
-                'user_cliente_id' => $userCliente->id,
+                'user_cliente_id' => $userCliente instanceof UserCliente ? $userCliente->id : null,
                 'fecha_cotizacion' => now(),
                 'subtotal' => $subtotal,
                 'igv' => $igv,
