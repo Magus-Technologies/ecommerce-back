@@ -86,7 +86,8 @@ class CotizacionesController extends Controller
                 'userCliente',
                 'estadoCotizacion',
                 'detalles.producto',
-                'tracking.estadoCotizacion.usuario',
+                'tracking.estadoCotizacion',
+                'tracking.usuario',
                 'compras.estadoCompra'
             ])->findOrFail($id);
 

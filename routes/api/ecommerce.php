@@ -92,7 +92,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/estadisticas', [CotizacionesController::class, 'estadisticas']);
         Route::get('/estados/lista', [CotizacionesController::class, 'getEstados']);
         Route::patch('/{id}', [CotizacionesController::class, 'update'])->middleware('permission:cotizaciones.edit');
-        Route::delete('/{id}', [CotizacionesController::class, 'destroy']);
+        Route::delete('/{id}', [CotizacionesController::class, 'destroy'])->middleware('permission:cotizaciones.delete');
         Route::patch('/{id}/estado', [CotizacionesController::class, 'cambiarEstado'])->middleware('permission:cotizaciones.edit');
     });
 
