@@ -2261,7 +2261,7 @@ class VentasController extends Controller
             'cliente_datos.telefono' => 'nullable|string|max:20',
 
             // Productos
-            'productos' => 'required|array|min:1',
+            'productos' => 'nullable|array|min:1',
             'productos.*.producto_id' => 'required|exists:productos,id',
             'productos.*.cantidad' => 'required|numeric|min:0.01',
             'productos.*.precio_unitario' => 'required|numeric|min:0',
@@ -2462,12 +2462,24 @@ class VentasController extends Controller
             $igvTotal = 0;
             $productosVenta = [];
 
+            // Si no se envían productos, mantener los existentes
+            $productosAActualizar = $request->has('productos') && !empty($request->productos) 
+                ? $request->productos 
+                : $venta->detalles->map(function ($detalle) {
+                    return [
+                        'producto_id' => $detalle->producto_id,
+                        'cantidad' => $detalle->cantidad,
+                        'precio_unitario' => $detalle->precio_unitario,
+                        'descuento_unitario' => $detalle->descuento_unitario ?? 0,
+                    ];
+                })->toArray();
+
             \Log::info('Iniciando validación de productos nuevos', [
                 'venta_id' => $venta->id,
-                'cantidad_productos_nuevos' => count($request->productos),
+                'cantidad_productos_nuevos' => count($productosAActualizar),
             ]);
 
-            foreach ($request->productos as $index => $prod) {
+            foreach ($productosAActualizar as $index => $prod) {
                 // IMPORTANTE: Refrescar el producto desde la BD para obtener el stock actualizado
                 $producto = Producto::find($prod['producto_id']);
                 if (!$producto) {
