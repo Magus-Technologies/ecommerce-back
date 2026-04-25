@@ -22,26 +22,39 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// ============================================
+// CAJAS - Control de efectivo diario (PÚBLICO)
+// ============================================
+Route::prefix('contabilidad')->group(function () {
+    Route::get('/cajas', [CajasController::class, 'index']);
+    Route::get('/cajas/movimientos-activos', [CajasController::class, 'movimientosActivos']);
+    Route::get('/cajas/{id}/reporte', [CajasController::class, 'reporte']);
+    Route::post('/cajas', [CajasController::class, 'store']);
+    Route::post('/cajas/aperturar', [CajasController::class, 'aperturar']);
+    Route::post('/cajas/{id}/cerrar', [CajasController::class, 'cerrar']);
+    Route::post('/cajas/transaccion', [CajasController::class, 'registrarTransaccion']);
+
+    // ============================================
+    // CAJA CHICA - Gastos menores (PÚBLICO)
+    // ============================================
+    Route::get('/caja-chica', [CajaChicaController::class, 'index']);
+    Route::get('/caja-chica/{id}/rendicion', [CajaChicaController::class, 'rendicion']);
+    Route::post('/caja-chica', [CajaChicaController::class, 'store']);
+    Route::post('/caja-chica/gasto', [CajaChicaController::class, 'registrarGasto']);
+    Route::post('/caja-chica/{id}/reposicion', [CajaChicaController::class, 'reposicion']);
+
+    // EXPORTACIONES DE CAJA (PÚBLICO)
+    Route::get('/exportar/caja/{id}/pdf', [ExportacionesController::class, 'exportarCajaPDF']);
+    Route::get('/exportar/caja/{id}/excel', [ExportacionesController::class, 'exportarCajaExcel']);
+
+    // FLUJO DE CAJA (PÚBLICO)
+    Route::get('/flujo-caja', [FlujoCajaController::class, 'index']);
+    Route::get('/flujo-caja/proyeccion-mensual', [FlujoCajaController::class, 'proyeccionMensual']);
+    Route::post('/flujo-caja', [FlujoCajaController::class, 'store']);
+    Route::post('/flujo-caja/{id}/registrar-real', [FlujoCajaController::class, 'registrarReal']);
+});
+
 Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
-
-    // ============================================
-    // CAJAS - Control de efectivo diario
-    // ============================================
-    Route::middleware('permission:contabilidad.cajas.ver')->group(function () {
-        Route::get('/cajas', [CajasController::class, 'index']);
-        Route::get('/cajas/movimientos-activos', [CajasController::class, 'movimientosActivos']);
-        Route::get('/cajas/{id}/reporte', [CajasController::class, 'reporte']);
-    });
-
-    Route::middleware('permission:contabilidad.cajas.create')->group(function () {
-        Route::post('/cajas', [CajasController::class, 'store']);
-    });
-
-    Route::middleware('permission:contabilidad.cajas.edit')->group(function () {
-        Route::post('/cajas/aperturar', [CajasController::class, 'aperturar']);
-        Route::post('/cajas/{id}/cerrar', [CajasController::class, 'cerrar']);
-        Route::post('/cajas/transaccion', [CajasController::class, 'registrarTransaccion']);
-    });
 
     // ============================================
     // KARDEX - Control de inventario
@@ -104,39 +117,6 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
     });
 
     // ============================================
-    // CAJA CHICA - Gastos menores
-    // ============================================
-    Route::middleware('permission:contabilidad.caja_chica.ver')->group(function () {
-        Route::get('/caja-chica', [CajaChicaController::class, 'index']);
-        Route::get('/caja-chica/{id}/rendicion', [CajaChicaController::class, 'rendicion']);
-    });
-
-    Route::middleware('permission:contabilidad.caja_chica.create')->group(function () {
-        Route::post('/caja-chica', [CajaChicaController::class, 'store']);
-    });
-
-    Route::middleware('permission:contabilidad.caja_chica.edit')->group(function () {
-        Route::post('/caja-chica/gasto', [CajaChicaController::class, 'registrarGasto']);
-        Route::post('/caja-chica/{id}/reposicion', [CajaChicaController::class, 'reposicion']);
-    });
-
-    // ============================================
-    // FLUJO DE CAJA - Proyecciones
-    // ============================================
-    Route::middleware('permission:contabilidad.flujo_caja.ver')->group(function () {
-        Route::get('/flujo-caja', [FlujoCajaController::class, 'index']);
-        Route::get('/flujo-caja/proyeccion-mensual', [FlujoCajaController::class, 'proyeccionMensual']);
-    });
-
-    Route::middleware('permission:contabilidad.flujo_caja.create')->group(function () {
-        Route::post('/flujo-caja', [FlujoCajaController::class, 'store']);
-    });
-
-    Route::middleware('permission:contabilidad.flujo_caja.edit')->group(function () {
-        Route::post('/flujo-caja/{id}/registrar-real', [FlujoCajaController::class, 'registrarReal']);
-    });
-
-    // ============================================
     // REPORTES CONTABLES
     // ============================================
     Route::middleware('permission:contabilidad.reportes.ver')->group(function () {
@@ -172,8 +152,6 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
     // EXPORTACIONES - PDF y Excel
     // ============================================
     Route::middleware('permission:contabilidad.reportes.ver')->group(function () {
-        Route::get('/exportar/caja/{id}/pdf', [ExportacionesController::class, 'exportarCajaPDF']);
-        Route::get('/exportar/caja/{id}/excel', [ExportacionesController::class, 'exportarCajaExcel']);
         Route::get('/exportar/kardex/{productoId}/pdf', [ExportacionesController::class, 'exportarKardexPDF']);
         Route::get('/exportar/kardex/{productoId}/excel', [ExportacionesController::class, 'exportarKardexExcel']);
         Route::get('/exportar/cxc/pdf', [ExportacionesController::class, 'exportarCxCPDF']);
