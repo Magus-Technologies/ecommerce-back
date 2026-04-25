@@ -101,8 +101,8 @@ class CotizacionesController extends Controller
                         'message' => 'No tienes permisos para ver esta cotización'
                     ], 403);
                 }
-            } elseif (!$user->hasRole('admin')) {
-                // Si no es admin, no puede ver
+            } elseif (!($user->hasRole('admin') || $user->hasRole('superadmin'))) {
+                // Si no es admin ni superadmin, no puede ver
                 return response()->json([
                     'status' => 'error',
                     'message' => 'No tienes permisos para ver esta cotización'
