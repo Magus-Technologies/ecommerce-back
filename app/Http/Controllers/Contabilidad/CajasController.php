@@ -151,4 +151,14 @@ class CajasController extends Controller
             ]
         ]);
     }
+
+    // Obtener movimientos activos
+    public function movimientosActivos()
+    {
+        $movimientos = CajaMovimiento::with(['caja', 'user'])
+            ->where('estado', 'ABIERTA')
+            ->get();
+
+        return response()->json($movimientos);
+    }
 }

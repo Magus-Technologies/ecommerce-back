@@ -29,6 +29,7 @@ Route::middleware(['auth:sanctum'])->prefix('contabilidad')->group(function () {
     // ============================================
     Route::middleware('permission:contabilidad.cajas.ver')->group(function () {
         Route::get('/cajas', [CajasController::class, 'index']);
+        Route::get('/cajas/movimientos-activos', [CajasController::class, 'movimientosActivos']);
         Route::get('/cajas/{id}/reporte', [CajasController::class, 'reporte']);
     });
 
