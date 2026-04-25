@@ -2384,6 +2384,31 @@ class VentasController extends Controller
                 if (!$cliente) {
                     throw new \Exception("Cliente no encontrado con ID: {$request->cliente_id}");
                 }
+                
+                // Si se envían datos del cliente, actualizar
+                if ($request->has('cliente_datos') && !empty($request->cliente_datos)) {
+                    $clienteData = $request->cliente_datos;
+                    $updateData = [];
+                    if (!empty($clienteData['razon_social'])) {
+                        $updateData['razon_social'] = $clienteData['razon_social'];
+                    }
+                    if (!empty($clienteData['nombre_comercial'])) {
+                        $updateData['nombre_comercial'] = $clienteData['nombre_comercial'];
+                    }
+                    if (!empty($clienteData['direccion'])) {
+                        $updateData['direccion'] = $clienteData['direccion'];
+                    }
+                    if (!empty($clienteData['email'])) {
+                        $updateData['email'] = $clienteData['email'];
+                    }
+                    if (!empty($clienteData['telefono'])) {
+                        $updateData['telefono'] = $clienteData['telefono'];
+                    }
+                    
+                    if (!empty($updateData)) {
+                        $cliente->update($updateData);
+                    }
+                }
             } elseif ($request->filled('user_cliente_id') && $request->user_cliente_id) {
                 $userCliente = UserCliente::find($request->user_cliente_id);
                 if (!$userCliente) {
