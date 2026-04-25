@@ -90,6 +90,24 @@ class CotizacionesController extends Controller
                 'compras.estadoCompra'
             ])->findOrFail($id);
 
+            // Verificar permisos: solo el propietario o un admin puede ver
+            $user = request()->user();
+            if ($user instanceof UserCliente) {
+                // Si es un cliente, solo puede ver sus propias cotizaciones
+                if ($cotizacion->user_cliente_id !== $user->id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'No tienes permisos para ver esta cotización'
+                    ], 403);
+                }
+            } elseif (!$user->hasRole('admin')) {
+                // Si no es admin, no puede ver
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No tienes permisos para ver esta cotización'
+                ], 403);
+            }
+
             return response()->json([
                 'status' => 'success',
                 'cotizacion' => $cotizacion
