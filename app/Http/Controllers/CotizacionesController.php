@@ -757,4 +757,108 @@ class CotizacionesController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Actualizar una cotización
+     */
+    public function update(Request $request, $id)
+    {
+        try {
+            $cotizacion = Cotizacion::findOrFail($id);
+
+            $validator = Validator::make($request->all(), [
+                'cliente_nombre' => 'nullable|string|max:255',
+                'cliente_email' => 'nullable|email|max:255',
+                'telefono_contacto' => 'nullable|string|max:20',
+                'numero_documento' => 'nullable|string|max:20',
+                'direccion_envio' => 'nullable|string',
+                'forma_envio' => 'nullable|string|max:50',
+                'costo_envio' => 'nullable|numeric|min:0',
+                'metodo_pago_preferido' => 'nullable|string|max:50',
+                'observaciones' => 'nullable|string',
+                'descuento_total' => 'nullable|numeric|min:0',
+                'detalles' => 'nullable|array',
+                'detalles.*.producto_id' => 'required_with:detalles|exists:productos,id',
+                'detalles.*.cantidad' => 'required_with:detalles|numeric|min:1',
+                'detalles.*.precio_unitario' => 'required_with:detalles|numeric|min:0',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Datos de validación incorrectos',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            // Actualizar campos básicos
+            if ($request->has('cliente_nombre')) $cotizacion->cliente_nombre = $request->cliente_nombre;
+            if ($request->has('cliente_email')) $cotizacion->cliente_email = $request->cliente_email;
+            if ($request->has('telefono_contacto')) $cotizacion->telefono_contacto = $request->telefono_contacto;
+            if ($request->has('numero_documento')) $cotizacion->numero_documento = $request->numero_documento;
+            if ($request->has('direccion_envio')) $cotizacion->direccion_envio = $request->direccion_envio;
+            if ($request->has('forma_envio')) $cotizacion->forma_envio = $request->forma_envio;
+            if ($request->has('costo_envio')) $cotizacion->costo_envio = $request->costo_envio;
+            if ($request->has('metodo_pago_preferido')) $cotizacion->metodo_pago_preferido = $request->metodo_pago_preferido;
+            if ($request->has('observaciones')) $cotizacion->observaciones = $request->observaciones;
+
+            // Actualizar detalles si se proporcionan
+            if ($request->has('detalles')) {
+                $subtotal = 0;
+                
+                // Eliminar detalles anteriores
+                CotizacionDetalle::where('cotizacion_id', $cotizacion->id)->delete();
+
+                // Crear nuevos detalles
+                foreach ($request->detalles as $detalle) {
+                    $subtotalLinea = $detalle['cantidad'] * $detalle['precio_unitario'];
+                    $subtotal += $subtotalLinea;
+
+                    CotizacionDetalle::create([
+                        'cotizacion_id' => $cotizacion->id,
+                        'producto_id' => $detalle['producto_id'],
+                        'cantidad' => $detalle['cantidad'],
+                        'precio_unitario' => $detalle['precio_unitario'],
+                        'subtotal_linea' => $subtotalLinea,
+                    ]);
+                }
+
+                // Recalcular totales
+                $descuentoTotal = $request->descuento_total ?? $cotizacion->descuento_total;
+                $igv = $subtotal * 0.18;
+                $costoEnvio = $request->costo_envio ?? $cotizacion->costo_envio ?? 0;
+                $total = $subtotal + $igv + $costoEnvio - $descuentoTotal;
+
+                $cotizacion->subtotal = $subtotal;
+                $cotizacion->igv = $igv;
+                $cotizacion->descuento_total = $descuentoTotal;
+                $cotizacion->total = $total;
+            } elseif ($request->has('descuento_total')) {
+                // Solo actualizar descuento si no se actualizan detalles
+                $cotizacion->descuento_total = $request->descuento_total;
+                $cotizacion->total = $cotizacion->subtotal + $cotizacion->igv + ($cotizacion->costo_envio ?? 0) - $request->descuento_total;
+            }
+
+            $cotizacion->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cotización actualizada exitosamente',
+                'cotizacion' => $cotizacion->load(['detalles.producto', 'estadoCotizacion'])
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error actualizando cotización: ' . $e->getMessage());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar la cotización: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -91,6 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/estados/lista', [CotizacionesController::class, 'getEstados']);
         Route::get('/{id}', [CotizacionesController::class, 'show'])->middleware('permission:cotizaciones.show');
         Route::get('/{id}/tracking', [CotizacionesController::class, 'getTracking']);
+        Route::patch('/{id}', [CotizacionesController::class, 'update'])->middleware('permission:cotizaciones.edit');
         Route::delete('/{id}', [CotizacionesController::class, 'destroy']);
 
         // ✅ ELIMINADAS las rutas duplicadas que ya están en el grupo de clientes (líneas 78, 81)
