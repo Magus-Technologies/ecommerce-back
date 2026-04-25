@@ -42,8 +42,14 @@ try {
 
         $codigo = strtoupper(substr($nombre, 0, 20));
         
-        $stmt = $pdo->prepare("INSERT INTO cajas (nombre, codigo, tienda_id, activo, created_at, updated_at) VALUES (?, ?, 1, 1, NOW(), NOW())");
-        $stmt->execute([$nombre, $codigo]);
+        // Obtener una tienda válida
+        $stmt = $pdo->prepare("SELECT id FROM tiendas LIMIT 1");
+        $stmt->execute();
+        $tienda = $stmt->fetch(PDO::FETCH_ASSOC);
+        $tienda_id = $tienda ? $tienda['id'] : null;
+        
+        $stmt = $pdo->prepare("INSERT INTO cajas (nombre, codigo, tienda_id, activo, created_at, updated_at) VALUES (?, ?, ?, 1, NOW(), NOW())");
+        $stmt->execute([$nombre, $codigo, $tienda_id]);
         
         $caja_id = $pdo->lastInsertId();
 
