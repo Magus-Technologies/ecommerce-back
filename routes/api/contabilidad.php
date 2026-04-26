@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('contabilidad')->group(function () {
     Route::get('/cajas', [CajasController::class, 'index']);
     Route::get('/cajas/movimientos-activos', [CajasController::class, 'movimientosActivos']);
+    Route::get('/cajas/historial', [CajasController::class, 'historial']);
     Route::get('/cajas/{id}/reporte', [CajasController::class, 'reporte']);
     Route::post('/cajas', [CajasController::class, 'store']);
     Route::post('/cajas/aperturar', [CajasController::class, 'aperturar']);

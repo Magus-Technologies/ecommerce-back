@@ -15,8 +15,8 @@ class CajasController extends Controller
     // Listar cajas
     public function index()
     {
-        $cajas = Caja::with(['tienda', 'movimientoActual'])->get();
-        return response()->json($cajas);
+        $cajas = Caja::with(['movimientoActual'])->get();
+        return response()->json(['data' => $cajas]);
     }
 
     // Crear caja
@@ -60,7 +60,7 @@ class CajasController extends Controller
 
         $movimiento = CajaMovimiento::create([
             'caja_id' => $request->caja_id,
-            'user_id' => auth()->id(),
+            'user_id' => auth()->id() ?? $request->user_id ?? 1,
             'tipo' => 'APERTURA',
             'fecha' => now()->toDateString(),
             'hora' => now()->toTimeString(),
@@ -152,13 +152,31 @@ class CajasController extends Controller
         ]);
     }
 
+    // Historial de todos los movimientos
+    public function historial(Request $request)
+    {
+        $movimientos = CajaMovimiento::with(['caja', 'user'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->through(function ($m) {
+                $m->fecha_apertura = $m->fecha . ' ' . $m->hora;
+                return $m;
+            });
+
+        return response()->json($movimientos);
+    }
+
     // Obtener movimientos activos
     public function movimientosActivos()
     {
         $movimientos = CajaMovimiento::with(['caja', 'user'])
             ->where('estado', 'ABIERTA')
-            ->get();
+            ->get()
+            ->map(function ($m) {
+                $m->fecha_apertura = $m->fecha . ' ' . $m->hora;
+                return $m;
+            });
 
-        return response()->json($movimientos);
+        return response()->json(['data' => $movimientos]);
     }
 }
