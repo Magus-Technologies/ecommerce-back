@@ -234,9 +234,7 @@ class VentasController extends Controller
 
         // Si hay efectivo, validar caja abierta
         if ($tieneEfectivo) {
-            $cajaAbierta = \App\Models\CajaMovimiento::where('estado', 'ABIERTA')
-                ->where('user_id', \Illuminate\Support\Facades\Auth::id() ?? 1)
-                ->exists();
+            $cajaAbierta = \App\Models\CajaMovimiento::where('estado', 'ABIERTA')->exists();
 
             if (! $cajaAbierta) {
                 return response()->json([
@@ -2318,9 +2316,7 @@ class VentasController extends Controller
 
         // Si hay efectivo, validar caja abierta
         if ($tieneEfectivo) {
-            $cajaAbierta = \App\Models\CajaMovimiento::where('estado', 'ABIERTA')
-                ->where('user_id', \Illuminate\Support\Facades\Auth::id() ?? 1)
-                ->exists();
+            $cajaAbierta = \App\Models\CajaMovimiento::where('estado', 'ABIERTA')->exists();
 
             if (! $cajaAbierta) {
                 return response()->json([

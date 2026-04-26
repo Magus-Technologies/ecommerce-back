@@ -159,7 +159,7 @@ class CajasController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->through(function ($m) {
-                $m->fecha_apertura = $m->fecha . ' ' . $m->hora;
+                $m->fecha_apertura = \Carbon\Carbon::parse($m->fecha)->toDateString() . ' ' . $m->hora;
                 return $m;
             });
 
@@ -173,7 +173,7 @@ class CajasController extends Controller
             ->where('estado', 'ABIERTA')
             ->get()
             ->map(function ($m) {
-                $m->fecha_apertura = $m->fecha . ' ' . $m->hora;
+                $m->fecha_apertura = \Carbon\Carbon::parse($m->fecha)->toDateString() . ' ' . $m->hora;
                 return $m;
             });
 
