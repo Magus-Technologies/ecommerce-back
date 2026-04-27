@@ -275,10 +275,24 @@ class NotasService
         $company = $this->greenterService->getCompany();
         $note->setCompany($company);
 
-        // Cliente
+        // Cliente - Detectar tipo de documento si es inválido o falta
+        $tipoDoc = $notaCredito->cliente->tipo_documento;
+        $numDoc = $notaCredito->cliente->numero_documento;
+
+        if (empty($tipoDoc) || $tipoDoc === '-') {
+            $longitud = strlen(trim($numDoc));
+            if ($longitud === 8) {
+                $tipoDoc = '1'; // DNI
+            } elseif ($longitud === 11) {
+                $tipoDoc = '6'; // RUC
+            } else {
+                $tipoDoc = '0'; // Otro
+            }
+        }
+
         $client = new Client;
-        $client->setTipoDoc($notaCredito->cliente->tipo_documento)
-            ->setNumDoc($notaCredito->cliente->numero_documento)
+        $client->setTipoDoc($tipoDoc)
+            ->setNumDoc($numDoc)
             ->setRznSocial($notaCredito->cliente->razon_social);
 
         if ($notaCredito->cliente->direccion) {

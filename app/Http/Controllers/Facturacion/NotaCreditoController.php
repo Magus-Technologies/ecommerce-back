@@ -197,8 +197,16 @@ class NotaCreditoController extends Controller
                 $cantidad = $item['cantidad'];
                 $descuento = $item['descuento'] ?? 0;
 
-                $subtotalItem = ($precioUnitario * $cantidad) - $descuento;
-                $igvItem = $item['tipo_afectacion_igv'] === '10' ? $subtotalItem * 0.18 : 0;
+                // Cálculo asumiendo que el precio ya incluye IGV (típico en ventas retail/boletas)
+                $totalItem = ($precioUnitario * $cantidad) - $descuento;
+                
+                if ($item['tipo_afectacion_igv'] === '10') {
+                    $subtotalItem = $totalItem / 1.18;
+                    $igvItem = $totalItem - $subtotalItem;
+                } else {
+                    $subtotalItem = $totalItem;
+                    $igvItem = 0;
+                }
 
                 $subtotal += $subtotalItem;
                 $totalIgv += $igvItem;
