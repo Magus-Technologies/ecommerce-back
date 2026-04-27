@@ -97,7 +97,7 @@ class NotasService
                         
                         // Marcar venta como anulada
                         if ($notaCredito->venta) {
-                            $notaCredito->venta->update(['estado' => 'anulada']);
+                            $notaCredito->venta->update(['estado' => 'ANULADO']);
                         }
                         
                         Log::info('Venta y Comprobante marcados como ANULADOS por Nota de Crédito');
