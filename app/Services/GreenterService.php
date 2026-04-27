@@ -2014,7 +2014,7 @@ class GreenterService
 
         // 3. Verificar que el CDR tenga hash digest
         try {
-            $digestValue = $cdrResponse->getDigestValue();
+            $digestValue = method_exists($cdrResponse, 'getDigestValue') ? $cdrResponse->getDigestValue() : null;
             if (empty($digestValue)) {
                 Log::error('CDR sin hash digest', [
                     'comprobante_id' => $comprobante->id,
@@ -2088,7 +2088,7 @@ class GreenterService
                         'mensaje_sunat' => $cdrResponse->getDescription(),
                         'tiene_cdr' => true,
                         'fecha_respuesta_sunat' => now(),
-                        'codigo_hash' => $cdrResponse->getDigestValue() ?? $comprobante->codigo_hash,
+                        'codigo_hash' => (method_exists($cdrResponse, 'getDigestValue') ? $cdrResponse->getDigestValue() : null) ?? $comprobante->codigo_hash,
                     ]);
 
                     Log::info('Estado consultado: ACEPTADO', [
