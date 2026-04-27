@@ -795,7 +795,7 @@ class GreenterService
                 if (! $this->validarCdrReal($cdrResponse, $cdrZip, $comprobante)) {
                     // CDR inválido o inexistente
                     $comprobante->update([
-                        'estado' => 'PENDIENTE_VALIDACION',
+                        'estado' => 'ENVIADO',
                         'mensaje_sunat' => 'Enviado a SUNAT - Pendiente de validación CDR',
                         'xml_firmado' => $xml,
                         'tiene_xml' => true,
