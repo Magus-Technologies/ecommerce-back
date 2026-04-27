@@ -90,6 +90,19 @@ class NotasService
                         'numero' => $notaCredito->serie.'-'.$notaCredito->numero,
                     ]);
 
+                    // Si el motivo es anulación de la operación (01)
+                    if ($notaCredito->tipo_nota_credito === '01') {
+                        // Marcar comprobante de referencia como ANULADO
+                        $comprobanteRef->update(['estado' => 'ANULADO']);
+                        
+                        // Marcar venta como anulada
+                        if ($notaCredito->venta) {
+                            $notaCredito->venta->update(['estado' => 'anulada']);
+                        }
+                        
+                        Log::info('Venta y Comprobante marcados como ANULADOS por Nota de Crédito');
+                    }
+
                     return [
                         'success' => true,
                         'message' => 'Nota de crédito aceptada por SUNAT',
