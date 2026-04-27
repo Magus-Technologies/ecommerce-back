@@ -214,6 +214,15 @@ class NotaCreditoController extends Controller
 
             $total = $subtotal + $totalIgv;
 
+            // Asegurar que tenemos el venta_id (buscarlo si el comprobante no lo tiene vinculado directamente)
+            $ventaId = $comprobanteRef->venta_id;
+            if (!$ventaId) {
+                $venta = \App\Models\Venta::where('comprobante_id', $comprobanteRef->id)->first();
+                if ($venta) {
+                    $ventaId = $venta->id;
+                }
+            }
+
             // Crear nota de crédito
             $notaCredito = NotaCredito::create([
                 'serie' => $serie->serie,
@@ -221,7 +230,7 @@ class NotaCreditoController extends Controller
                 'serie_comprobante_ref' => $comprobanteRef->serie,
                 'numero_comprobante_ref' => $comprobanteRef->correlativo,
                 'tipo_comprobante_ref' => $comprobanteRef->tipo_comprobante,
-                'venta_id' => $comprobanteRef->venta_id,
+                'venta_id' => $ventaId,
                 'cliente_id' => $comprobanteRef->cliente_id,
                 'fecha_emision' => now()->format('Y-m-d'),
                 'tipo_nota_credito' => $request->motivo_nota ?? $request->motivo ?? '01', // Código SUNAT (01-10)
