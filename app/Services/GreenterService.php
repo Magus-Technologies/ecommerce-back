@@ -38,6 +38,9 @@ class GreenterService
         if ($this->see === null) {
             $this->see = new See;
             $this->configurarSee();
+        }
+
+        if ($this->company === null) {
             $this->configurarEmpresa();
         }
     }
@@ -1960,6 +1963,8 @@ class GreenterService
      */
     public function getCompany()
     {
+        $this->initializeSee();
+
         return $this->company;
     }
 

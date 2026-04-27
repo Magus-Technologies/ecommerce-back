@@ -59,6 +59,26 @@ class NotaCreditoController extends Controller
 
             $notas = $query->orderBy('created_at', 'desc')->paginate(20);
 
+            // Enriquecer respuesta con información del cliente (similar a VentasController)
+            $notas->getCollection()->transform(function ($nota) {
+                $notaArray = $nota->toArray();
+
+                $numeroDocumento = '00000000';
+                $nombreCompleto = 'CLIENTE GENERAL';
+
+                if ($nota->cliente) {
+                    $numeroDocumento = $nota->cliente->numero_documento ?? '00000000';
+                    $nombreCompleto = $nota->cliente->razon_social ?? $nota->cliente->nombre_comercial ?? 'CLIENTE GENERAL';
+                }
+
+                $notaArray['cliente_info'] = [
+                    'numero_documento' => $numeroDocumento,
+                    'nombre_completo' => $nombreCompleto,
+                ];
+
+                return $notaArray;
+            });
+
             return response()->json($notas);
 
         } catch (\Exception $e) {
@@ -78,9 +98,23 @@ class NotaCreditoController extends Controller
         try {
             $notaCredito = NotaCredito::with(['cliente', 'venta'])->findOrFail($id);
 
+            $notaArray = $notaCredito->toArray();
+            $numeroDocumento = '00000000';
+            $nombreCompleto = 'CLIENTE GENERAL';
+
+            if ($notaCredito->cliente) {
+                $numeroDocumento = $notaCredito->cliente->numero_documento ?? '00000000';
+                $nombreCompleto = $notaCredito->cliente->razon_social ?? $notaCredito->cliente->nombre_comercial ?? 'CLIENTE GENERAL';
+            }
+
+            $notaArray['cliente_info'] = [
+                'numero_documento' => $numeroDocumento,
+                'nombre_completo' => $nombreCompleto,
+            ];
+
             return response()->json([
                 'success' => true,
-                'data' => $notaCredito,
+                'data' => $notaArray,
             ]);
 
         } catch (\Exception $e) {
