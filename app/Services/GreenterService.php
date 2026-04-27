@@ -2012,22 +2012,19 @@ class GreenterService
             return false;
         }
 
-        // 3. Verificar que el CDR tenga hash digest
-        try {
-            $digestValue = method_exists($cdrResponse, 'getDigestValue') ? $cdrResponse->getDigestValue() : null;
-            if (empty($digestValue)) {
-                Log::error('CDR sin hash digest', [
+        // 3. Digest value opcional — getDigestValue() no existe en esta versión de Greenter
+        if (method_exists($cdrResponse, 'getDigestValue')) {
+            try {
+                $digestValue = $cdrResponse->getDigestValue();
+                if (empty($digestValue)) {
+                    Log::warning('CDR sin hash digest', ['comprobante_id' => $comprobante->id]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('No se pudo obtener digest value del CDR', [
                     'comprobante_id' => $comprobante->id,
+                    'error' => $e->getMessage(),
                 ]);
-
-                return false;
             }
-        } catch (\Exception $e) {
-            Log::warning('No se pudo obtener digest value del CDR', [
-                'comprobante_id' => $comprobante->id,
-                'error' => $e->getMessage(),
-            ]);
-            // No es crítico si no tiene digest, algunos CDR antiguos no lo incluyen
         }
 
         // 4. Verificar que el CDR ZIP tenga contenido válido
