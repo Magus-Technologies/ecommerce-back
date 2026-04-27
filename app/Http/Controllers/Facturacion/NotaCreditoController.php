@@ -175,13 +175,17 @@ class NotaCreditoController extends Controller
                 ], 400);
             }
 
-            // Obtener serie para nota de crédito
+            // Obtener serie para nota de crédito que coincida con el tipo de comprobante (F para Factura, B para Boleta)
+            $prefijo = $comprobanteRef->tipo_comprobante === '01' ? 'F' : 'B';
+
             $serie = SerieComprobante::where('tipo_comprobante', '07')
+                ->where('serie', 'LIKE', $prefijo.'%')
                 ->where('activo', true)
                 ->first();
 
-            if (!$serie) {
-                throw new \Exception('No hay serie disponible para notas de crédito');
+            if (! $serie) {
+                $tipoDoc = $comprobanteRef->tipo_comprobante === '01' ? 'Facturas' : 'Boletas';
+                throw new \Exception("No hay una serie activa configurada para Notas de Crédito de {$tipoDoc} (debe empezar con '{$prefijo}')");
             }
 
             // Calcular totales
